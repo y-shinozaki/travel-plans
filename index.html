@@ -29,6 +29,10 @@
         --text: #000000;
         --text-soft: #333333;
         --text-dim: #93928b;
+        --move-bg: #f7f7f7;
+        --move-bg-hover: #f0f0ed;
+        --move-border: #dadada;
+        --move-text: #93928b;
         --border: #dadada;
         --border-med: #c0c0c0;
         --sh-sm: none;
@@ -40,6 +44,15 @@
         --r-pill: 0px;
         --font-d: "Noto Sans JP", sans-serif;
         --font-b: "Noto Sans JP", sans-serif;
+        --overlay-bg: rgba(20, 16, 9, 0.5);
+        --white-90: rgba(255, 255, 255, 0.9);
+        --white-68: rgba(255, 255, 255, 0.68);
+        --white-40: rgba(255, 255, 255, 0.4);
+        --white-38: rgba(255, 255, 255, 0.38);
+        --white-35: rgba(255, 255, 255, 0.35);
+        --white-30: rgba(255, 255, 255, 0.3);
+        --white-07: rgba(255, 255, 255, 0.07);
+        --shadow-text: 0 1px 4px rgba(0, 0, 0, 0.5);
       }
 
       html {
@@ -185,8 +198,8 @@
         font-weight: 500;
         letter-spacing: 0.22em;
         text-transform: uppercase;
-        color: rgba(255, 255, 255, 0.9);
-        text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+        color: var(--white-90);
+        text-shadow: var(--shadow-text);
         animation: fadeUp 0.8s ease 0.1s backwards;
       }
 
@@ -203,7 +216,7 @@
         font-family: "Dancing Script", cursive;
         font-size: clamp(5.6rem, 10vw, 12rem);
         font-weight: 700;
-        color: #fff;
+        color: var(--white);
         line-height: 0.95;
         letter-spacing: 0.01em;
       }
@@ -211,7 +224,7 @@
       .hero-title-ja {
         font-size: clamp(1.8rem, 3vw, 3.2rem);
         font-weight: 300;
-        color: rgba(255, 255, 255, 0.68);
+        color: var(--white-68);
         letter-spacing: 0.32em;
         padding-left: 0.06em;
         margin-top: 0.8rem;
@@ -233,18 +246,14 @@
         font-weight: 700;
         letter-spacing: 0.2em;
         text-transform: uppercase;
-        color: rgba(255, 255, 255, 0.35);
+        color: var(--white-35);
         writing-mode: vertical-rl;
       }
 
       .hero-scroll-line {
         width: 1px;
         height: 48px;
-        background: linear-gradient(
-          to bottom,
-          rgba(255, 255, 255, 0.4),
-          transparent
-        );
+        background: linear-gradient(to bottom, var(--white-40), transparent);
         animation: scrollLine 2s ease-in-out 1.5s infinite;
       }
 
@@ -296,7 +305,7 @@
         font-weight: 700;
         letter-spacing: 0.2em;
         text-transform: uppercase;
-        color: #93928b;
+        color: var(--text-dim);
         margin-bottom: 0.8rem;
       }
 
@@ -394,9 +403,9 @@
       }
 
       .tc-toggle.active {
-        background: #000000;
-        border-color: #000000;
-        color: #fff;
+        background: var(--dark);
+        border-color: var(--dark);
+        color: var(--white);
         box-shadow: none;
       }
 
@@ -404,7 +413,7 @@
         font-size: 1.4rem;
       }
 
-      /* Calendar */
+      /* ─── Calendar ──────────────────────────────────── */
       .cal-outer {
         overflow-x: auto;
         border-radius: 0px;
@@ -441,13 +450,13 @@
         flex: 1;
         padding: 1.8rem 0.8rem 1.4rem;
         text-align: center;
-        border-left: 1px solid rgba(255, 255, 255, 0.07);
+        border-left: 1px solid var(--white-07);
       }
 
       .day-hdr .dow {
         font-size: 0.95rem;
         font-weight: 600;
-        color: rgba(255, 255, 255, 0.38);
+        color: var(--white-38);
         letter-spacing: 0.12em;
         text-transform: uppercase;
       }
@@ -456,7 +465,7 @@
         font-family: var(--font-d);
         font-size: 2.8rem;
         font-weight: 700;
-        color: #fff;
+        color: var(--white);
         line-height: 1.05;
         margin-top: 0.3rem;
         letter-spacing: 0.05em;
@@ -519,7 +528,7 @@
       }
 
       .allday-event:hover {
-        background: #333333;
+        background: var(--green-mid);
         transform: none;
       }
 
@@ -578,9 +587,9 @@
         padding: 2px 7px;
         font-size: 1rem;
         overflow: hidden;
-        background: #f7f7f7;
-        border-left: 3px solid #000000;
-        color: #000000;
+        background: var(--ceramic);
+        border-left: 3px solid var(--dark);
+        color: var(--text);
         z-index: 2;
         cursor: pointer;
         display: flex;
@@ -592,17 +601,17 @@
       }
 
       .event[data-cat="cat-move"] {
-        background: #f7f7f7;
-        border-left-color: #93928b;
-        color: #333333;
+        background: var(--move-bg);
+        border-left-color: var(--move-border);
+        color: var(--move-text);
       }
 
       .event[data-cat="cat-move"]:hover {
-        background: #e5e5e1;
+        background: var(--move-bg-hover);
       }
 
       .event:hover {
-        background: #e5e5e1;
+        background: var(--border);
         box-shadow: none;
         transform: none;
       }
@@ -642,7 +651,7 @@
       .overlay {
         position: fixed;
         inset: 0;
-        background: rgba(20, 16, 9, 0.5);
+        background: var(--overlay-bg);
         backdrop-filter: blur(6px);
         -webkit-backdrop-filter: blur(6px);
         z-index: 300;
@@ -663,7 +672,7 @@
         bottom: 0;
         width: 400px;
         max-width: 100vw;
-        background: #ffffff;
+        background: var(--white);
         z-index: 400;
         backdrop-filter: none;
         -webkit-backdrop-filter: none;
@@ -709,8 +718,8 @@
         font-weight: 700;
         padding: 0.5rem 1.4rem;
         border-radius: 0px;
-        background: #93928b;
-        color: #ffffff;
+        background: var(--text-dim);
+        color: var(--white);
         letter-spacing: 0.1em;
         text-transform: uppercase;
       }
@@ -859,7 +868,7 @@
       .panel-map-hint {
         font-size: 1rem;
         font-weight: 600;
-        color: #333333;
+        color: var(--text-soft);
         letter-spacing: 0;
         text-transform: none;
         margin-left: 0.4rem;
@@ -949,14 +958,14 @@
       }
 
       .loc-filter-btn:hover {
-        border-color: #000000;
+        border-color: var(--dark);
         color: var(--text);
       }
 
       .loc-filter-btn.active {
-        background: #000000;
-        border-color: #000000;
-        color: #fff;
+        background: var(--dark);
+        border-color: var(--dark);
+        color: var(--white);
         box-shadow: none;
       }
 
@@ -981,12 +990,12 @@
       }
 
       .location-card:hover {
-        border-color: #000000;
+        border-color: var(--dark);
         background: var(--ceramic);
       }
 
       .location-card.active {
-        border-color: #000000;
+        border-color: var(--dark);
         background: var(--ceramic);
       }
 
@@ -1026,7 +1035,7 @@
 
       /* ─── Footer ────────────────────────────────────── */
       .site-footer {
-        background: #000000;
+        background: var(--dark);
         padding: 1.6rem 4rem;
         text-align: center;
       }
@@ -1037,7 +1046,7 @@
         justify-content: center;
         gap: 1.6rem;
         font-size: 1.2rem;
-        color: rgba(255, 255, 255, 0.3);
+        color: var(--white-30);
         letter-spacing: 0.14em;
         text-transform: uppercase;
       }
@@ -1180,7 +1189,12 @@
           <span class="tc-sep">〜</span>
           <select id="view-end"></select>
           <span class="tc-divider"></span>
-          <button class="tc-toggle" id="toggle-hotel" onclick="toggleHotels()">
+          <button
+            class="tc-toggle"
+            id="toggle-hotel"
+            onclick="toggleHotels()"
+            aria-pressed="false"
+          >
             <span class="material-symbols-outlined">hotel</span>ホテル
           </button>
         </div>
@@ -1208,6 +1222,7 @@
               class="map-fit-btn"
               onclick="fitMapToMarkers()"
               title="全体表示"
+              aria-label="全体表示"
             >
               <span class="material-symbols-outlined">fit_screen</span>
             </button>
@@ -1231,7 +1246,7 @@
     <div class="detail-panel" id="detail-panel">
       <div class="panel-header">
         <span class="panel-cat-badge" id="panel-cat-badge"></span>
-        <button class="panel-close" onclick="closePanel()">
+        <button class="panel-close" onclick="closePanel()" aria-label="閉じる">
           <span class="material-symbols-outlined">close</span>
         </button>
       </div>
@@ -1274,6 +1289,7 @@
         // ─ 終日（宿泊）
         {
           d: 0,
+          cat: "cat-hotel",
           icon: "hotel",
           title: "バンコク1泊目",
           allDay: true,
@@ -1285,6 +1301,7 @@
         },
         {
           d: 1,
+          cat: "cat-hotel",
           icon: "hotel",
           title: "バンコク2泊目",
           allDay: true,
@@ -1296,6 +1313,7 @@
         },
         {
           d: 2,
+          cat: "cat-hotel",
           icon: "hotel",
           title: "パタヤ1泊目",
           allDay: true,
@@ -1307,6 +1325,7 @@
         },
         {
           d: 3,
+          cat: "cat-hotel",
           icon: "hotel",
           title: "パタヤ2泊目",
           allDay: true,
@@ -1318,6 +1337,7 @@
         },
         {
           d: 4,
+          cat: "cat-move",
           icon: "flight",
           title: "機内泊",
           allDay: true,
@@ -1919,10 +1939,7 @@
 
       function renderCalendar() {
         const cal = document.getElementById("cal");
-        if (!cal) {
-          console.error("[renderCalendar] Element #cal not found");
-          return;
-        }
+        if (!cal) return;
         cal.innerHTML = "";
 
         // ─ ヘッダー行
@@ -2065,10 +2082,7 @@
       // 表示時間セレクターの初期化
       function buildOptions(elId, min, max, selected) {
         const sel = document.getElementById(elId);
-        if (!sel) {
-          console.error(`[buildOptions] Element #${elId} not found`);
-          return;
-        }
+        if (!sel) return;
         for (let h = min; h <= max; h++) {
           const opt = document.createElement("option");
           opt.value = h;
@@ -2084,46 +2098,41 @@
       const viewStartEl = document.getElementById("view-start");
       if (viewStartEl) {
         viewStartEl.addEventListener("change", (e) => {
-          try {
-            viewStart = parseInt(e.target.value);
-            if (viewStart >= viewEnd) {
-              viewEnd = viewStart + 1;
-              const viewEndEl = document.getElementById("view-end");
-              if (viewEndEl) viewEndEl.value = viewEnd;
-            }
-            renderCalendar();
-          } catch (err) {
-            console.error("[view-start change] Error:", err);
+          const val = parseInt(e.target.value, 10);
+          if (isNaN(val)) return;
+          viewStart = val;
+          if (viewStart >= viewEnd) {
+            viewEnd = viewStart + 1;
+            const viewEndEl = document.getElementById("view-end");
+            if (viewEndEl) viewEndEl.value = viewEnd;
           }
+          renderCalendar();
         });
       }
 
       const viewEndEl = document.getElementById("view-end");
       if (viewEndEl) {
         viewEndEl.addEventListener("change", (e) => {
-          try {
-            viewEnd = parseInt(e.target.value);
-            if (viewEnd <= viewStart) {
-              viewStart = viewEnd - 1;
-              const viewStartEl = document.getElementById("view-start");
-              if (viewStartEl) viewStartEl.value = viewStart;
-            }
-            renderCalendar();
-          } catch (err) {
-            console.error("[view-end change] Error:", err);
+          const val = parseInt(e.target.value, 10);
+          if (isNaN(val)) return;
+          viewEnd = val;
+          if (viewEnd <= viewStart) {
+            viewStart = viewEnd - 1;
+            const viewStartEl = document.getElementById("view-start");
+            if (viewStartEl) viewStartEl.value = viewStart;
           }
+          renderCalendar();
         });
       }
 
       function toggleHotels() {
-        try {
-          showHotels = !showHotels;
-          const toggleBtn = document.getElementById("toggle-hotel");
-          if (toggleBtn) toggleBtn.classList.toggle("active", showHotels);
-          renderCalendar();
-        } catch (err) {
-          console.error("[toggleHotels] Error:", err);
+        showHotels = !showHotels;
+        const toggleBtn = document.getElementById("toggle-hotel");
+        if (toggleBtn) {
+          toggleBtn.classList.toggle("active", showHotels);
+          toggleBtn.setAttribute("aria-pressed", String(showHotels));
         }
+        renderCalendar();
       }
 
       renderCalendar();
@@ -2131,136 +2140,108 @@
       // ─── Panel ─────────────────────────────────────────
 
       function openPanel(ev) {
-        try {
-          const meta = catMeta[ev.cat] || { icon: "location_on", label: "" };
-          const badge = document.getElementById("panel-cat-badge");
-          const title = document.getElementById("panel-title");
-          const notes = document.getElementById("panel-notes");
+        const meta = catMeta[ev.cat] || { icon: "location_on", label: "" };
+        const badge = document.getElementById("panel-cat-badge");
+        const title = document.getElementById("panel-title");
+        const notes = document.getElementById("panel-notes");
 
-          if (!badge || !title || !notes) {
-            console.error("[openPanel] Required panel elements not found");
-            return;
+        if (!badge || !title || !notes) return;
+
+        const panelImage = document.getElementById("panel-image");
+        if (panelImage) {
+          if (ev.image) {
+            const pos = ev.imagePos || "center";
+            panelImage.innerHTML = `<img src="${ev.image}" alt="${ev.title}" style="object-position:${pos}" onerror="this.parentElement.classList.remove('visible');this.remove();">`;
+            panelImage.classList.add("visible");
+          } else {
+            panelImage.innerHTML = "";
+            panelImage.classList.remove("visible");
           }
+        }
 
-          const panelImage = document.getElementById("panel-image");
-          if (panelImage) {
-            if (ev.image) {
-              const pos = ev.imagePos || "center";
-              panelImage.innerHTML = `<img src="${ev.image}" alt="${ev.title}" style="object-position:${pos}">`;
-              panelImage.classList.add("visible");
-            } else {
-              panelImage.innerHTML = "";
-              panelImage.classList.remove("visible");
-            }
-          }
+        badge.innerHTML = `<span class="material-symbols-outlined">${ev.icon || meta.icon}</span>${meta.label}`;
+        title.textContent = ev.title;
+        notes.textContent = ev.notes || "—";
 
-          badge.innerHTML = `<span class="material-symbols-outlined">${ev.icon || meta.icon}</span>${meta.label}`;
-          title.textContent = ev.title;
-          notes.textContent = (ev.notes || "—").replace(/\\n/g, "\n");
-
-          const hasCoords = ev.lat != null && ev.lng != null;
-          const locRow = hasCoords
-            ? `<div class="panel-meta-row panel-meta-row--map" onclick="flyToLocation(${ev.lat},${ev.lng})">
+        const hasCoords = ev.lat != null && ev.lng != null;
+        const locRow = hasCoords
+          ? `<div class="panel-meta-row panel-meta-row--map" onclick="flyToLocation(${ev.lat},${ev.lng})">
          <div class="panel-meta-icon"><span class="material-symbols-outlined">location_on</span></div>
          <div>
            <div class="panel-meta-label">場所 <span class="panel-map-hint">マップで見る</span></div>
            <div class="panel-meta-value">${ev.location}</div>
          </div>
        </div>`
-            : `<div class="panel-meta-row">
+          : `<div class="panel-meta-row">
          <div class="panel-meta-icon"><span class="material-symbols-outlined">location_on</span></div>
          <div><div class="panel-meta-label">場所</div><div class="panel-meta-value">${ev.location}</div></div>
        </div>`;
 
-          const urlRow = ev.url
-            ? `<div class="panel-meta-row">
+        const urlRow = ev.url
+          ? `<div class="panel-meta-row">
          <div class="panel-meta-icon"><span class="material-symbols-outlined">open_in_new</span></div>
          <div><div class="panel-meta-label">リンク</div>
            <div class="panel-meta-value"><a href="${ev.url}" target="_blank" rel="noopener" style="color:var(--green);text-decoration:none;border-bottom:1px solid var(--green-pale)">${ev.url.replace(/^https?:\/\//, "").split("/")[0]}</a></div>
          </div>
        </div>`
-            : "";
-          const panelMeta = document.getElementById("panel-meta");
-          if (panelMeta) {
-            panelMeta.innerHTML = `
+          : "";
+        const panelMeta = document.getElementById("panel-meta");
+        if (panelMeta) {
+          panelMeta.innerHTML = `
       <div class="panel-meta-row">
         <div class="panel-meta-icon"><span class="material-symbols-outlined">schedule</span></div>
         <div><div class="panel-meta-label">時間</div><div class="panel-meta-value">${ev.time}</div></div>
       </div>
       ${locRow}
       ${urlRow}`;
-          }
+        }
 
-          const detailPanel = document.getElementById("detail-panel");
-          const overlay = document.getElementById("overlay");
-          if (detailPanel && overlay) {
-            detailPanel.classList.add("open");
-            overlay.classList.add("open");
-          }
-        } catch (err) {
-          console.error("[openPanel] Error:", err);
+        const detailPanel = document.getElementById("detail-panel");
+        const overlay = document.getElementById("overlay");
+        if (detailPanel && overlay) {
+          detailPanel.classList.add("open");
+          overlay.classList.add("open");
         }
       }
 
       function flyToLocation(lat, lng, animate = true) {
-        try {
-          if (!map) {
-            console.warn("[flyToLocation] Map not initialized yet");
-            return;
-          }
-          const key = `${lat},${lng}`;
-          document.querySelectorAll(".location-card").forEach((c) => {
-            c.classList.toggle("active", c.dataset.locKey === key);
-          });
-          if (animate) {
-            map.flyTo([lat, lng], 15, { duration: 0.8 });
-            window.markerMap?.get(key)?.openPopup();
-          } else {
-            map.setView([lat, lng], 14, { animate: false });
-          }
-        } catch (err) {
-          console.error("[flyToLocation] Error:", err);
+        if (!map) return;
+        const key = `${lat},${lng}`;
+        document.querySelectorAll(".location-card").forEach((c) => {
+          c.classList.toggle("active", c.dataset.locKey === key);
+        });
+        if (animate) {
+          map.flyTo([lat, lng], 15, { duration: 0.8 });
+          window.markerMap?.get(key)?.openPopup();
+        } else {
+          map.setView([lat, lng], 14, { animate: false });
         }
       }
 
       function fitMapToMarkers() {
-        try {
-          if (!map || !window.markerMap || window.markerMap.size === 0) return;
-          const visibleMarkers = [];
-          window.markerMap.forEach((marker) => {
-            if (map.hasLayer(marker)) {
-              visibleMarkers.push(marker.getLatLng());
-            }
-          });
-          if (visibleMarkers.length === 0) return;
-          const bounds = L.latLngBounds(visibleMarkers);
-          map.flyToBounds(bounds, { padding: [40, 40], duration: 0.6 });
-        } catch (err) {
-          console.error("[fitMapToMarkers] Error:", err);
-        }
+        if (!map || !window.markerMap || window.markerMap.size === 0) return;
+        const visibleMarkers = [];
+        window.markerMap.forEach((marker) => {
+          if (map.hasLayer(marker)) {
+            visibleMarkers.push(marker.getLatLng());
+          }
+        });
+        if (visibleMarkers.length === 0) return;
+        const bounds = L.latLngBounds(visibleMarkers);
+        map.flyToBounds(bounds, { padding: [40, 40], duration: 0.6 });
       }
 
       function closePanel() {
-        try {
-          const detailPanel = document.getElementById("detail-panel");
-          const overlay = document.getElementById("overlay");
-          if (detailPanel && overlay) {
-            detailPanel.classList.remove("open");
-            overlay.classList.remove("open");
-          }
-        } catch (err) {
-          console.error("[closePanel] Error:", err);
+        const detailPanel = document.getElementById("detail-panel");
+        const overlay = document.getElementById("overlay");
+        if (detailPanel && overlay) {
+          detailPanel.classList.remove("open");
+          overlay.classList.remove("open");
         }
       }
 
       document.addEventListener("keydown", (e) => {
-        if (e.key === "Escape") {
-          try {
-            closePanel();
-          } catch (err) {
-            console.error("[keydown] Error closing panel:", err);
-          }
-        }
+        if (e.key === "Escape") closePanel();
       });
 
       // ─── Map ───────────────────────────────────────────
@@ -2268,9 +2249,7 @@
       let map;
 
       function initMap() {
-        // Leaflet ライブラリ読み込み検証
         if (!window.L) {
-          console.error("Leaflet library failed to load from CDN.");
           const mapEl = document.getElementById("leaflet-map");
           if (mapEl) {
             mapEl.innerHTML =
@@ -2282,8 +2261,7 @@
         try {
           map = L.map("leaflet-map", { zoomControl: false });
           L.control.zoom({ position: "bottomright" }).addTo(map);
-        } catch (err) {
-          console.error("[initMap] Map initialization failed:", err);
+        } catch {
           const mapEl = document.getElementById("leaflet-map");
           if (mapEl) {
             mapEl.innerHTML =
@@ -2369,52 +2347,34 @@
       }
 
       function buildLocationList() {
-        try {
-          const locs = buildFilteredLocations();
-          const listEl = document.getElementById("location-list");
-          if (!listEl) {
-            console.error(
-              "[buildLocationList] Element #location-list not found",
-            );
-            return;
-          }
-          listEl.innerHTML = "";
-          locs.forEach((loc, i) => {
-            const key = `${loc.lat},${loc.lng}`;
-            const card = document.createElement("div");
-            card.className = "location-card";
-            card.dataset.locKey = key;
-            card.style.animationDelay = `${i * 0.07}s`;
-            card.innerHTML = `
+        const locs = buildFilteredLocations();
+        const listEl = document.getElementById("location-list");
+        if (!listEl) return;
+        listEl.innerHTML = "";
+        locs.forEach((loc, i) => {
+          const key = `${loc.lat},${loc.lng}`;
+          const card = document.createElement("div");
+          card.className = "location-card";
+          card.dataset.locKey = key;
+          card.style.animationDelay = `${i * 0.07}s`;
+          card.innerHTML = `
         <div class="loc-icon"><span class="material-symbols-outlined">${loc.icon}</span></div>
         <div class="loc-name">${loc.name}</div>`;
-            card.addEventListener("click", () => {
-              try {
-                document
-                  .querySelectorAll(".location-card")
-                  .forEach((c) => c.classList.remove("active"));
-                card.classList.add("active");
-                flyToLocation(loc.lat, loc.lng, true);
-              } catch (err) {
-                console.error("[location-card click] Error:", err);
-              }
-            });
-            listEl.appendChild(card);
+          card.addEventListener("click", () => {
+            document
+              .querySelectorAll(".location-card")
+              .forEach((c) => c.classList.remove("active"));
+            card.classList.add("active");
+            flyToLocation(loc.lat, loc.lng, true);
           });
-          // マーカーの表示・非表示
-          if (map && window.markerMap) {
-            const visibleKeys = new Set(locs.map((l) => `${l.lat},${l.lng}`));
-            window.markerMap.forEach((marker, key) => {
-              try {
-                if (visibleKeys.has(key)) map.addLayer(marker);
-                else map.removeLayer(marker);
-              } catch (err) {
-                console.error("[marker visibility] Error:", err);
-              }
-            });
-          }
-        } catch (err) {
-          console.error("[buildLocationList] Error:", err);
+          listEl.appendChild(card);
+        });
+        if (map && window.markerMap) {
+          const visibleKeys = new Set(locs.map((l) => `${l.lat},${l.lng}`));
+          window.markerMap.forEach((marker, key) => {
+            if (visibleKeys.has(key)) map.addLayer(marker);
+            else map.removeLayer(marker);
+          });
         }
       }
 
@@ -2430,111 +2390,75 @@
       }
 
       function buildLocFilterUI() {
-        try {
-          // カテゴリフィルター
-          const catEl = document.getElementById("loc-cat-filters");
-          if (!catEl) {
-            console.error(
-              "[buildLocFilterUI] Element #loc-cat-filters not found",
-            );
-            return;
-          }
-          const availCats = [
-            ...new Set(
-              events.filter((e) => e.lat && e.lng && e.cat).map((e) => e.cat),
-            ),
-          ];
-          [
-            { val: "", label: "全て" },
-            ...availCats.map((c) => ({
-              val: c,
-              label: catMeta[c]?.label || c,
-            })),
-          ].forEach(({ val, label }) => {
-            const btn = document.createElement("button");
-            btn.className = "loc-filter-btn" + (val === "" ? " active" : "");
-            btn.textContent = label;
-            btn.dataset.val = val;
-            btn.addEventListener("click", () => {
-              try {
-                locFilter.cat = val || null;
-                setLocFilterBtn("loc-cat-filters", locFilter.cat);
-                buildLocationList();
-              } catch (err) {
-                console.error("[cat-filter click] Error:", err);
-              }
-            });
-            catEl.appendChild(btn);
+        const catEl = document.getElementById("loc-cat-filters");
+        if (!catEl) return;
+        const availCats = [
+          ...new Set(
+            events.filter((e) => e.lat && e.lng && e.cat).map((e) => e.cat),
+          ),
+        ];
+        [
+          { val: "", label: "全て" },
+          ...availCats.map((c) => ({
+            val: c,
+            label: catMeta[c]?.label || c,
+          })),
+        ].forEach(({ val, label }) => {
+          const btn = document.createElement("button");
+          btn.className = "loc-filter-btn" + (val === "" ? " active" : "");
+          btn.textContent = label;
+          btn.dataset.val = val;
+          btn.addEventListener("click", () => {
+            locFilter.cat = val || null;
+            setLocFilterBtn("loc-cat-filters", locFilter.cat);
+            buildLocationList();
           });
+          catEl.appendChild(btn);
+        });
 
-          // 日付フィルター
-          const dayEl = document.getElementById("loc-day-filters");
-          if (!dayEl) {
-            console.error(
-              "[buildLocFilterUI] Element #loc-day-filters not found",
-            );
-            return;
-          }
+        const dayEl = document.getElementById("loc-day-filters");
+        if (!dayEl) return;
 
-          const allDayBtn = document.createElement("button");
-          allDayBtn.className = "loc-filter-btn active";
-          allDayBtn.textContent = "全日程";
-          allDayBtn.dataset.val = "";
-          allDayBtn.addEventListener("click", () => {
-            try {
-              locFilter.day = null;
-              setLocFilterBtn("loc-day-filters", null);
-              buildLocationList();
-            } catch (err) {
-              console.error("[day-filter click] Error:", err);
-            }
+        const allDayBtn = document.createElement("button");
+        allDayBtn.className = "loc-filter-btn active";
+        allDayBtn.textContent = "全日程";
+        allDayBtn.dataset.val = "";
+        allDayBtn.addEventListener("click", () => {
+          locFilter.day = null;
+          setLocFilterBtn("loc-day-filters", null);
+          buildLocationList();
+        });
+        dayEl.appendChild(allDayBtn);
+
+        days.forEach((d, i) => {
+          const hasLoc = events.some(
+            (ev) => ev.lat && ev.lng && eventOccursOnDay(ev, i),
+          );
+          if (!hasLoc) return;
+          const btn = document.createElement("button");
+          btn.className = "loc-filter-btn";
+          btn.textContent = d.date;
+          btn.dataset.val = String(i);
+          btn.addEventListener("click", () => {
+            locFilter.day = i;
+            setLocFilterBtn("loc-day-filters", i);
+            buildLocationList();
           });
-          dayEl.appendChild(allDayBtn);
-
-          days.forEach((d, i) => {
-            const hasLoc = events.some(
-              (ev) => ev.lat && ev.lng && eventOccursOnDay(ev, i),
-            );
-            if (!hasLoc) return;
-            const btn = document.createElement("button");
-            btn.className = "loc-filter-btn";
-            btn.textContent = d.date;
-            btn.dataset.val = String(i);
-            btn.addEventListener("click", () => {
-              try {
-                locFilter.day = i;
-                setLocFilterBtn("loc-day-filters", i);
-                buildLocationList();
-              } catch (err) {
-                console.error("[day-filter click] Error:", err);
-              }
-            });
-            dayEl.appendChild(btn);
-          });
-        } catch (err) {
-          console.error("[buildLocFilterUI] Error:", err);
-        }
+          dayEl.appendChild(btn);
+        });
       }
 
-      try {
-        buildLocFilterUI();
-        buildLocationList();
-      } catch (err) {
-        console.error("[init location UI] Error:", err);
-      }
+      buildLocFilterUI();
+      buildLocationList();
 
       // ─── Reveal ────────────────────────────────────────
 
       const revealObs = new IntersectionObserver(
         (entries, obs) => {
           entries.forEach((e) => {
-            try {
-              if (e.isIntersecting) {
-                e.target.classList.add("visible");
-                obs.unobserve(e.target);
-              }
-            } catch (err) {
-              console.error("[IntersectionObserver] Error:", err);
+            if (e.isIntersecting) {
+              e.target.classList.add("visible");
+              obs.unobserve(e.target);
             }
           });
         },
