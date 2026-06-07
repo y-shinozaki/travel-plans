@@ -4,197 +4,147 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Quick Start
 
-**No build tools required.** This is a single-page HTML application. To develop:
+No build tools required. This is a single-page HTML application.
 
 ```bash
-# Local server (Python 3)
-python3 -m http.server 8000
-# Open http://localhost:8000/index.html
-```
-
-**Or open directly:**
-```bash
+# Option 1: Open directly in browser
 open index.html
+
+# Option 2: Serve locally with Python 3
+python3 -m http.server 8000
+# Then visit http://localhost:8000
 ```
 
 ## Architecture Overview
 
 ### Single HTML File (`index.html`)
 
-The entire application is in one file with three main sections:
+The entire application lives in one file with three main sections:
 
-1. **`<style>` block** (lines ~11–422)
-   - CSS variables (colors from `DESIGN.md`, typography, shadows)
-   - All component styles (hero, calendar, map, detail panel)
-   - Animations (fadeUp, scrollLine, reveal effects)
-   - Responsive breakpoints at 960px and 600px
+1. **`<style>` block** (lines 14–1075)
+   - CSS custom properties (tokens) for colors, spacing, typography
+   - Responsive breakpoints: 960px (calendar layout) and 600px (mobile)
+   - Component styles: hero, calendar grid, map, location filters, detail panel
+   - Animations: fadeUp, cardIn, reveal effects
 
-2. **`<body>` HTML** (lines ~710–800)
-   - Semantic sections: Hero → Schedule → Map → Footer → Detail Panel
-   - All UI structure (no templating)
+2. **`<body>` HTML** (lines 1078–1165)
+   - Semantic structure: hero → schedule → map section → footer → detail panel
+   - Calendar container (`#cal`)
+   - Leaflet map container (`#leaflet-map`)
+   - Filter buttons and location list
 
-3. **`<script>` block** (lines ~820–1080)
-   - Core functions: `renderCalendar()`, `deriveMapLocations()`, `expandEvents()`
-   - Filter logic: `buildFilteredLocations()`, `buildLocationList()`
+3. **`<script>` block** (lines 1167–end)
+   - Event data: `days[]`, `catMeta{}`, `events[]`
+   - Core functions: `renderCalendar()`, `collectLocations()`, `expandEvents()`
    - Map initialization with Leaflet + CartoDB Voyager tiles
-   - Intersection Observer for scroll-triggered reveals
+   - Filter state: `locFilter`, `viewStart`, `viewEnd`, `showHotels`
+
+### Key Data Structures
+
+**Event object** (three types):
+
+```javascript
+// Type 1: Simple timed event (single day, on calendar and map)
+{ d: 0, cat: 'cat-food', icon: 'restaurant', title: '...',
+  start: 12.5, end: 13.5, time: '12:30 → 13:30',
+  location: '...', lat: 13.7563, lng: 100.5018, notes: '...' }
+
+// Type 2: Multi-day event (spans multiple calendar cells and days)
+{ multiDay: true, startDay: 0, endDay: 2, startHour: 15, endHour: 11,
+  cat: 'cat-hotel', icon: 'hotel', title: '...',
+  location: '...', lat: 13.7278, lng: 100.5601, notes: '...' }
+
+// Type 3: All-day event (no map marker, hotels list only)
+{ d: 0, icon: 'hotel', title: '...', allDay: true, time: '終日',
+  location: '...', notes: '' }
+```
+
+**Key constant:**
+- `HOUR_H = 44`: Pixel height per 1-hour slot in the calendar grid
 
 ### Data Flow
 
 ```
-schedule.csv (parsed from <script> block)
-    ↓
-expandEvents() → splits multi-day events into daily segments
-    ↓
-renderCalendar() → time-slot grid layout
-deriveMapLocations() → extracts lat/lng, deduplicates
-    ↓
-buildFilteredLocations() → applies category + date filters
-    ↓
-buildLocationList() → renders location cards
+events (raw data)
+  ↓
+expandEvents() → convert multiDay to daily segments
+  ↓
+renderCalendar() → time-slot grid (respects viewStart/viewEnd)
+collectLocations() → extract lat/lng, deduplicate by coordinate
+  ↓
+buildFilteredLocations() → apply category + date filters
+buildLocationList() → render cards, update marker visibility
 ```
 
-## Key Concepts
+### Time Format
 
-### Multi-Day Events (`expandEvents`)
-
-Events spanning multiple days use the `multiDay` structure:
+Events use decimal hour format (e.g., `12.5` = 12:30, `15.08` = 15:04):
 
 ```javascript
-{
-  multiDay: true,
-  startDay: 2,   // day index in `days` array
-  endDay: 4,
-  startHour: 15, // first day: 15:00→24:00
-  endHour: 11,   // last day: 0:00→11:00
-  // … other fields
-}
+start: 10.58,  // 10:35 (0.58 * 60 ≈ 35 minutes)
+end: 15.08     // 15:05 (0.08 * 60 ≈ 5 minutes)
 ```
 
-`expandEvents()` converts each to individual day-segment objects with calculated `visStart` / `visEnd` hours. This lets calendar render them correctly across multiple cells.
+Convert: `hours + (minutes / 60)`.
 
-### Map Locations (`deriveMapLocations`)
-
-Extracts `{lat, lng}` from all time-based events and deduplicates by coordinate:
+### Map & Filtering State
 
 ```javascript
-function deriveMapLocations() {
-  const seen = new Map(); // key: "lat,lng"
-  events.forEach(ev => {
-    if (ev.lat && ev.lng) {
-      const key = `${ev.lat},${ev.lng}`;
-      if (!seen.has(key)) {
-        seen.set(key, {
-          name: ev.location,
-          icon: ev.icon,
-          lat: ev.lat,
-          lng: ev.lng,
-          evs: [] // populated later
-        });
-      }
-    }
-  });
-  return [...seen.values()];
-}
+let locFilter = { cat: null, day: null };  // null = show all
+let viewStart = 6, viewEnd = 22;           // calendar time range
+let showHotels = false;                    // toggle hotel visibility
 ```
 
-**Important:** All-day events (hotels, flights) intentionally have NO `lat`/`lng` — they're filtered out of the map. Only time-based events populate the map.
+When filter changes, call `buildFilteredLocations()` and `buildLocationList()`.
 
-### Filtering by Category + Date
+## Design System
 
-`locFilter` state:
-- `.cat`: `null` (all) or category string (e.g., `'cat-food'`)
-- `.day`: `null` (all days) or day index (0–5)
+All colors are CSS custom properties (defined in `:root`):
 
-`buildFilteredLocations()` recalculates visible locations. `buildLocationList()` re-renders cards and updates marker visibility on the map.
+- `--dark`: House Green (#1E3932) — headers, footers
+- `--green`: Starbucks Green (#006241) — primary headings
+- `--green-mid`: Green Accent (#00754A) — CTAs, active states
+- `--canvas`: Neutral Warm (#f2f0eb) — page background
+- `--ceramic`: Ceramic (#edebe9) — calendar row backgrounds
 
-### Calendar Time Grid
+See `DESIGN.md` for complete palette and typography system.
 
-- `HOUR_H = 44` (CSS height per 1-hour slot)
-- `viewStart` / `viewEnd` (user-selected, default 6–22)
-- Background gradient for hour lines matches `HOUR_H` (43px transparent + 1px border at 44px)
-- Events positioned absolutely within their time slots with `top` and `height` calculated from hour offsets
+**Never use hardcoded hex values.** Always use CSS variables.
 
-### Typography & WONK Variation
-
-Fraunces font uses CSS custom property `font-variation-settings`:
-
-```css
-.hero-title-en {
-  font-variation-settings: "opsz" 144, "WONK" 1;
-}
-```
-
-- `opsz` (optical size): 144 for huge display, 72 for section titles, 36 for panel/calendar
-- `WONK` 1: activates whimsical serif variations (unique to Fraunces)
-
-**Do not remove or change.** These settings are intentional per the design direction.
-
-## Design System (`DESIGN.md`)
-
-All colors are CSS variables. **Strict adherence required:**
-
-- **`--dark` (`#1E3932`)**: House Green, used for header/footer/dark bands
-- **`--green` (`#006241`)**: Starbucks Green, primary headings/brand
-- **`--green-mid` (`#00754A`)**: Green Accent, CTAs/interactive elements
-- **`--canvas` (`#f2f0eb`)**: Neutral Warm, primary page background
-- **`--ceramic` (`#edebe9`)**: Ceramic, calendar row backgrounds
-
-Shadows use three-tier system: `--sh-sm`, `--sh-md`, `--sh-lg` per DESIGN.md specifications. Do not invent new colors or shadows.
-
-## External Dependencies
-
-All loaded via CDN (no npm/yarn):
-
-```html
-<!-- Google Fonts -->
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,700;9..144,900&family=DM+Sans:wght@300;400;500;600;700&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,400,0,0&display=swap">
-
-<!-- Leaflet (mapping) -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-```
-
-If updating Leaflet: update version in both `<link>` and `<script>` tags.
-
-## Common Tasks
-
-### Modify Color Palette
-
-1. Find the color in `DESIGN.md` (e.g., Starbucks Green)
-2. Update `:root` CSS variable (e.g., `--green`)
-3. All usages automatically inherit the change
-4. Do NOT use hardcoded hex codes — always use CSS variables
+## Common Development Tasks
 
 ### Add a New Event
 
-1. Add row to `schedule.csv` (or inline in the `events` array)
-2. If multi-day, use `multiDay: true` with `startDay`/`endDay`/`startHour`/`endHour`
-3. If showing on map, include `lat` and `lng`
-4. If all-day (hotel, flight), omit `lat`/`lng` and set `allDay: true`
-5. Run `renderCalendar()` and `buildLocationList()` are called automatically on page load
+1. Add to the `events` array in the `<script>` block
+2. If time-specified: set `d` (day index), `start`/`end` (decimal hours), `location`, `lat`/`lng`
+3. If multi-day: use `multiDay: true` with `startDay`, `endDay`, `startHour`, `endHour`
+4. If all-day (hotel): set `allDay: true`, omit `lat`/`lng`
+5. Categorize with `cat` key (e.g., `'cat-food'`, `'cat-sight'`)
+6. Include `icon` (Material Symbol name), `title`, `notes`
+7. Functions auto-run on page load; for live preview, reload browser
 
-### Adjust Schedule Grid Height
+### Change Calendar Grid Height
 
-Change `HOUR_H = 44` (line ~553). Then update the repeating-linear-gradient in `.cal-day-col`:
+1. Update `HOUR_H` constant (line ~1170)
+2. Update `.cal-day-col` background-image repeating-linear-gradient to match:
+   ```css
+   repeating-linear-gradient(
+     to bottom,
+     transparent 0px,
+     transparent ${HOUR_H - 1}px,
+     var(--border) ${HOUR_H - 1}px,
+     var(--border) ${HOUR_H}px
+   );
+   ```
 
-```css
-background-image: repeating-linear-gradient(
-  to bottom,
-  transparent 0px,
-  transparent ${HOUR_H - 1}px,
-  var(--border) ${HOUR_H - 1}px,
-  var(--border) ${HOUR_H}px
-);
-```
+### Change Calendar Time Range
 
-### Change Default View Time
-
-Modify `viewStart` and `viewEnd` (line ~651). Update dropdown initial selections in `buildOptions()`.
+1. Modify `viewStart` and `viewEnd` in `<script>` (line ~1285)
+2. Update dropdown options in `buildOptions()` function to match
 
 ### Update Map Tiles
 
-Currently using CartoDB Voyager:
+Replace the `L.tileLayer()` call in the map initialization:
 
 ```javascript
 L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
@@ -203,27 +153,54 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r
 }).addTo(map);
 ```
 
-To change: replace the URL and attribution. Stamen Watercolor or Esri World Imagery are good alternatives.
+Alternatives: Stamen Watercolor, Esri World Imagery, OpenStreetMap default.
+
+### Modify Colors
+
+1. Find the color in `DESIGN.md` (e.g., Starbucks Green)
+2. Update the CSS variable in `:root` (line ~16)
+3. All usages inherit the change automatically
+
+## External Dependencies
+
+All loaded via CDN; no npm/build step:
+
+```html
+<!-- Google Fonts: Fraunces (display), DM Sans (body) -->
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,700;9..144,900&family=DM+Sans:wght@300;400;500;600;700&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,400,0,0&display=swap">
+
+<!-- Leaflet (mapping) -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+```
+
+When updating Leaflet, match version in both `<link>` and `<script>` tags.
 
 ## Responsive Design
 
-Breakpoints:
-- **960px**: Map shifts from side-by-side to stacked layout; hero title shrinks
-- **600px**: Detail panel becomes full-width; hero scroll indicator hidden; padding reduced
+**Breakpoints:**
+- **960px**: Map + sidebar shifts to vertical stack; hero title shrinks
+- **600px**: Detail panel goes full-width; mobile-optimized padding; hero scroll indicator hidden
 
-Mobile-first constraints: Ensure `.detail-panel` works at 100vw width.
+All breakpoints defined in `@media` queries in the `<style>` block.
 
-## GitHub Pages Deployment
+## Browser Support
 
-On push to `main`, GitHub Pages serves `index.html` at the repo root. No build step needed.
+- Chrome/Edge (latest)
+- Firefox (latest)
+- Safari (iOS 14+)
 
-**Enable in repo settings:**
-- Settings → Pages
-- Source: `main` branch, root directory
+## Deployment
+
+GitHub Pages deployment on push to `main`:
+
+1. Ensure repo settings enable Pages (source: `main` branch, root directory)
+2. Push changes to `main` — site auto-updates
+3. Live: `https://y-shinozaki.github.io/travel-plans/`
 
 ## Notes for Future Development
 
-- **No state management library** — use global variables (`viewStart`, `showHotels`, `locFilter`) sparingly; consider refactor if complexity grows
-- **No component framework** — HTML structure is fixed; any dynamic content uses `innerHTML` (safe here since no user input)
-- **Leaflet map** — MarkerCluster not implemented; if event count grows significantly, consider adding
-- **Fraunces availability** — ensure WONK variation is loaded by Google Fonts; fallback to serif if unavailable
+- No state management library — global variables (`viewStart`, `showHotels`, `locFilter`) are acceptable; consider refactor if complexity grows beyond current scope
+- No component framework — all DOM updates via `innerHTML` (safe here since no user input)
+- Leaflet MarkerCluster not implemented; add if event density grows significantly
+- Fraunces WONK variation (whimsical serif) is intentional per design direction — do not remove
