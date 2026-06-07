@@ -41,6 +41,8 @@
         --r-sm: 0px;
         --r: 0px;
         --r-lg: 0px;
+        --cal-gutter-width: 52px;
+        --cal-content-min-width: 768px;
         --r-pill: 0px;
         --font-d: "Noto Sans JP", sans-serif;
         --font-b: "Noto Sans JP", sans-serif;
@@ -415,7 +417,7 @@
 
       /* ─── Calendar ──────────────────────────────────── */
       .cal-outer {
-        overflow-x: auto;
+        overflow-x: clip;
         border-radius: 0px;
         box-shadow: none;
         border: 1px solid var(--border);
@@ -424,9 +426,7 @@
       .cal {
         display: flex;
         flex-direction: column;
-        min-width: 820px;
         border-radius: 0px;
-        overflow: hidden;
         background: var(--white);
       }
 
@@ -434,16 +434,27 @@
         display: flex;
         background: var(--dark);
         flex-shrink: 0;
+        overflow-x: auto;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+      .cal-hdr-row::-webkit-scrollbar {
+        display: none;
       }
 
       .cal-gutter {
-        width: 52px;
+        width: var(--cal-gutter-width);
         flex-shrink: 0;
+        position: sticky;
+        left: 0;
+        z-index: 3;
+        background: var(--dark);
       }
 
       .cal-days-hdr {
         flex: 1;
         display: flex;
+        min-width: var(--cal-content-min-width);
       }
 
       .day-hdr {
@@ -476,16 +487,25 @@
         border-bottom: 1px solid var(--border);
         flex-shrink: 0;
         background: var(--ceramic);
+        overflow-x: auto;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+      .cal-allday-row::-webkit-scrollbar {
+        display: none;
       }
 
       .allday-label {
-        width: 52px;
+        width: var(--cal-gutter-width);
         flex-shrink: 0;
         background: var(--ceramic);
         border-right: 1px solid var(--border);
         display: flex;
         align-items: flex-start;
         justify-content: flex-end;
+        position: sticky;
+        left: 0;
+        z-index: 3;
         padding: 6px 8px;
         font-size: 0.9rem;
         font-weight: 700;
@@ -498,6 +518,7 @@
       .cal-allday-cells {
         flex: 1;
         display: flex;
+        min-width: var(--cal-content-min-width);
       }
 
       .allday-cell {
@@ -540,13 +561,17 @@
 
       .cal-body-row {
         display: flex;
+        overflow-x: auto;
       }
 
       .cal-time-col {
-        width: 52px;
+        width: var(--cal-gutter-width);
         flex-shrink: 0;
         background: var(--ceramic);
         border-right: 1px solid var(--border);
+        position: sticky;
+        left: 0;
+        z-index: 3;
       }
 
       .time-slot {
@@ -564,6 +589,7 @@
       .cal-day-cols {
         flex: 1;
         display: flex;
+        min-width: var(--cal-content-min-width);
       }
 
       .cal-day-col {
@@ -2077,6 +2103,8 @@
 
         bodyRow.appendChild(dayCols);
         cal.appendChild(bodyRow);
+
+        attachScrollSync();
       }
 
       // 表示時間セレクターの初期化
@@ -2468,6 +2496,29 @@
       document
         .querySelectorAll(".reveal")
         .forEach((el) => revealObs.observe(el));
+
+      function attachScrollSync() {
+        const rows = document.querySelectorAll(
+          ".cal-hdr-row, .cal-allday-row, .cal-body-row",
+        );
+        if (rows.length === 0) return;
+        let ticking = false;
+        rows.forEach((row) => {
+          row.addEventListener("scroll", () => {
+            if (ticking) return;
+            ticking = true;
+            requestAnimationFrame(() => {
+              const left = row.scrollLeft;
+              rows.forEach((r) => {
+                if (r !== row) r.scrollLeft = left;
+              });
+              requestAnimationFrame(() => {
+                ticking = false;
+              });
+            });
+          });
+        });
+      }
     </script>
   </body>
 </html>
