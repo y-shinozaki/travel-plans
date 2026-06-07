@@ -41,6 +41,8 @@
         --r-sm: 0px;
         --r: 0px;
         --r-lg: 0px;
+        --cal-gutter-width: 52px;
+        --cal-content-min-width: 768px;
         --r-pill: 0px;
         --font-d: "Noto Sans JP", sans-serif;
         --font-b: "Noto Sans JP", sans-serif;
@@ -415,7 +417,7 @@
 
       /* ─── Calendar ──────────────────────────────────── */
       .cal-outer {
-        overflow-x: hidden;
+        overflow-x: clip;
         border-radius: 0px;
         box-shadow: none;
         border: 1px solid var(--border);
@@ -441,7 +443,7 @@
       }
 
       .cal-gutter {
-        width: 52px;
+        width: var(--cal-gutter-width);
         flex-shrink: 0;
         position: sticky;
         left: 0;
@@ -452,7 +454,7 @@
       .cal-days-hdr {
         flex: 1;
         display: flex;
-        min-width: 768px;
+        min-width: var(--cal-content-min-width);
       }
 
       .day-hdr {
@@ -494,7 +496,7 @@
       }
 
       .allday-label {
-        width: 52px;
+        width: var(--cal-gutter-width);
         flex-shrink: 0;
         background: var(--ceramic);
         border-right: 1px solid var(--border);
@@ -516,7 +518,7 @@
       .cal-allday-cells {
         flex: 1;
         display: flex;
-        min-width: 768px;
+        min-width: var(--cal-content-min-width);
       }
 
       .allday-cell {
@@ -563,7 +565,7 @@
       }
 
       .cal-time-col {
-        width: 52px;
+        width: var(--cal-gutter-width);
         flex-shrink: 0;
         background: var(--ceramic);
         border-right: 1px solid var(--border);
@@ -587,7 +589,7 @@
       .cal-day-cols {
         flex: 1;
         display: flex;
-        min-width: 768px;
+        min-width: var(--cal-content-min-width);
       }
 
       .cal-day-col {
@@ -1996,7 +1998,10 @@
           const cell = document.createElement("div");
           cell.className = "allday-cell";
           events
-            .filter((e) => e.d === di && e.allDay)
+            .filter(
+              (e) =>
+                e.d === di && e.allDay && (showHotels || e.cat !== "cat-hotel"),
+            )
             .forEach((ev) => {
               const evEl = document.createElement("div");
               evEl.className = "allday-event";
@@ -2098,6 +2103,8 @@
 
         bodyRow.appendChild(dayCols);
         cal.appendChild(bodyRow);
+
+        attachScrollSync();
       }
 
       // 表示時間セレクターの初期化
@@ -2490,23 +2497,28 @@
         .querySelectorAll(".reveal")
         .forEach((el) => revealObs.observe(el));
 
-      // Sync horizontal scroll across calendar rows
-      (function syncCalScroll() {
+      function attachScrollSync() {
         const rows = document.querySelectorAll(
           ".cal-hdr-row, .cal-allday-row, .cal-body-row",
         );
-        let syncing = false;
+        if (rows.length === 0) return;
+        let ticking = false;
         rows.forEach((row) => {
           row.addEventListener("scroll", () => {
-            if (syncing) return;
-            syncing = true;
-            rows.forEach((r) => {
-              if (r !== row) r.scrollLeft = row.scrollLeft;
+            if (ticking) return;
+            ticking = true;
+            requestAnimationFrame(() => {
+              const left = row.scrollLeft;
+              rows.forEach((r) => {
+                if (r !== row) r.scrollLeft = left;
+              });
+              requestAnimationFrame(() => {
+                ticking = false;
+              });
             });
-            syncing = false;
           });
         });
-      })();
+      }
     </script>
   </body>
 </html>
