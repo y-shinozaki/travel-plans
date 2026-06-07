@@ -1,0 +1,32 @@
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Environment
+.env
+.env.local
+
+# Dependencies (if added in future)
+node_modules/
+package-lock.json
+yarn.lock
+
+# Build outputs (if added in future)
+dist/
+build/
+.parcel-cache/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Local development (but keep .claude/settings.json and .mcp.json for project config)
