@@ -1,132 +1,132 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+このファイルは、このリポジトリで Claude Code (claude.ai/code) を使用する際のガイダンスを提供します。
 
-## Quick Start
+## クイックスタート
 
-No build tools required. This is a single-page HTML application.
+ビルドツール不要。シングルページ HTML アプリケーション。
 
 ```bash
-# Option 1: Open directly in browser
+# 方法1: ブラウザで直接開く
 open index.html
 
-# Option 2: Serve locally with Python 3
+# 方法2: Python 3 でローカルサーバーを起動
 python3 -m http.server 8000
-# Then visit http://localhost:8000
+# その後 http://localhost:8000 にアクセス
 ```
 
-## Architecture Overview
+## アーキテクチャ概要
 
-### Single HTML File (`index.html`)
+### シングル HTML ファイル (`index.html`)
 
-The entire application lives in one file with three main sections:
+アプリケーション全体が 1 つのファイルに含まれ、3 つのメインセクションからなります：
 
-1. **`<style>` block** (lines 14–1075)
-   - CSS custom properties (tokens) for colors, spacing, typography
-   - Responsive breakpoints: 960px (calendar layout) and 600px (mobile)
-   - Component styles: hero, calendar grid, map, location filters, detail panel
-   - Animations: fadeUp, cardIn, reveal effects
+1. **`<style>` ブロック**（行 14～1075）
+   - CSS カスタムプロパティ（トークン）: カラー、間隔、タイポグラフィ
+   - レスポンシブブレークポイント: 960px（カレンダーレイアウト）、600px（モバイル）
+   - コンポーネントスタイル: ヒーロー、カレンダーグリッド、マップ、位置情報フィルター、詳細パネル
+   - アニメーション: fadeUp、cardIn、reveal エフェクト
 
-2. **`<body>` HTML** (lines 1078–1165)
-   - Semantic structure: hero → schedule → map section → footer → detail panel
-   - Calendar container (`#cal`)
-   - Leaflet map container (`#leaflet-map`)
-   - Filter buttons and location list
+2. **`<body>` HTML**（行 1078～1165）
+   - セマンティック構造: ヒーロー → スケジュール → マップセクション → フッター → 詳細パネル
+   - カレンダーコンテナ（`#cal`）
+   - Leaflet マップコンテナ（`#leaflet-map`）
+   - フィルターボタンと位置情報リスト
 
-3. **`<script>` block** (lines 1167–end)
-   - Event data: `days[]`, `catMeta{}`, `events[]`
-   - Core functions: `renderCalendar()`, `collectLocations()`, `expandEvents()`
-   - Map initialization with Leaflet + CartoDB Voyager tiles
-   - Filter state: `locFilter`, `viewStart`, `viewEnd`, `showHotels`
+3. **`<script>` ブロック**（行 1167～終了）
+   - イベントデータ: `days[]`、`catMeta{}`、`events[]`
+   - コア関数: `renderCalendar()`、`collectLocations()`、`expandEvents()`
+   - Leaflet + CartoDB Voyager タイルを使用したマップ初期化
+   - フィルター状態: `locFilter`、`viewStart`、`viewEnd`、`showHotels`
 
-### Key Data Structures
+### キーとなるデータ構造
 
-**Event object** (three types):
+**イベントオブジェクト**（3 つのタイプ）:
 
 ```javascript
-// Type 1: Simple timed event (single day, on calendar and map)
+// タイプ1: 時間指定イベント（単一日、カレンダーとマップに表示）
 { d: 0, cat: 'cat-food', icon: 'restaurant', title: '...',
   start: 12.5, end: 13.5, time: '12:30 → 13:30',
   location: '...', lat: 13.7563, lng: 100.5018, notes: '...' }
 
-// Type 2: Multi-day event (spans multiple calendar cells and days)
+// タイプ2: 複数日イベント（複数のカレンダーセルと日にまたがる）
 { multiDay: true, startDay: 0, endDay: 2, startHour: 15, endHour: 11,
   cat: 'cat-hotel', icon: 'hotel', title: '...',
   location: '...', lat: 13.7278, lng: 100.5601, notes: '...' }
 
-// Type 3: All-day event (no map marker, hotels list only)
+// タイプ3: 終日イベント（マップマーカーなし、ホテルリストのみ）
 { d: 0, icon: 'hotel', title: '...', allDay: true, time: '終日',
   location: '...', notes: '' }
 ```
 
-**Key constant:**
-- `HOUR_H = 44`: Pixel height per 1-hour slot in the calendar grid
+**重要な定数:**
+- `HOUR_H = 44`: カレンダーグリッドの 1 時間あたりのピクセル高さ
 
-### Data Flow
+### データフロー
 
 ```
-events (raw data)
+イベント（生データ）
   ↓
-expandEvents() → convert multiDay to daily segments
+expandEvents() → 複数日イベントを日単位のセグメントに変換
   ↓
-renderCalendar() → time-slot grid (respects viewStart/viewEnd)
-collectLocations() → extract lat/lng, deduplicate by coordinate
+renderCalendar() → 時間スロットグリッド（viewStart/viewEnd を尊重）
+collectLocations() → 緯度経度を抽出、座標ごとに重複排除
   ↓
-buildFilteredLocations() → apply category + date filters
-buildLocationList() → render cards, update marker visibility
+buildFilteredLocations() → カテゴリ + 日付フィルターを適用
+buildLocationList() → カードを描画、マーカー表示を更新
 ```
 
-### Time Format
+### 時間フォーマット
 
-Events use decimal hour format (e.g., `12.5` = 12:30, `15.08` = 15:04):
+イベントは 10 進数時間フォーマットを使用（例: `12.5` = 12:30、`15.08` = 15:04）:
 
 ```javascript
-start: 10.58,  // 10:35 (0.58 * 60 ≈ 35 minutes)
-end: 15.08     // 15:05 (0.08 * 60 ≈ 5 minutes)
+start: 10.58,  // 10:35 (0.58 * 60 ≈ 35 分)
+end: 15.08     // 15:05 (0.08 * 60 ≈ 5 分)
 ```
 
-Convert: `hours + (minutes / 60)`.
+変換式: `時間 + (分 / 60)`。
 
-### Map & Filtering State
+### マップ＆フィルター状態
 
 ```javascript
-let locFilter = { cat: null, day: null };  // null = show all
-let viewStart = 6, viewEnd = 22;           // calendar time range
-let showHotels = false;                    // toggle hotel visibility
+let locFilter = { cat: null, day: null };  // null = すべて表示
+let viewStart = 6, viewEnd = 22;           // カレンダー時間範囲
+let showHotels = false;                    // ホテル表示/非表示切り替え
 ```
 
-When filter changes, call `buildFilteredLocations()` and `buildLocationList()`.
+フィルター変更時は `buildFilteredLocations()` と `buildLocationList()` を呼び出します。
 
-## Design System
+## デザインシステム
 
-All colors are CSS custom properties (defined in `:root`):
+すべてのカラーは CSS カスタムプロパティ（`:root` で定義）:
 
-- `--dark`: House Green (#1E3932) — headers, footers
-- `--green`: Starbucks Green (#006241) — primary headings
-- `--green-mid`: Green Accent (#00754A) — CTAs, active states
-- `--canvas`: Neutral Warm (#f2f0eb) — page background
-- `--ceramic`: Ceramic (#edebe9) — calendar row backgrounds
+- `--dark`: ハウスグリーン（#1E3932） — ヘッダー、フッター
+- `--green`: スターバックスグリーン（#006241） — プライマリ見出し
+- `--green-mid`: グリーンアクセント（#00754A） — CTA、アクティブ状態
+- `--canvas`: ニュートラルウォーム（#f2f0eb） — ページ背景
+- `--ceramic`: セラミック（#edebe9） — カレンダー行背景
 
-See `DESIGN.md` for complete palette and typography system.
+詳細なパレットとタイポグラフィシステムは `DESIGN.md` を参照。
 
-**Never use hardcoded hex values.** Always use CSS variables.
+**ハードコードされた 16 進数値を使用しないでください。** 常に CSS 変数を使用してください。
 
-## Common Development Tasks
+## よく使う開発タスク
 
-### Add a New Event
+### 新しいイベントを追加
 
-1. Add to the `events` array in the `<script>` block
-2. If time-specified: set `d` (day index), `start`/`end` (decimal hours), `location`, `lat`/`lng`
-3. If multi-day: use `multiDay: true` with `startDay`, `endDay`, `startHour`, `endHour`
-4. If all-day (hotel): set `allDay: true`, omit `lat`/`lng`
-5. Categorize with `cat` key (e.g., `'cat-food'`, `'cat-sight'`)
-6. Include `icon` (Material Symbol name), `title`, `notes`
-7. Functions auto-run on page load; for live preview, reload browser
+1. `<script>` ブロック内の `events` 配列に追加
+2. 時間指定の場合: `d`（日インデックス）、`start`/`end`（10 進数時間）、`location`、`lat`/`lng` を設定
+3. 複数日の場合: `multiDay: true` で `startDay`、`endDay`、`startHour`、`endHour` を設定
+4. 終日（ホテル）の場合: `allDay: true` を設定、`lat`/`lng` は省略
+5. `cat` キーでカテゴリ化（例: `'cat-food'`、`'cat-sight'`）
+6. `icon`（Material Symbol 名）、`title`、`notes` を含める
+7. 関数はページ読み込み時に自動実行。ライブプレビューはブラウザをリロード
 
-### Change Calendar Grid Height
+### カレンダーグリッドの高さを変更
 
-1. Update `HOUR_H` constant (line ~1170)
-2. Update `.cal-day-col` background-image repeating-linear-gradient to match:
+1. `HOUR_H` 定数を更新（行 ~1170）
+2. `.cal-day-col` の背景画像 repeating-linear-gradient を同じ値で更新:
    ```css
    repeating-linear-gradient(
      to bottom,
@@ -137,14 +137,14 @@ See `DESIGN.md` for complete palette and typography system.
    );
    ```
 
-### Change Calendar Time Range
+### カレンダーの時間範囲を変更
 
-1. Modify `viewStart` and `viewEnd` in `<script>` (line ~1285)
-2. Update dropdown options in `buildOptions()` function to match
+1. `<script>` ブロック内の `viewStart` と `viewEnd` を修正（行 ~1285）
+2. `buildOptions()` 関数のドロップダウンオプションも同じ値で更新
 
-### Update Map Tiles
+### マップタイルを更新
 
-Replace the `L.tileLayer()` call in the map initialization:
+マップ初期化の `L.tileLayer()` 呼び出しを置換:
 
 ```javascript
 L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
@@ -153,54 +153,54 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r
 }).addTo(map);
 ```
 
-Alternatives: Stamen Watercolor, Esri World Imagery, OpenStreetMap default.
+代替案: Stamen Watercolor、Esri World Imagery、OpenStreetMap デフォルト。
 
-### Modify Colors
+### カラーを変更
 
-1. Find the color in `DESIGN.md` (e.g., Starbucks Green)
-2. Update the CSS variable in `:root` (line ~16)
-3. All usages inherit the change automatically
+1. `DESIGN.md` でカラーを探す（例: スターバックスグリーン）
+2. `:root` 内の CSS 変数を更新（行 ~16）
+3. すべての使用箇所が自動的に変更を継承
 
-## External Dependencies
+## 外部ライブラリ
 
-All loaded via CDN; no npm/build step:
+すべて CDN から読み込み、npm/ビルドステップなし:
 
 ```html
 <!-- Google Fonts: Fraunces (display), DM Sans (body) -->
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,700;9..144,900&family=DM+Sans:wght@300;400;500;600;700&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,400,0,0&display=swap">
 
-<!-- Leaflet (mapping) -->
+<!-- Leaflet (マッピング) -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 ```
 
-When updating Leaflet, match version in both `<link>` and `<script>` tags.
+Leaflet 更新時は `<link>` と `<script>` タグのバージョンを一致させてください。
 
-## Responsive Design
+## レスポンシブデザイン
 
-**Breakpoints:**
-- **960px**: Map + sidebar shifts to vertical stack; hero title shrinks
-- **600px**: Detail panel goes full-width; mobile-optimized padding; hero scroll indicator hidden
+**ブレークポイント:**
+- **960px**: マップ + サイドバーが縦並びに変更、ヒーロータイトルが縮小
+- **600px**: 詳細パネルが全幅表示、モバイル最適化パディング、ヒーロースクロール指標が非表示
 
-All breakpoints defined in `@media` queries in the `<style>` block.
+すべてのブレークポイントは `<style>` ブロック内の `@media` クエリで定義。
 
-## Browser Support
+## ブラウザサポート
 
-- Chrome/Edge (latest)
-- Firefox (latest)
-- Safari (iOS 14+)
+- Chrome/Edge（最新版）
+- Firefox（最新版）
+- Safari（iOS 14 以上）
 
-## Deployment
+## デプロイメント
 
-GitHub Pages deployment on push to `main`:
+`main` ブランチへのプッシュで GitHub Pages 自動デプロイ:
 
-1. Ensure repo settings enable Pages (source: `main` branch, root directory)
-2. Push changes to `main` — site auto-updates
-3. Live: `https://y-shinozaki.github.io/travel-plans/`
+1. リポジトリ設定で Pages を有効化（ソース: `main` ブランチ、ルートディレクトリ）
+2. `main` にプッシュ — サイトは自動更新
+3. ライブ: `https://y-shinozaki.github.io/travel-plans/`
 
-## Notes for Future Development
+## 今後の開発に向けたノート
 
-- No state management library — global variables (`viewStart`, `showHotels`, `locFilter`) are acceptable; consider refactor if complexity grows beyond current scope
-- No component framework — all DOM updates via `innerHTML` (safe here since no user input)
-- Leaflet MarkerCluster not implemented; add if event density grows significantly
-- Fraunces WONK variation (whimsical serif) is intentional per design direction — do not remove
+- 状態管理ライブラリなし — グローバル変数（`viewStart`、`showHotels`、`locFilter`）は許容。複雑度が増せば将来的にリファクタリングを検討
+- コンポーネントフレームワークなし — すべての DOM 更新は `innerHTML` 経由（ユーザー入力がないため安全）
+- Leaflet MarkerCluster は未実装。イベント密度が大幅に増加した場合に追加検討
+- Fraunces WONK バリエーション（遊び心のあるセリフ）はデザイン方針による意図的な選択 — 削除しないでください
