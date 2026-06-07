@@ -415,7 +415,7 @@
 
       /* ─── Calendar ──────────────────────────────────── */
       .cal-outer {
-        overflow-x: auto;
+        overflow-x: hidden;
         border-radius: 0px;
         box-shadow: none;
         border: 1px solid var(--border);
@@ -424,9 +424,7 @@
       .cal {
         display: flex;
         flex-direction: column;
-        min-width: 820px;
         border-radius: 0px;
-        overflow: hidden;
         background: var(--white);
       }
 
@@ -434,16 +432,27 @@
         display: flex;
         background: var(--dark);
         flex-shrink: 0;
+        overflow-x: auto;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+      .cal-hdr-row::-webkit-scrollbar {
+        display: none;
       }
 
       .cal-gutter {
         width: 52px;
         flex-shrink: 0;
+        position: sticky;
+        left: 0;
+        z-index: 3;
+        background: var(--dark);
       }
 
       .cal-days-hdr {
         flex: 1;
         display: flex;
+        min-width: 768px;
       }
 
       .day-hdr {
@@ -476,6 +485,12 @@
         border-bottom: 1px solid var(--border);
         flex-shrink: 0;
         background: var(--ceramic);
+        overflow-x: auto;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+      .cal-allday-row::-webkit-scrollbar {
+        display: none;
       }
 
       .allday-label {
@@ -486,6 +501,9 @@
         display: flex;
         align-items: flex-start;
         justify-content: flex-end;
+        position: sticky;
+        left: 0;
+        z-index: 3;
         padding: 6px 8px;
         font-size: 0.9rem;
         font-weight: 700;
@@ -498,6 +516,7 @@
       .cal-allday-cells {
         flex: 1;
         display: flex;
+        min-width: 768px;
       }
 
       .allday-cell {
@@ -540,6 +559,7 @@
 
       .cal-body-row {
         display: flex;
+        overflow-x: auto;
       }
 
       .cal-time-col {
@@ -547,6 +567,9 @@
         flex-shrink: 0;
         background: var(--ceramic);
         border-right: 1px solid var(--border);
+        position: sticky;
+        left: 0;
+        z-index: 3;
       }
 
       .time-slot {
@@ -564,6 +587,7 @@
       .cal-day-cols {
         flex: 1;
         display: flex;
+        min-width: 768px;
       }
 
       .cal-day-col {
@@ -1972,10 +1996,7 @@
           const cell = document.createElement("div");
           cell.className = "allday-cell";
           events
-            .filter(
-              (e) =>
-                e.d === di && e.allDay && (showHotels || e.cat !== "cat-hotel"),
-            )
+            .filter((e) => e.d === di && e.allDay)
             .forEach((ev) => {
               const evEl = document.createElement("div");
               evEl.className = "allday-event";
@@ -2468,6 +2489,24 @@
       document
         .querySelectorAll(".reveal")
         .forEach((el) => revealObs.observe(el));
+
+      // Sync horizontal scroll across calendar rows
+      (function syncCalScroll() {
+        const rows = document.querySelectorAll(
+          ".cal-hdr-row, .cal-allday-row, .cal-body-row",
+        );
+        let syncing = false;
+        rows.forEach((row) => {
+          row.addEventListener("scroll", () => {
+            if (syncing) return;
+            syncing = true;
+            rows.forEach((r) => {
+              if (r !== row) r.scrollLeft = row.scrollLeft;
+            });
+            syncing = false;
+          });
+        });
+      })();
     </script>
   </body>
 </html>
