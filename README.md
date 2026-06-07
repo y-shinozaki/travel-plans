@@ -1,160 +1,161 @@
-# Thailand 2026 Travel Plan
+# タイ 2026 旅行計画
 
-A single-page schedule and map application for planning a trip to Thailand (August 12-17, 2026).
+タイ旅行（2026年8月12日～17日）のスケジュールとマップを管理するシングルページアプリケーション。
 
-**Live Site**: https://y-shinozaki.github.io/travel-plans/
+**ライブサイト**: https://y-shinozaki.github.io/travel-plans/
 
-## Features
+## 機能
 
-- Weekly calendar view with hourly time slots and customizable time range
-- Interactive map powered by Leaflet and CartoDB Voyager tiles
-- Location filtering by category and date
-- Event details panel with quick access to information
-- Hotel/accommodation toggle on the map
-- Fully responsive design for mobile, tablet, and desktop
-- No build process required—just open `index.html`
+- 時間別スケジュール表示（表示時間帯はカスタマイズ可能）
+- Leaflet と CartoDB Voyager タイルを使用したインタラクティブマップ
+- カテゴリと日付による位置情報フィルタリング
+- サイドパネルでのイベント詳細表示
+- マップ上でホテル表示/非表示を切り替え
+- モバイル、タブレット、デスクトップに完全対応
+- ビルドプロセス不要 - `index.html` を開くだけ
 
-## Technology
+## 技術スタック
 
-- **HTML5, CSS3**: Single-file application with semantic structure
-- **JavaScript**: Vanilla JavaScript, no frameworks
-- **Leaflet.js**: Interactive map library
-- **Google Fonts**: Fraunces (serif display), DM Sans (sans-serif body)
-- **Material Symbols**: Icon library for events
+- **HTML5、CSS3**: シングルファイルアプリケーション（セマンティック構造）
+- **JavaScript**: フレームワークを使用しないバニラ JavaScript
+- **Leaflet.js**: インタラクティブマップライブラリ
+- **Google Fonts**: Fraunces（セリフ表示用）、DM Sans（サンセリフ本文用）
+- **Material Symbols**: イベントアイコンライブラリ
 
-## Getting Started
+## はじめ方
 
-### Local Development
+### ローカル開発
 
-No build tools needed. Simply:
+ビルドツール不要。以下のいずれかで実行：
 
 ```bash
-# Open directly in browser
+# ブラウザで直接開く
 open index.html
 
-# Or serve locally with Python
+# または Python でローカルサーバーを起動
 python3 -m http.server 8000
-# Then visit http://localhost:8000
+# その後 http://localhost:8000 にアクセス
 ```
 
-## Project Structure
+## プロジェクト構成
 
 ```
 travel-plans/
-├── index.html          Single-page application with all code
-├── DESIGN.md           Design system and color palette documentation
-├── schedule.csv        Event data (embedded in HTML <script>)
-├── README.md           This file
+├── index.html          シングルページアプリケーション（すべてのコードを含む）
+├── DESIGN.md           デザインシステムとカラーパレットドキュメント
+├── schedule.csv        イベントデータ（HTML の <script> 内に埋め込み）
+├── README.md           このファイル
 ├── .claude/settings.json
 ├── .mcp.json
 └── .gitignore
 ```
 
-## Design System
+## デザインシステム
 
-See [DESIGN.md](./DESIGN.md) for the complete design system.
+詳細については [DESIGN.md](./DESIGN.md) を参照。
 
-**Color Palette**:
-- Primary: Starbucks Green (#006241)
-- Accent: Green (#00754A)
-- Dark: House Green (#1E3932)
-- Canvas: Neutral Warm (#f2f0eb)
+**カラーパレット**:
+- プライマリ: スターバックスグリーン（#006241）
+- アクセント: グリーン（#00754A）
+- ダーク: ハウスグリーン（#1E3932）
+- キャンバス: ニュートラルウォーム（#f2f0eb）
 
-**Typography**:
-- Display: Fraunces (serif with WONK variation for unique character styling)
-- Body: DM Sans (sans-serif)
+**タイポグラフィ**:
+- 見出し: Fraunces（セリフ体、WONK バリエーション付き）
+- 本文: DM Sans（サンセリフ体）
 
-## Key Features
+## 主な機能
 
-### Calendar View
-- Horizontal timeline with hourly slots (configurable view range: 6am–10pm)
-- Multi-day events span across calendar cells
-- Click events to show details in the side panel
+### カレンダービュー
+- 時間別スロットの横軸タイムライン（表示時間帯: 6am～10pm をカスタマイズ可能）
+- 複数日にまたがるイベントはカレンダーセルを横断表示
+- イベントをクリックするとサイドパネルに詳細を表示
 
-### Map Integration
-- Location markers for all timed events
-- Hotels and all-day accommodations appear in a separate list
-- Toggle hotel visibility on/off
-- Click markers to highlight location details
+### マップ連携
+- 時間指定イベントのすべてに位置情報マーカーを表示
+- ホテルと終日イベントは別リストに表示
+- マップ上でホテル表示/非表示を切り替え可能
+- マーカークリックで位置情報詳細をハイライト
 
-### Event Filtering
-- Filter by category (food, sightseeing, etc.)
-- Filter by date
-- Real-time update of map markers and location list
+### イベントフィルタリング
+- カテゴリ（食事、観光など）でフィルタリング
+- 日付でフィルタリング
+- マップマーカーと位置情報リストをリアルタイムで更新
 
-### Responsive Design
-- Stacks vertically on screens below 960px
-- Detail panel goes full-width below 600px
-- Mobile-friendly touch targets
+### レスポンシブデザイン
+- 960px 以下の画面では縦並びレイアウト
+- 600px 以下ではサイドパネルが全幅表示
+- モバイルフレンドリータップターゲット
 
-## Architecture
+## アーキテクチャ
 
-### Data Flow
+### データフロー
 
 ```
-Events (defined in <script>)
+イベント（<script> で定義）
   ↓
-expandEvents() → convert multi-day events to daily segments
+expandEvents() → 複数日イベントを日単位セグメントに変換
   ↓
-renderCalendar() → time-slot grid
-deriveMapLocations() → extract lat/lng, deduplicate
+renderCalendar() → 時間スロットグリッドを生成
+deriveMapLocations() → 緯度経度を抽出、重複を排除
   ↓
-buildFilteredLocations() → apply filters
+buildFilteredLocations() → フィルターを適用
   ↓
-buildLocationList() → render cards and update map
+buildLocationList() → カードを描画、マップを更新
 ```
 
-### Event Structure
+### イベント構造
 
-Events support two formats:
+イベントは 3 つのタイプをサポート：
 
-**Time-based event** (appears on calendar and map):
+**時間指定イベント**（カレンダーとマップに表示）:
 ```javascript
 {
-  title: "Lunch at Restaurant",
+  title: "レストランでランチ",
   icon: "restaurant",
   start: "2026/08/13 12:00",
   end: "2026/08/13 13:30",
-  location: "Bangkok",
+  location: "バンコク",
   lat: 13.7563,
   lng: 100.5018,
   category: "food"
 }
 ```
 
-**Multi-day event** (spans multiple calendar days):
+**複数日イベント**（カレンダーの複数セルにまたがる）:
 ```javascript
 {
-  title: "Bangkok Hotel",
+  title: "バンコクホテル",
   icon: "hotel",
   multiDay: true,
   startDay: 0,
   endDay: 2,
   startHour: 15,
   endHour: 11,
-  location: "137 Pillars House Bangkok",
+  location: "137 ピラーズ レジデンス バンコク",
   lat: 13.7325,
   lng: 100.5064
 }
 ```
 
-**All-day event** (no map marker, hotels list only):
+**終日イベント**（マップマーカーなし、ホテルリストのみ）:
 ```javascript
 {
-  title: "Hotel Stay",
+  title: "ホテル滞在",
   icon: "hotel",
   allDay: true,
   start: "2026/08/12",
   end: "2026/08/14",
-  location: "Bangkok"
-  // Note: no lat/lng, so does not appear on map
+  location: "バンコク"
+  // 注意: 緯度経度がないため、マップには表示されません
 }
 ```
 
-## Customization
+## カスタマイズ
 
-### Change Colors
-Update CSS variables in `:root` in `index.html`:
+### カラー変更
+`index.html` の `:root` セクション内の CSS 変数を更新：
+
 ```css
 --dark: #1E3932;
 --green: #006241;
@@ -162,43 +163,43 @@ Update CSS variables in `:root` in `index.html`:
 --canvas: #f2f0eb;
 ```
 
-All colors must be defined as CSS variables. Never use hardcoded hex values.
+すべてのカラーは CSS 変数として定義する必要があります。ハードコードされた16進数値は使用しないでください。
 
-### Adjust Calendar Grid Height
-Change `HOUR_H = 44` in the `<script>` section, then update the repeating-linear-gradient background in `.cal-day-col` CSS to match.
+### カレンダーグリッドの高さを調整
+`<script>` セクション内の `HOUR_H = 44` を変更し、`.cal-day-col` CSS の repeating-linear-gradient 背景も合わせて更新。
 
-### Change Time Range
-Edit `viewStart` and `viewEnd` variables in the `<script>` block, and update the dropdown options in `buildOptions()`.
+### 時間表示範囲を変更
+`<script>` ブロック内の `viewStart` と `viewEnd` 変数を編集し、`buildOptions()` のドロップダウンオプションも更新。
 
-### Update Map Tiles
-Replace the `L.tileLayer()` URL in the `<script>` section. Currently uses CartoDB Voyager. Alternatives: Stamen Watercolor, Esri World Imagery, OpenStreetMap.
+### マップタイルを変更
+`<script>` セクション内の `L.tileLayer()` URL を置換。現在は CartoDB Voyager を使用。代替案: Stamen Watercolor、Esri World Imagery、OpenStreetMap。
 
-## Deployment
+## デプロイメント
 
-This repository is deployed to GitHub Pages.
+このリポジトリは GitHub Pages にデプロイされています。
 
-### First-time setup:
-1. Go to repository Settings → Pages
-2. Select source: `main` branch, root directory
-3. Save
+### 初回セットアップ:
+1. リポジトリの Settings → Pages に移動
+2. Source を選択: `main` ブランチ、ルートディレクトリ
+3. 保存
 
-### To deploy:
-Push to the `main` branch. The site updates automatically.
+### デプロイ方法:
+`main` ブランチにプッシュ。サイトは自動更新されます。
 
-## Browser Support
+## ブラウザサポート
 
-- Chrome/Edge (latest)
-- Firefox (latest)
-- Safari (iOS 14+)
+- Chrome/Edge（最新版）
+- Firefox（最新版）
+- Safari（iOS 14 以上）
 
-## License
+## ライセンス
 
-Private project
+プライベートプロジェクト
 
-## Author
+## 作成者
 
 y-shinozaki
 
 ---
 
-**Last updated**: June 7, 2026
+**最終更新**: 2026年6月7日
