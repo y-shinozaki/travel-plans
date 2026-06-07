@@ -959,14 +959,6 @@
       text-transform: uppercase;
     }
 
-    .footer-dot {
-      width: 3px;
-      height: 3px;
-      border-radius: 50%;
-      background: rgba(255, 255, 255, .2);
-    }
-
-
     /* ─── Stagger animations ────────────────────────── */
     @keyframes cardIn {
       from {
@@ -1291,6 +1283,10 @@
 
     function renderCalendar() {
       const cal = document.getElementById('cal');
+      if (!cal) {
+        console.error('[renderCalendar] Element #cal not found');
+        return;
+      }
       cal.innerHTML = '';
 
       // ─ ヘッダー行
@@ -1414,6 +1410,10 @@
     // 表示時間セレクターの初期化
     function buildOptions(elId, min, max, selected) {
       const sel = document.getElementById(elId);
+      if (!sel) {
+        console.error(`[buildOptions] Element #${elId} not found`);
+        return;
+      }
       for (let h = min; h <= max; h++) {
         const opt = document.createElement('option');
         opt.value = h;
@@ -1426,28 +1426,48 @@
     buildOptions('view-start', 0, 23, viewStart);
     buildOptions('view-end', 1, 24, viewEnd);
 
-    document.getElementById('view-start').addEventListener('change', e => {
-      viewStart = parseInt(e.target.value);
-      if (viewStart >= viewEnd) {
-        viewEnd = viewStart + 1;
-        document.getElementById('view-end').value = viewEnd;
-      }
-      renderCalendar();
-    });
+    const viewStartEl = document.getElementById('view-start');
+    if (viewStartEl) {
+      viewStartEl.addEventListener('change', e => {
+        try {
+          viewStart = parseInt(e.target.value);
+          if (viewStart >= viewEnd) {
+            viewEnd = viewStart + 1;
+            const viewEndEl = document.getElementById('view-end');
+            if (viewEndEl) viewEndEl.value = viewEnd;
+          }
+          renderCalendar();
+        } catch (err) {
+          console.error('[view-start change] Error:', err);
+        }
+      });
+    }
 
-    document.getElementById('view-end').addEventListener('change', e => {
-      viewEnd = parseInt(e.target.value);
-      if (viewEnd <= viewStart) {
-        viewStart = viewEnd - 1;
-        document.getElementById('view-start').value = viewStart;
-      }
-      renderCalendar();
-    });
+    if (viewEndEl) {
+      viewEndEl.addEventListener('change', e => {
+        try {
+          viewEnd = parseInt(e.target.value);
+          if (viewEnd <= viewStart) {
+            viewStart = viewEnd - 1;
+            const viewStartEl = document.getElementById('view-start');
+            if (viewStartEl) viewStartEl.value = viewStart;
+          }
+          renderCalendar();
+        } catch (err) {
+          console.error('[view-end change] Error:', err);
+        }
+      });
+    }
 
     function toggleHotels() {
-      showHotels = !showHotels;
-      document.getElementById('toggle-hotel').classList.toggle('active', showHotels);
-      renderCalendar();
+      try {
+        showHotels = !showHotels;
+        const toggleBtn = document.getElementById('toggle-hotel');
+        if (toggleBtn) toggleBtn.classList.toggle('active', showHotels);
+        renderCalendar();
+      } catch (err) {
+        console.error('[toggleHotels] Error:', err);
+      }
     }
 
     renderCalendar();
@@ -1455,11 +1475,20 @@
     // ─── Panel ─────────────────────────────────────────
 
     function openPanel(ev) {
-      const meta = catMeta[ev.cat] || { icon: 'location_on', label: '' };
-      const badge = document.getElementById('panel-cat-badge');
-      badge.innerHTML = `<span class="material-symbols-outlined">${ev.icon || meta.icon}</span>${meta.label}`;
-      document.getElementById('panel-title').textContent = ev.title;
-      document.getElementById('panel-notes').textContent = (ev.notes || '—').replace(/\\n/g, '\n');
+      try {
+        const meta = catMeta[ev.cat] || { icon: 'location_on', label: '' };
+        const badge = document.getElementById('panel-cat-badge');
+        const title = document.getElementById('panel-title');
+        const notes = document.getElementById('panel-notes');
+
+        if (!badge || !title || !notes) {
+          console.error('[openPanel] Required panel elements not found');
+          return;
+        }
+
+        badge.innerHTML = `<span class="material-symbols-outlined">${ev.icon || meta.icon}</span>${meta.label}`;
+        title.textContent = ev.title;
+        notes.textContent = (ev.notes || '—').replace(/\\n/g, '\n');
 
       const hasCoords = ev.lat != null && ev.lng != null;
       const locRow = hasCoords
@@ -1483,84 +1512,148 @@
          </div>
        </div>`
         : '';
-      document.getElementById('panel-meta').innerHTML = `
-    <div class="panel-meta-row">
-      <div class="panel-meta-icon"><span class="material-symbols-outlined">schedule</span></div>
-      <div><div class="panel-meta-label">時間</div><div class="panel-meta-value">${ev.time}</div></div>
-    </div>
-    ${locRow}
-    ${urlRow}`;
+        const panelMeta = document.getElementById('panel-meta');
+        if (panelMeta) {
+          panelMeta.innerHTML = `
+      <div class="panel-meta-row">
+        <div class="panel-meta-icon"><span class="material-symbols-outlined">schedule</span></div>
+        <div><div class="panel-meta-label">時間</div><div class="panel-meta-value">${ev.time}</div></div>
+      </div>
+      ${locRow}
+      ${urlRow}`;
+        }
 
-      // 座標があればマップに反映
-      if (hasCoords) flyToLocation(ev.lat, ev.lng, false);
+        // 座標があればマップに反映
+        if (hasCoords) flyToLocation(ev.lat, ev.lng, false);
 
-      document.getElementById('detail-panel').classList.add('open');
-      document.getElementById('overlay').classList.add('open');
+        const detailPanel = document.getElementById('detail-panel');
+        const overlay = document.getElementById('overlay');
+        if (detailPanel && overlay) {
+          detailPanel.classList.add('open');
+          overlay.classList.add('open');
+        }
+      } catch (err) {
+        console.error('[openPanel] Error:', err);
+      }
     }
 
     function flyToLocation(lat, lng, animate = true) {
-      const key = `${lat},${lng}`;
-      document.querySelectorAll('.location-card').forEach(c => {
-        c.classList.toggle('active', c.dataset.locKey === key);
-      });
-      if (animate) {
-        map.flyTo([lat, lng], 15, { duration: 0.8 });
-        markerMap.get(key)?.openPopup();
-      } else {
-        map.setView([lat, lng], 14, { animate: false });
+      try {
+        if (!map) {
+          console.warn('[flyToLocation] Map not initialized yet');
+          return;
+        }
+        const key = `${lat},${lng}`;
+        document.querySelectorAll('.location-card').forEach(c => {
+          c.classList.toggle('active', c.dataset.locKey === key);
+        });
+        if (animate) {
+          map.flyTo([lat, lng], 15, { duration: 0.8 });
+          window.markerMap?.get(key)?.openPopup();
+        } else {
+          map.setView([lat, lng], 14, { animate: false });
+        }
+      } catch (err) {
+        console.error('[flyToLocation] Error:', err);
       }
     }
 
     function closePanel() {
-      document.getElementById('detail-panel').classList.remove('open');
-      document.getElementById('overlay').classList.remove('open');
+      try {
+        const detailPanel = document.getElementById('detail-panel');
+        const overlay = document.getElementById('overlay');
+        if (detailPanel && overlay) {
+          detailPanel.classList.remove('open');
+          overlay.classList.remove('open');
+        }
+      } catch (err) {
+        console.error('[closePanel] Error:', err);
+      }
     }
 
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') closePanel(); });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        try {
+          closePanel();
+        } catch (err) {
+          console.error('[keydown] Error closing panel:', err);
+        }
+      }
+    });
 
     // ─── Map ───────────────────────────────────────────
 
-    const map = L.map('leaflet-map', { zoomControl: false });
-    L.control.zoom({ position: 'bottomright' }).addTo(map);
+    let map;
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
-      subdomains: 'abcd', maxZoom: 19,
-    }).addTo(map);
+    function initMap() {
+      // Leaflet ライブラリ読み込み検証
+      if (!window.L) {
+        console.error('Leaflet library failed to load from CDN.');
+        const mapEl = document.getElementById('leaflet-map');
+        if (mapEl) {
+          mapEl.innerHTML = '<div style="padding:2rem;background:var(--canvas);color:var(--text);">マップを読み込めませんでした。ページを再読み込みしてください。</div>';
+        }
+        return;
+      }
 
-    const mapLocations = collectLocations();
-    const markerMap = new Map(); // key: "lat,lng" → L.marker
+      try {
+        map = L.map('leaflet-map', { zoomControl: false });
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+      } catch (err) {
+        console.error('[initMap] Map initialization failed:', err);
+        const mapEl = document.getElementById('leaflet-map');
+        if (mapEl) {
+          mapEl.innerHTML = '<div style="padding:2rem;background:var(--canvas);color:var(--text);">マップの初期化に失敗しました。</div>';
+        }
+        return;
+      }
 
-    mapLocations.forEach(loc => {
-      const key = `${loc.lat},${loc.lng}`;
-      const pin = L.divIcon({
-        html: `<div style="
-      background:#2D6B4A;border:2px solid #4A9265;
-      border-radius:50% 50% 50% 0;transform:rotate(-45deg);
-      width:32px;height:32px;
-      display:flex;align-items:center;justify-content:center;
-      box-shadow:0 2px 8px rgba(0,0,0,0.25);
-    "><span class="material-symbols-outlined" style="
-      transform:rotate(45deg);font-size:15px;color:#fff;line-height:1;
-    ">${loc.icon}</span></div>`,
-        className: '',
-        iconSize: [32, 32],
-        iconAnchor: [16, 32],
-        popupAnchor: [0, -36],
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
+        subdomains: 'abcd', maxZoom: 19,
+      }).addTo(map);
+
+      const mapLocations = collectLocations();
+      window.markerMap = new Map(); // key: "lat,lng" → L.marker
+
+      mapLocations.forEach(loc => {
+        const key = `${loc.lat},${loc.lng}`;
+        const pin = L.divIcon({
+          html: `<div style="
+        background:var(--green);border:2px solid var(--green-mid);
+        border-radius:50% 50% 50% 0;transform:rotate(-45deg);
+        width:32px;height:32px;
+        display:flex;align-items:center;justify-content:center;
+        box-shadow:0 2px 8px rgba(0,0,0,0.25);
+      "><span class="material-symbols-outlined" style="
+        transform:rotate(45deg);font-size:15px;color:var(--white);line-height:1;
+      ">${loc.icon}</span></div>`,
+          className: '',
+          iconSize: [32, 32],
+          iconAnchor: [16, 32],
+          popupAnchor: [0, -36],
+        });
+
+        const marker = L.marker([loc.lat, loc.lng], { icon: pin })
+          .addTo(map)
+          .bindPopup(`<strong style="font-size:13px">${loc.name}</strong><br><span style="font-size:12px;color:var(--text-dim)">${loc.evs.length}件のイベント</span>`);
+        window.markerMap.set(key, marker);
       });
 
-      const marker = L.marker([loc.lat, loc.lng], { icon: pin })
-        .addTo(map)
-        .bindPopup(`<strong style="font-size:13px">${loc.name}</strong><br><span style="font-size:12px;color:#888">${loc.evs.length}件のイベント</span>`);
-      markerMap.set(key, marker);
-    });
+      // 登録済みの全スポットが収まるよう初期ビューを調整
+      if (mapLocations.length > 0) {
+        const bounds = L.latLngBounds(mapLocations.map(loc => [loc.lat, loc.lng]));
+        map.fitBounds(bounds, { padding: [48, 48] });
+      } else {
+        map.setView([13.736, 100.523], 11);
+      }
+    }
 
-    // 登録済みの全スポットが収まるよう初期ビューを調整
-    if (mapLocations.length > 0) {
-      const bounds = L.latLngBounds(mapLocations.map(loc => [loc.lat, loc.lng]));
-      map.fitBounds(bounds, { padding: [48, 48] });
+    // ページ読み込み完了後にマップを初期化
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initMap);
     } else {
-      map.setView([13.736, 100.523], 11);
+      initMap();
     }
 
     // ─── ロケーションフィルター ────────────────────────
@@ -1582,31 +1675,49 @@
     }
 
     function buildLocationList() {
-      const locs = buildFilteredLocations();
-      const listEl = document.getElementById('location-list');
-      listEl.innerHTML = '';
-      locs.forEach((loc, i) => {
-        const key = `${loc.lat},${loc.lng}`;
-        const card = document.createElement('div');
-        card.className = 'location-card';
-        card.dataset.locKey = key;
-        card.style.animationDelay = `${i * 0.07}s`;
-        card.innerHTML = `
-      <div class="loc-icon"><span class="material-symbols-outlined">${loc.icon}</span></div>
-      <div class="loc-name">${loc.name}</div>`;
-        card.addEventListener('click', () => {
-          document.querySelectorAll('.location-card').forEach(c => c.classList.remove('active'));
-          card.classList.add('active');
-          flyToLocation(loc.lat, loc.lng, true);
+      try {
+        const locs = buildFilteredLocations();
+        const listEl = document.getElementById('location-list');
+        if (!listEl) {
+          console.error('[buildLocationList] Element #location-list not found');
+          return;
+        }
+        listEl.innerHTML = '';
+        locs.forEach((loc, i) => {
+          const key = `${loc.lat},${loc.lng}`;
+          const card = document.createElement('div');
+          card.className = 'location-card';
+          card.dataset.locKey = key;
+          card.style.animationDelay = `${i * 0.07}s`;
+          card.innerHTML = `
+        <div class="loc-icon"><span class="material-symbols-outlined">${loc.icon}</span></div>
+        <div class="loc-name">${loc.name}</div>`;
+          card.addEventListener('click', () => {
+            try {
+              document.querySelectorAll('.location-card').forEach(c => c.classList.remove('active'));
+              card.classList.add('active');
+              flyToLocation(loc.lat, loc.lng, true);
+            } catch (err) {
+              console.error('[location-card click] Error:', err);
+            }
+          });
+          listEl.appendChild(card);
         });
-        listEl.appendChild(card);
-      });
-      // マーカーの表示・非表示
-      const visibleKeys = new Set(locs.map(l => `${l.lat},${l.lng}`));
-      markerMap.forEach((marker, key) => {
-        if (visibleKeys.has(key)) map.addLayer(marker);
-        else map.removeLayer(marker);
-      });
+        // マーカーの表示・非表示
+        if (map && window.markerMap) {
+          const visibleKeys = new Set(locs.map(l => `${l.lat},${l.lng}`));
+          window.markerMap.forEach((marker, key) => {
+            try {
+              if (visibleKeys.has(key)) map.addLayer(marker);
+              else map.removeLayer(marker);
+            } catch (err) {
+              console.error('[marker visibility] Error:', err);
+            }
+          });
+        }
+      } catch (err) {
+        console.error('[buildLocationList] Error:', err);
+      }
     }
 
     function setLocFilterBtn(groupId, value) {
@@ -1616,8 +1727,13 @@
     }
 
     function buildLocFilterUI() {
-      // カテゴリフィルター
-      const catEl = document.getElementById('loc-cat-filters');
+      try {
+        // カテゴリフィルター
+        const catEl = document.getElementById('loc-cat-filters');
+        if (!catEl) {
+          console.error('[buildLocFilterUI] Element #loc-cat-filters not found');
+          return;
+        }
       const availCats = [...new Set(events.filter(e => e.lat && e.lng && e.cat).map(e => e.cat))];
       [{ val: '', label: '全て' }, ...availCats.map(c => ({ val: c, label: catMeta[c]?.label || c }))]
         .forEach(({ val, label }) => {
@@ -1626,50 +1742,81 @@
           btn.textContent = label;
           btn.dataset.val = val;
           btn.addEventListener('click', () => {
-            locFilter.cat = val || null;
-            setLocFilterBtn('loc-cat-filters', locFilter.cat);
-            buildLocationList();
+            try {
+              locFilter.cat = val || null;
+              setLocFilterBtn('loc-cat-filters', locFilter.cat);
+              buildLocationList();
+            } catch (err) {
+              console.error('[cat-filter click] Error:', err);
+            }
           });
           catEl.appendChild(btn);
         });
 
-      // 日付フィルター
-      const dayEl = document.getElementById('loc-day-filters');
-      const allDayBtn = document.createElement('button');
-      allDayBtn.className = 'loc-filter-btn active';
-      allDayBtn.textContent = '全日程';
-      allDayBtn.dataset.val = '';
-      allDayBtn.addEventListener('click', () => {
-        locFilter.day = null;
-        setLocFilterBtn('loc-day-filters', null);
-        buildLocationList();
-      });
-      dayEl.appendChild(allDayBtn);
+        // 日付フィルター
+        const dayEl = document.getElementById('loc-day-filters');
+        if (!dayEl) {
+          console.error('[buildLocFilterUI] Element #loc-day-filters not found');
+          return;
+        }
 
-      days.forEach((d, i) => {
-        const hasLoc = events.some(ev => ev.lat && ev.lng && eventOccursOnDay(ev, i));
-        if (!hasLoc) return;
-        const btn = document.createElement('button');
-        btn.className = 'loc-filter-btn';
-        btn.textContent = d.date;
-        btn.dataset.val = String(i);
-        btn.addEventListener('click', () => {
-          locFilter.day = i;
-          setLocFilterBtn('loc-day-filters', i);
-          buildLocationList();
+        const allDayBtn = document.createElement('button');
+        allDayBtn.className = 'loc-filter-btn active';
+        allDayBtn.textContent = '全日程';
+        allDayBtn.dataset.val = '';
+        allDayBtn.addEventListener('click', () => {
+          try {
+            locFilter.day = null;
+            setLocFilterBtn('loc-day-filters', null);
+            buildLocationList();
+          } catch (err) {
+            console.error('[day-filter click] Error:', err);
+          }
         });
-        dayEl.appendChild(btn);
-      });
+        dayEl.appendChild(allDayBtn);
+
+        days.forEach((d, i) => {
+          const hasLoc = events.some(ev => ev.lat && ev.lng && eventOccursOnDay(ev, i));
+          if (!hasLoc) return;
+          const btn = document.createElement('button');
+          btn.className = 'loc-filter-btn';
+          btn.textContent = d.date;
+          btn.dataset.val = String(i);
+          btn.addEventListener('click', () => {
+            try {
+              locFilter.day = i;
+              setLocFilterBtn('loc-day-filters', i);
+              buildLocationList();
+            } catch (err) {
+              console.error('[day-filter click] Error:', err);
+            }
+          });
+          dayEl.appendChild(btn);
+        });
+      } catch (err) {
+        console.error('[buildLocFilterUI] Error:', err);
+      }
     }
 
-    buildLocFilterUI();
-    buildLocationList();
+    try {
+      buildLocFilterUI();
+      buildLocationList();
+    } catch (err) {
+      console.error('[init location UI] Error:', err);
+    }
 
     // ─── Reveal ────────────────────────────────────────
 
     const revealObs = new IntersectionObserver((entries, obs) => {
       entries.forEach(e => {
-        if (e.isIntersecting) { e.target.classList.add('visible'); obs.unobserve(e.target); }
+        try {
+          if (e.isIntersecting) {
+            e.target.classList.add('visible');
+            obs.unobserve(e.target);
+          }
+        } catch (err) {
+          console.error('[IntersectionObserver] Error:', err);
+        }
       });
     }, { threshold: 0.1 });
 

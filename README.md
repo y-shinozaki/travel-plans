@@ -97,7 +97,7 @@ travel-plans/
 expandEvents() → 複数日イベントを日単位セグメントに変換
   ↓
 renderCalendar() → 時間スロットグリッドを生成
-deriveMapLocations() → 緯度経度を抽出、重複を排除
+collectLocations() → 緯度経度を抽出、重複を排除
   ↓
 buildFilteredLocations() → フィルターを適用
   ↓
