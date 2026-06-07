@@ -29,6 +29,4 @@ build/
 *.log
 npm-debug.log*
 
-# Local development
-.claude/
-.mcp.json
+# Local development (but keep .claude/settings.json and .mcp.json for project config)
