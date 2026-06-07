@@ -3,11 +3,9 @@
     "github": {
       "type": "stdio",
       "command": "npx",
-      "args": [
-        "@modelcontextprotocol/server-github"
-      ],
+      "args": ["@modelcontextprotocol/server-github"],
       "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN_PRIVATE}"
       }
     },
     "notion": {
