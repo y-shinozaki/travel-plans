@@ -1,580 +1,374 @@
-# Design System Inspired by Starbucks
+# DESIGN.md — 代官山 蔦屋書店 (Daikanyama T-SITE)
+
+> 代官山 蔦屋書店（https://store.tsite.jp/daikanyama/）のデザイン仕様書。
+> 2026-05-08 取得の computed style に基づく。
+
+---
 
 ## 1. Visual Theme & Atmosphere
 
-Starbucks' design system is a **warm, confident retail flagship** wearing the green of their storefront apron across every surface. The canvas alternates between a neutral-warm cream (`#f2f0eb`) and a ceramic off-white (`#edebe9`) — colors that reference actual store materials: the paper napkins, the café walls, the wood finishes — while the signature **Starbucks Green** (`#006241`) anchors the brand moment on hero bands, CTAs, and the Rewards experience. The greens come in four calibrated shades (Starbucks, Accent, House, Uplift) each mapped to a specific surface role, and gold (`#cba258`) appears only around Rewards-status ceremony — not as a general accent.
+- **デザイン方針**: 2011年開業、クライン ダイサム アーキテクツ設計の代官山 T-SITE 内にある旗艦書店。「大人のための文化複合施設」をコンセプトに、書籍・雑貨・カフェ・イベントを一体化させた施設の公式サイト。**極小フォント（10〜12px）と大きな写真の対比**、彩度を抑えた**クラフト紙のような #f6f6f3 背景**が特徴
+- **密度**: 情報量が極めて多い。営業時間・カレンダー・カテゴリ・新刊情報・イベント情報が縦に積層する。書店としての網羅性を優先
+- **キーワード**: 書店、文化複合、和洋折衷、クラフト紙、極小フォント、Noto Sans Japanese、square corners、編集の密度
+- **特徴**: **すべての要素で `border-radius: 0px`** の徹底した直角主義。ベース背景は純白ではなく **#f6f6f3（クラフト紙のような淡いベージュ）**。NEW バッジには **#c4002e（蔦屋ブランドレッド）**、カテゴリ面色には **#93928b（暖灰）**。曜日テーブルは土曜 #4f9eef・日曜 #ee6a6a と古典的なカラーリング
 
-Typography carries most of the brand voice. The proprietary **SoDoSans** typeface (custom to Starbucks) sits across nearly every surface with a tight `-0.16px` letter-spacing — it reads confident and friendly rather than fashion-magazine severe. What's unusual: the Rewards page switches to a warm serif (`"Lander Tall", "Iowan Old Style", Georgia`) for specific headline moments, subtly echoing the nostalgic feel of a coffeehouse chalkboard. And the Careers pages use a handwritten script (`"Kalam", "Comic Sans MS", cursive`) for personal cup-name touches. Three typefaces, three contexts — the system is disciplined about when each appears.
-
-The surfaces breathe through rounded geometry. Every button is a 50px full-pill. Cards take a 12px rounded-rectangle. The "Frap" floating CTA — a 56px circular order button in Green Accent (`#00754A`) — is the product's signature depth move: it floats bottom-right with a layered shadow stack (`0 0 6px rgba(0,0,0,0.24)` base + `0 8px 12px rgba(0,0,0,0.14)` ambient) and compresses via `scale(0.95)` on press. Elevations are otherwise restrained — card shadows stay at a whispered `0.14/0.24` alpha, global nav gets a quiet three-layer shadow stack. The whole system feels like clean café signage: legible, warm, and never shouting.
-
-**Key Characteristics:**
-- Four-tier green brand system (Starbucks / Accent / House / Uplift) each mapped to a distinct surface role — not a single "brand green"
-- Gold reserved for Rewards-status moments only; never a general-purpose accent
-- Warm-neutral canvas (`#f2f0eb` / `#edebe9`) instead of cold white — references café materials
-- Custom proprietary typeface (SoDoSans) with tight `-0.16px` letter-spacing as the universal voice
-- Context-specific type switches: serif (Lander Tall) for Rewards, script (Kalam) for Careers cup-names
-- Full-pill buttons (`50px` radius) universal, `scale(0.95)` active press the signature micro-interaction
-- Floating "Frap" circular CTA (`56px`, Green Accent fill, layered shadow stack) — the product's signature elevation element
-- Gift-card surfaces designed as **photographed physical product** — every card is a distinct illustrated photograph rather than a generated graphic
-- 12px card radius + whisper-soft shadows keep content cards flat-plus-hint-of-lift
-- Rem-based spacing scale anchored at 1.6rem (~16px) = `--space-3`, stepping to 6.4rem (~64px)
-
-**Color-block page rhythm:** Cream hero → White content sections → Dark-green (`#1E3932`) feature band with white text → Cream utility zone → Dark-green (`#1E3932`) footer with gold / white text — an espresso-dark bookend around the bright body.
+---
 
 ## 2. Color Palette & Roles
 
-**Source pages analyzed:** homepage, rewards, gift cards, product detail (Pink Energy Drink), product nutrition (Cold Brew).
+### Primary（ブランドカラー）
 
-### Primary
+- **Tsutaya Red** (`#c4002e`): 「NEW」バッジ等、新着情報の強調色のみに使用（rgb 196, 0, 46）
+- **Cream** (`#f6f6f3`): 主背景。クラフト紙のような淡いベージュ（rgb 246, 246, 243）。出現回数 20 とサイト内で最頻出
+- **Warm Gray** (`#93928b`): カテゴリラベル背景（rgb 147, 146, 139）。書棚のジャンル札のような色
 
-- **Starbucks Green** (`#006241`): The historic brand green. Used on h1 headings, primary section headers on the Rewards page, and as the main brand signal wherever a single dominant color is needed.
-- **Green Accent** (`#00754A`): A slightly brighter, more luminous green. The primary filled-CTA color ("Explore our afternoon menu", "See the spring menu") and the fill of the floating Frap circular button.
-- **House Green** (`#1E3932`): The deep near-black brand green. Footer surface, feature-band backgrounds, reward-status dark surfaces, and the headline "Free coffee is just the beginning" hero band on Rewards.
-- **Green Uplift** (`#2b5148`): A secondary mid-dark green used sparingly on decorative accents and dark-gradient moments.
-- **Green Light** (`#d4e9e2`): A pale mint wash used for form-valid-state tints and light green utility surfaces.
+### Surface
 
-### Secondary & Accent
+- **White** (`#ffffff`): カード本体、検索バー
+- **Card Surface** (`#e5e5e1`): イベント・お知らせカード背景。Cream より一段濃い
+- **Light Gray Surface** (`#f7f7f7`): 「TODAY'S EVENT」セクション背景
+- **Border Gray** (`#dadada`): 区切り線、入力フィールド枠
+- **Mid Gray** (`#c0c0c0`): 検索フィールドの placeholder 背景
+- **Overlay** (`rgba(0, 0, 0, 0.5)`): モーダル等の半透明黒
 
-- **Gold** (`#cba258`): Reserved almost exclusively for Rewards-status ceremony — Gold-tier callouts, partnership badges (SkyMiles, Bonvoy), and premium-feeling accents. Never a general-purpose brand color.
-- **Gold Light** (`#dfc49d`): Softer gold for background washes on gold-tier sections.
-- **Gold Lightest** (`#faf6ee`): Cream-gold page-surface wash used under partnership sections on the Rewards page — ties the gold accent back into the warm neutral system.
+### Text
 
-### Surface & Background
+- **Black** (`#000000`): 本文・見出し（純黒を採用する数少ないサイト）
+- **Charcoal** (`#333333`): 価格表示
+- **White** (`#ffffff`): バッジ・反転テキスト
 
-- **White** (`#ffffff`): Primary card and modal surface. Also card fill on gift-card tiles.
-- **Neutral Cool** (`#f9f9f9`): Subtle cool-gray surface used on dropdown menus ("Account" dropdown), form-card wraps, and quiet utility containers.
-- **Neutral Warm** (`#f2f0eb`): The warm cream **primary page canvas** for Rewards utility zones and hero bands.
-- **Ceramic** (`#edebe9`): A slightly warmer/darker cream for zone separators, soft page-section washes, and Rewards partnership band.
-- **Black** (`#000000`): Deep ink reserved for the dark top-of-page CTA strip ("Join now") and high-contrast top-nav sign-in buttons.
+### Calendar Accent
 
-### Neutrals & Text
+- **Saturday** (`#4f9eef`): 土曜列の数字（rgb 79, 158, 239）
+- **Sunday** (`#ee6a6a`): 日曜列の数字（rgb 238, 106, 106）
 
-- **Text Black** (`rgba(0, 0, 0, 0.87)`): Primary heading and body text color on light surfaces. Not pure black — an 87%-opacity black that reads warmer.
-- **Text Black Soft** (`rgba(0, 0, 0, 0.58)`): Secondary/metadata text on light surfaces.
-- **Text White** (`rgba(255, 255, 255, 1)`): Primary heading/body text on dark green surfaces.
-- **Text White Soft** (`rgba(255, 255, 255, 0.70)`): Secondary text on dark-green surfaces — footer link descriptions, caption text.
-- **Rewards Green** (`#33433d`): A dedicated muted slate-green used only on Rewards-page text blocks — a slightly "dustier" reading color than Text Black that signals "reward surface" without using full Starbucks Green.
-
-### Semantic & Accent
-
-- **Red** (`#c82014`): Error and destructive state (form invalid, destructive actions).
-- **Yellow** (`#fbbc05`): Warning state, legacy brand touch.
-- **Green Light** (`#d4e9e2` at 33% opacity = `hsl(160 32% 87% / 33%)`): Form valid-field tint background.
-- **Red Tint** (`hsl(4 82% 43% / 5%)`): Invalid-field tint on forms.
-
-### Black / White Alpha Ladders
-
-Two parallel translucent scales for overlay and secondary-text use:
-- `rgba(0,0,0,0.06)` through `rgba(0,0,0,0.90)` in 10% steps — for dark overlays on light surfaces
-- `rgba(255,255,255,0.10)` through `rgba(255,255,255,0.90)` in 10% steps — for light overlays on dark surfaces
-
-### Gradient System
-
-No structural gradient tokens observed. Surface hierarchy is solid-color-block throughout — the system relies on its five-tier cream/green surface palette rather than gradients.
+---
 
 ## 3. Typography Rules
 
-### Font Family
+### 3.1 和文フォント
 
-- **Primary:** `SoDoSans, "Helvetica Neue", Helvetica, Arial, sans-serif` — Starbucks' proprietary corporate typeface, used across nearly every surface
-- **Loading Fallback:** `"Helvetica Neue", Helvetica, Arial, sans-serif` — what users see before SoDoSans loads
-- **Rewards Serif:** `"Lander Tall", "Iowan Old Style", Georgia, serif` — used on specific Rewards-page headline moments for a warm editorial feel
-- **Careers Script:** `"Kalam", "Comic Sans MS", cursive` — used exclusively for Careers-page "cup name" decorative touches, referencing the hand-written names on Starbucks cups
+- **Noto Sans Japanese**: 唯一の和文フォント。書体への装飾は加えず、Google Fonts の "Noto Sans Japanese" を素朴に使う
 
-No OpenType stylistic sets explicitly activated at `:root`.
+```css
+font-family: "Noto Sans Japanese", sans-serif;
+```
 
-### Hierarchy
+蔦屋書店は**徹底的に Noto Sans 一択**で構成され、明朝体や游ゴシックのバリエーションは持たない。
 
-| Role | Size | Weight | Line Height | Letter Spacing | Notes |
-|------|------|--------|-------------|----------------|-------|
-| Display (text-10) | 5.0rem / 80px | 400–600 | 1.2 | -0.16px | Largest Rewards/hero display |
-| Jumbo (text-9) | 3.6rem / 58px | 400–600 | 1.2 | -0.16px | Secondary hero headings |
-| Hero Large (text-8) | 2.8rem / 45px | 400–600 | 1.2–1.5 | -0.16px | Landing section headlines |
-| H1 | 24px | 600 | 36px | -0.16px | Starbucks-Green primary heading |
-| H2 | 24px | 400 | 36px | -0.16px | Regular-weight section title in Text Black |
-| Body Large | 19px | 400–600 | 33.25px (~1.75) | -0.16px | Hero intro copy, feature-band body |
-| Body (text-3) | 1.6rem / 16px | 400 | 1.5 (24px) | -0.01em | Default body copy |
-| Small (text-2) | 1.4rem / ~14px | 400–600 | 1.5 | -0.01em | Button label, metadata, form labels |
-| Micro (text-1) | 1.3rem / ~13px | 400 | 1.5 | -0.01em | Active float-label state, caption micro-copy |
-| Button Label | 14–16px | 400–600 | 1.2 | -0.01em | All pill-button labels |
+### 3.2 欧文フォント
 
-**Letter-spacing tokens:**
-- `letterSpacingNormal`: `-0.01em` (default — tight, characteristic)
-- `letterSpacingLoose`: `0.1em` (emphasized caps)
-- `letterSpacingLooser`: `0.15em` (uppercase-style labels, extreme emphasis)
+- **Muli**: NEW バッジなど英字バッジの専用フォント（Google Fonts）。`Muli, sans-serif`
+- **Arial**: 検索フィールドの入力用フォント
 
-**Line-height tokens:**
-- `lineHeightNormal`: `1.5` (body)
-- `lineHeightCompact`: `1.2` (display/buttons)
+### 3.3 font-family 指定
 
-### Principles
+```css
+/* 本文・見出し（メインスタック） */
+font-family: "Noto Sans Japanese", sans-serif;
 
-- **Tight negative tracking (`-0.01em`)** is applied almost universally — the entire product reads slightly compressed, which gives SoDoSans its confident presence without feeling squeezed.
-- **Weight shifts carry hierarchy, not size shifts.** H1 and H2 share the same 24px/36px size; only weight (600 vs 400) and color (Starbucks-Green vs Text Black) separate them.
-- **Size tokens use rem, anchored to `1rem = 10px`** on this site (via a `font-size: 62.5%` root trick). So `1.6rem` = 16px, `2.4rem` = 24px, etc. The scale is semantic (textSize-1 through textSize-10), not arbitrary pixel values.
-- **Context-specific typeface swaps** — serif on Rewards, script on Careers — are deliberate and localized. Never mix them with the primary sans within the same surface.
-- **Body text never goes pure black** — it sits at `rgba(0,0,0,0.87)` to match the warm-neutral canvas temperature.
+/* バッジ用（NEW、SOLD OUT 等） */
+font-family: Muli, sans-serif;
 
-### Note on Font Substitutes
+/* 検索フィールド */
+font-family: Arial;
+```
 
-SoDoSans is proprietary to Starbucks (licensed from House Industries, not publicly available). Reasonable open-source substitutes:
-- **Inter** (Google Fonts) — similar humanist geometric proportions, wide weight range
-- **Manrope** — slightly rounder, similar confident feel
-- **Nunito Sans** — warmer, good for a "café" brand substitute
+### 3.4 文字サイズ・ウェイト階層
 
-If substituting, verify the tight `-0.01em` / `-0.16px` tracking still reads well; some open-source fonts need `-0.005em` instead.
+蔦屋書店は**極小フォントを多用**する。情報量を優先するため、PC ビューでも 10px が標準サイズ。
 
-Lander Tall (the Rewards serif) is custom — open-source substitutes: **Iowan Old Style** (already in fallback), **Lora**, or **Source Serif Pro**. Kalam (Careers script) is available on Google Fonts directly.
+| Role                    | Size   | Weight | Line Height  | Letter Spacing | 備考                                               |
+| ----------------------- | ------ | ------ | ------------ | -------------- | -------------------------------------------------- |
+| Body                    | 10px   | 300    | normal       | 0.1em (1px)    | サイト全体の基本サイズ。極小                       |
+| H1 / H2 / Section Title | 28px   | 700    | normal       | 0.1em (1px)    | "RECOMMEND" "TODAY'S EVENT"                        |
+| Sub Banner Title        | 24px   | 300    | normal       | 0.1em (1px)    | 検索バー周辺の大型テキスト                         |
+| Calendar Date Cell      | 16px   | 700    | 50px (3.125) | 0.1em (1px)    | 営業時間カレンダー                                 |
+| Search Label (sp)       | 14.4px | 300    | normal       | 0.1em (1px)    | スマートフォン用ラベル                             |
+| Nav Item                | 14px   | 300    | 64px (4.57)  | normal         | グローバルナビ。lh 64px はヘッダー高 64px に揃える |
+| Skip Link               | 12px   | 300    | normal       | 0.1em (1px)    | "メインコンテンツへ移動"                           |
+| Product Title           | 12px   | 300    | 18px (1.5)   | 0.1em (1px)    | 商品名                                             |
+| Price                   | 12px   | 300    | normal       | 0.1em (1px)    | "￥5,500" 価格表示                                 |
+| Product Code            | 10px   | 300    | normal       | 0.1em (1px)    | 商品 ID                                            |
+| NEW Badge               | 11px   | 700    | 22px (2.0)   | 0.18em (2px)   | Muli フォント。バッジ専用                          |
+
+### 3.5 行間・字間
+
+- **本文の line-height: normal**（ブラウザデフォルト ≒ 1.2）。日本語サイトとしては詰めた行間
+- **テーブルセル lh 50px**: カレンダーの曜日マスは 50px の行高で正方形を意識
+- **ナビ lh 64px**: ヘッダー領域の高さ 64px に行高を一致させ、垂直方向中央揃えを実現
+- **letter-spacing: 1px (0.1em)**: ほぼすべてのテキストに均一に適用。極小フォントを読みやすく
+- **NEW バッジは letter-spacing: 2px**: より広く開けて、英大文字バッジとしての視認性を確保
+
+### 3.6 OpenType 機能 / palt
+
+- **palt は使用しない**。Noto Sans Japanese のデフォルトメトリクスを尊重
+- font-feature-settings は明示指定なし
+
+### 3.7 数値・記号の組み方
+
+- **半角数字優先**: "￥5,500"、"2026.05.07(水)" など、価格・日付は半角数字で組む
+- **括弧は全角**: 日付の "(水)" は全角括弧で組まれる
+- **ナンバリング**: 商品 ID "53407" は半角数字 10px / 300 で表示
+
+---
 
 ## 4. Component Stylings
 
-### Buttons
+### Buttons / Links
 
-**1. Primary Filled — "Explore our afternoon menu / Sign up for free"**
-- Background: `#00754A` (Green Accent)
-- Text: `#ffffff`
-- Border: `1px solid #00754A`
-- Radius: `50px` (full pill)
-- Padding: `7px 16px`
-- Font: SoDoSans, 16px, weight 600, letter-spacing `-0.01em`
-- Active state: `transform: scale(0.95)` via `--buttonActiveScale`
-- Transition: `all 0.2s ease`
+蔦屋書店は CTA に明示的な「ボタン枠」を持たない。すべてテキストリンクか、テキストの前後に下線を付ける程度。
 
-**2. Primary Outlined — "Give them a try / Start an order"**
-- Background: transparent
-- Text: `#00754A` (Green Accent)
-- Border: `1px solid #00754A`
-- Same radius/padding/active/transition as Primary Filled
+**Skip Link（左上の隠しリンク）**
 
-**3. Black Filled — "Join now"**
 - Background: `#000000`
 - Text: `#ffffff`
-- Border: `1px solid #000000`
-- Radius: `50px`, Padding: `7px 16px`
-- Font: 14px, weight 600
-- Used on the top-of-page join strip and similar conversion moments
+- Font: Noto Sans Japanese 12px / 300
+- Padding: 8px
+- Border Radius: 0px
+- Letter Spacing: 0.1em
 
-**4. Dark Outlined — "Sign in"**
-- Background: transparent
-- Text: `rgba(0, 0, 0, 0.87)` (Text Black)
-- Border: `1px solid rgba(0, 0, 0, 0.87)`
-- Radius: `50px`, Padding: `7px 16px`
-- Font: 14px, weight 600
+**MORE / 一覧へ**
 
-**5. Green-on-Green Inverted — "See the spring menu"**
 - Background: `#ffffff`
-- Text: `#00754A`
-- Border: `1px solid #ffffff`
-- Used when the surface behind the button is the dark green House Green band — white button with green text instead of a filled green pill on green bg
+- Text: `#000000`
+- Font: Noto Sans Japanese 10px / 300
+- Padding: 0px（テキストのみ）
+- Border Radius: 0px
+- Underline: hover 時のみ
 
-**6. Outlined on Dark — "Learn more / Order now"**
+**Nav Item**
+
 - Background: transparent
+- Text: `#000000`
+- Font: Noto Sans Japanese 14px / 300
+- Line Height: 64px（ヘッダー高に一致）
+- Padding: 0 12px
+
+### Badge
+
+**NEW Badge（赤）**
+
+- Background: `#c4002e`
 - Text: `#ffffff`
-- Border: `1px solid #ffffff`
-- Used on dark-green feature bands for secondary action paired with a white filled CTA
+- Font Family: **Muli**, sans-serif
+- Font Size: 11px
+- Font Weight: 700
+- Line Height: 22px
+- Padding: 0 0 0 3px（左に微小オフセット）
+- Border Radius: 0px
+- Letter Spacing: 0.18em (2px)
 
-**7. Consent Agree (dark-green variant)**
-- Background: `rgb(0, 130, 72)` (a specific variant green used in the cookie-consent module)
+**Category Tag（暖灰）**
+
+- Background: `#93928b`
 - Text: `#ffffff`
-- No border, `50px` radius, `7px 16px` padding, 14px / weight 400
-- Slightly brighter than Green Accent — reserved for the consent-banner Agree action
+- Font: Noto Sans Japanese 10px / 300
+- Padding: 4px 12px
+- Border Radius: 0px
 
-**8. Frap — Floating Circular Order Button**
-- Background: `#00754A` (Green Accent)
-- Icon: `#ffffff`
-- Size: `5.6rem / 56px` (standard), `4rem / 40px` (mini variant)
-- Radius: `50%` (full circle)
-- Fixed bottom-right, `-0.8rem` touch offset for extra tap comfort
-- Shadow stack: base `0 0 6px rgba(0,0,0,0.24)` + ambient `0 8px 12px rgba(0,0,0,0.14)`
-- Active state: ambient shadow fades to `0 8px 12px rgba(0,0,0,0)`
-- This is the product's signature elevation element — it floats over every scrolled surface
+### Cards
 
-**9. Full-width Feedback Tab — "Provide feedback"**
-- Background: `#00754A`
-- Text: `#ffffff`
-- Radius: `12px 12px 0px 0px` (top-rounded only)
-- Padding: `8px 16px`
-- Font: 14px, weight 400
-- Positioned fixed bottom-right-inside, attached to the viewport edge
+**Event Card（クリーム）**
 
-### Cards & Containers
+- Background: `#e5e5e1`
+- Border: なし
+- Border Radius: 0px
+- Padding: 内側にゆとり
+- Shadow: なし
 
-**Content Card (default)**
-- Background: `#ffffff` (`--cardBackgroundColor`)
-- Radius: `12px` (`--cardBorderRadius`)
-- Shadow: `0px 0px .5px 0px rgba(0,0,0,0.14), 0px 1px 1px 0px rgba(0,0,0,0.24)` (`--cardBoxShadow`)
-- Used for: feature cards, menu-item tiles, reward-status panels
+**Product Card**
 
-**Gift Card Tile**
-- Background: illustrated photography fills the card (no solid bg)
-- Radius: similar to cards (`~12px`, slightly tighter on corners)
-- Shadow: lighter than default card — these are treated like physical cards laid on the canvas
-- Labeled by category above the card grid (Spring, Thank You, Birthday, Celebration, Mother's Day, Appreciation, Encouragement, Milestones, Anytime)
+- Background: `#ffffff`（または #f6f6f3 シリーズ背景に置く）
+- Border: なし
+- Border Radius: 0px
+- Image: 矩形のままトリミング
+- Title 12px + Price 12px + Code 10px の3 段構成
 
-**Rewards Status Cards (Rewards page signature)**
-- Three-column grid: Bronze / Gold / Silver-ish — each a dark-green (`#1E3932`) panel with:
-  - Colored gradient/color header ring
-  - Numbered "Level" badge
-  - Status title in large SoDoSans weight 600
-  - Stars / benefits list in white/translucent-white text
-  - Bottom "As you earn more stars…" progression caption
+### Inputs
 
-**Partnership Card (Rewards)**
-- Background: `#faf6ee` (Gold Lightest) warm-cream surface
-- Content: partner logos ("SkyMiles", "Bonvoy") centered, with descriptive text below
-- Radius and shadow follow default card spec
+**Search Field**
 
-**Dropdown Menu (Account dropdown, top-nav)**
-- Background: `#f9f9f9` (Neutral Cool)
-- Menu items at `24px / weight 400` in Text Black
-- No border — just background surface shift against white nav
-
-**Modal**
-- Padding: `2.4rem` (`--modalPadding`)
-- Top padding: `8.8rem` (`--modalTopPadding`) — leaves room for close button / header
-- Combined vertical padding: `11.2rem`
-- Radius inherits from card spec (`12px`)
-
-### Inputs & Forms
-
-**Floating Label Input**
-- Label floats above the input border when focused/filled
-- Desktop label font size: `1.9rem` default, animates to `1.4rem` when active
-- Mobile label font size: `1.6rem` default, animates to `1.3rem` active
-- Label horizontal offset: `12px` from left
-- Active label translate: up to `-12px` with `-50%` Y translation
-- Field padding: `12px`
-- Form horizontal padding: `1.6rem`
-- Validation: valid-field gets `rgba(green-light, 0.33)` tint; invalid-field gets `rgba(red, 0.05)` tint
-- Transition: `0.3s option-label-marker-expansion cubic-bezier(0.32, 2.32, 0.61, 0.27)` on checked-input
-
-**Option Icon (checkbox/radio)**
-- Padding: `3px` inner
-- Uses the checked-input cubic-bezier animation above (a slightly "springy" 2.32 overshoot curve)
-
-### Navigation
-
-**Global Nav (top bar)**
-- Fixed position with progressive heights: `64px` xs → `72px` mobile → `83px` tablet → `99px` desktop
-- Shadow stack: `0 1px 3px rgba(0,0,0,0.1), 0 2px 2px rgba(0,0,0,0.06), 0 0 2px rgba(0,0,0,0.07)` — three-layer soft lift
-- Left: Starbucks wordmark logo, offsetting by `99px` (md) / `131px` (lg) from left edge
-- Primary links inline in SoDoSans weight 400–600: Menu · Rewards · Gift Cards
-- Right: Find a store link + Sign in (outlined) + Join now (black filled)
-
-**Sub-nav (second bar, e.g., Rewards internal)**
-- Height: `53px` (global subnav) / `48px` (internal subnav)
-- Typically horizontal tab group beneath the global nav
-
-**Mobile Nav**
-- Collapses to a hamburger drawer below tablet breakpoint
-- Frap floating button persists at bottom-right regardless of nav state
-
-### Image Treatment
-
-- **Hero photography**: Product photos (beverages in clear glass with colored backgrounds — coral, sage, warm amber) occupy ~40vw of a split-hero layout; text occupies the other 60vw (`--headerCrateProportion: 40vw` / `--contentCrateProportion: 60vw`)
-- **Gift card illustrations**: Each card is a distinct illustrated photograph (painted-feel, hand-drawn-looking, warm color palette). Never generic generated graphics.
-- **Rewards ceremony imagery**: Photographs of Starbucks Rewards App screens held in-hand, angled compositions — product-in-context photography.
-- **Menu thumbnails**: Square or 4:3 product photography with clean white/cream backdrops, slight soft drop-shadow around the glass.
-- **Image fade-in**: `opacity 0.3s ease-in` transition on image load (`--imageFadeTransition`).
-
-### Feature Band (dark-green hero strip)
-
-Full-width `#1E3932` (House Green) band with:
-- Left: white headline + subhead + CTA row
-- Right: product photography or illustration
-- Split ratio ~40/60 or 50/50 depending on section
-- White text throughout with `rgba(255,255,255,0.70)` for secondary copy
-- CTAs follow Green-on-Green Inverted (white filled) + Outlined on Dark (white outline) pairing
-
-### Expander / Accordion
-
-- Duration: `300ms` (`--expanderDuration`)
-- Timing curve: `cubic-bezier(0.25, 0.46, 0.45, 0.94)` — a measured ease-out
-- Used for FAQ sections on Rewards and gift page
-
-### Cookie Consent Module
-
-Dark-green modal card at top of page with "Agree" (green-filled) and "Manage preferences" (outlined) buttons. Appears on first visit; dismissible.
-
-### Product Detail Components (PDP signature cluster)
-
-A repeating component cluster used on menu product pages (e.g., `/menu/product/40498/iced` for a drink detail, `/menu/product/.../nutrition` for nutrition facts). These extend the component inventory without changing tokens.
-
-**Size Options Selector**
-- Horizontal row of 4 cup-icon buttons (Tall / Grande / Venti / Trenta)
-- Each item: cup silhouette icon on top, size name below (16/700 in Starbucks-Green), fluid-ounce caption (13/400 in Text Black Soft)
-- Active state: a green circular ring outline (`2px solid #00754A`) around the selected cup icon
-- Inactive: no ring, same typography
-- Full-width row, equal spacing
-- Radius of container: `12px` or flat; individual icons are `50%` circular
-- Padding: `16px 24px` internal
-
-**Add-in / Milk Select (outlined rectangle)**
 - Background: `#ffffff`
-- Border: `1px solid #d6dbde` (Input Border)
-- Radius: `4px`
-- Full-width in its column
-- Floating label above top border: "Add-ins" / "Milk" / "Add-ins" — 13/700 in Text Black, uppercase, `0.325px` letter-spacing
-- Value displayed centered (e.g., "Ice", "Coconut", "Strawberry Fruit Inclusions scoop"): 16/400 Text Black
-- Chevron-down icon right side in Text Black Soft
-- Focus: border shifts to Green Accent (`#00754A`)
+- Border: 1px solid `#dadada`
+- Border Radius: 0px（完全直角）
+- Padding: 12px
+- Font Family: Arial
+- Font Size: 16px
+- Line Height: 46px
 
-**Numeric Stepper**
-- Embedded inside an Add-in row when a quantity is required (e.g., Strawberry Fruit Inclusions scoop)
-- `−` minus button + count number + `+` plus button, all inline right of the label
-- Buttons: circular `32×32px` with `1px solid #d6dbde` border, neutral gray icon
-- Count number: 16/700 Text Black centered
+**Search Submit Button**
 
-**Customize Button**
-- Background: `#ffffff`
-- Text: `#00754A` (Green Accent)
-- Border: `1.5px solid #00754A`
-- Radius: `50px` (full pill)
-- Padding: `14px 40px` (generously larger than default pills — this is a secondary primary action)
-- Label: "Customize" with a gold sparkle ✨ icon inset left
-- Used for: entering the drink-customization flow after size/milk selection
+- Background: `#c0c0c0`
+- Border: なし
+- Border Radius: 0px
+- Padding: 12px
 
-**Add to Order Button (PDP)**
-- Background: `#00754A` (Green Accent)
-- Text: `#ffffff`
-- Radius: `50px`
-- Padding: `14px 32px`
-- Pinned top-right of product card and/or aligned right within the store-availability band
-- Same scale(0.95) active behavior as other primary CTAs
+### Calendar Table（営業時間）
 
-**Rewards Cost Pill — "200★ item"**
-- Background: transparent
-- Border: `1px solid #cba258` (Gold)
-- Text: `#cba258` (Gold)
-- Radius: `50px` (full pill)
-- Padding: `4px 12px`
-- Content: "200★ item" where `★` is a small filled star glyph — indicates the Rewards Stars required to redeem this item
-- Font: Proxima Nova 13/700 with `0.5px` letter-spacing
-- Used only on products that are Rewards-redeemable
+- Border: 1px solid `#dadada`（セル境界）
+- Cell padding: 0
+- Cell line-height: 50px
+- Saturday color: `#4f9eef`
+- Sunday color: `#ee6a6a`
+- Weekday color: `#000000`
+- Header (曜日名) weight: 700
 
-**Product Description Band**
-- Full-width dark-green band (`#1E3932` House Green)
-- Contains top-to-bottom:
-  1. Rewards Cost Pill (gold) if applicable
-  2. Product description body copy in white (16/400/1.5)
-  3. Nutritional summary inline ("140 calories, 25g sugar, 2.5g fat") with info-icon tooltip — 14/700 white
-  4. "Full nutrition & ingredients list" outlined-white-on-green pill button
-- Padding: `32px` vertical
-- Appears beneath the primary product header band
-
-**Ingredients / Nutrition Table**
-- Two-column layout on the Nutrition page
-- Left column: "Ingredients" header + list or "Not available for this item" placeholder text block with an explanatory paragraph in Text Black Soft 14/400
-- Right column: "Nutrition" header + label/value rows
-- Each row: nutrient label (Proxima Nova 14/400) on the left, value (e.g., "140 calories", "25g", "205 mg**") on the right, separated by a `1px solid #e7e7e7` hairline below
-- Footnote for caffeine/asterisk markers in 13/400 Text Black Soft at the bottom
-- Reusable pattern for nutrition facts regulation-compliant tables
-
-**Store Availability Selector**
-- Appears on dark-green feature band above the size-options row
-- Full-width rounded rectangle with transparent-white interior
-- Text: "For item availability, choose a store" in white, 14/400
-- Right side: chevron-down affordance + shopping-bag SVG icon in white outline
-- Radius: `4px`
-- Height: ~48px
-
-**PDP Breadcrumb**
-- "Menu / Refreshers / Pink Energy Drink" trail above the product title
-- Separator: `/` slash character in Text Black Soft
-- Current page is unlinked, prior pages are underlined green-accent links
-- Font: 14/400 Proxima Nova
-- Appears on all PDP pages
-
-**Back Chevron Link (PDP nutrition / detail sub-pages)**
-- "← Back" text link above section headings on the nutrition page
-- Text in Green Accent (`#00754A`) 14/700 Proxima Nova
-- Left chevron `<` in the same green
-- Alternative to full breadcrumb on deep sub-pages
+---
 
 ## 5. Layout Principles
 
-### Spacing System
+### Container
 
-Rem-based semantic scale (anchored `1rem = 10px`):
+- 最大幅は 1200〜1400px 想定
+- ヘッダー高さ: 64px（ナビ lh と一致）
+- フッター padding: 上下 40px
 
-| Token | Rem | Pixels | Typical Use |
-|-------|-----|--------|-------------|
-| `--space-1` | `0.4rem` | 4px | Tightest inline padding |
-| `--space-2` | `0.8rem` | 8px | Small gap, button vertical padding |
-| `--space-3` | `1.6rem` | 16px | Default — card padding, outer gutter xs |
-| `--space-4` | `2.4rem` | 24px | Section inner spacing, outer gutter md |
-| `--space-5` | `3.2rem` | 32px | Major between-section spacing |
-| `--space-6` | `4rem` | 40px | Large gaps, outer gutter lg, header crate |
-| `--space-7` | `4.8rem` | 48px | Section-to-section spacing |
-| `--space-8` | `5.6rem` | 56px | Very large breathing — Frap height |
-| `--space-9` | `6.4rem` | 64px | Widest section padding |
+### Spacing Scale（実測ベース）
 
-**Gutter tokens:**
-- `--outerGutter: 1.6rem` (16px, default / mobile)
-- `--outerGutterMedium: 2.4rem` (24px, tablet)
-- `--outerGutterLarge: 4.0rem` (40px, desktop)
+| Token | Value | 用途                         |
+| ----- | ----- | ---------------------------- |
+| XS    | 2px   | バッジ内余白、小細工         |
+| S     | 8px   | Skip Link padding            |
+| M     | 12px  | ナビ左右、フォーム padding   |
+| L     | 20px  | セクションラベル左右 padding |
+| XL    | 40px  | フッター上下                 |
+| XXL   | 64px  | ヘッダー高                   |
 
-**Universal rhythm constant:** `1.6rem` (16px) appears across every page as the default outer gutter, card padding baseline, and text size 3 body — the system's most frequent spacing unit.
+### Grid
 
-### Grid & Container
+- ヒーローはフル幅（書影スライド）
+- 商品グリッドは 4〜5 カラム（PC）→ 2 カラム（タブレット）→ 1 カラム（モバイル）
+- カレンダーは 7 カラム固定（曜日）
 
-- Column width scale: `--columnWidthSmall: 343px` / `Medium: 500px` / `Large: 720px` / `XLarge: 1440px`
-- Gift-card grid uses a 3-5-up responsive grid of `~343px` tiles
-- Rewards status section: 3-up dark-green panels at `lg+` breakpoints
-- Hero: asymmetric split 40% (image) / 60% (content) via `--headerCrateProportion` / `--contentCrateProportion`
-
-### Whitespace Philosophy
-
-Whitespace carries the feeling of "plenty of space in the café." Section padding leans generous (40–64px). Content blocks are separated by whitespace rather than dividers. The cream canvas (`#f2f0eb`) is itself a visual breath between white cards and green feature bands.
-
-### Border Radius Scale
-
-| Value | Use |
-|-------|-----|
-| `12px` | Cards, modals, menu-item tiles (`--cardBorderRadius`) |
-| `12px 12px 0 0` | Full-width feedback tab (top-rounded only) |
-| `50px` | All buttons — full-pill radius (`--buttonBorderRadius`) |
-| `50%` | Circular icons, Frap floating button, avatar thumbnails |
-| Specialty | `3.3333%/5.298%` elliptical for Starbucks-Visa-Card mockups (`--svcRoundedCorners`) |
+---
 
 ## 6. Depth & Elevation
 
-| Level | Treatment | Use |
-|-------|-----------|-----|
-| Card | `0 0 0.5px rgba(0,0,0,0.14), 0 1px 1px rgba(0,0,0,0.24)` | Default content cards — a whisper-soft dual-shadow |
-| Global Nav | `0 1px 3px rgba(0,0,0,0.1), 0 2px 2px rgba(0,0,0,0.06), 0 0 2px rgba(0,0,0,0.07)` | Triple-layer soft lift on the fixed top bar |
-| Frap Base | `0 0 6px rgba(0,0,0,0.24)` | Base halo around the floating circular CTA |
-| Frap Ambient | `0 8px 12px rgba(0,0,0,0.14)` | Stacked directional ambient — floats the Frap forward |
-| Gift Card | Light drop shadow around illustrated photograph | Physical-card feel for gift tiles |
-| Starbucks Card (SVC) | `drop-shadow(0 4px 1px rgba(0,0,0,0.11)) drop-shadow(0 0 2px rgba(0,0,0,0.24))` | Stacked SVG drop shadows for Starbucks Card visuals |
+蔦屋書店は**完全フラット**。ドロップシャドウや角丸を一切使わず、紙面のような平面性を保つ。
 
-**Shadow philosophy:** Whisper-soft, layered over solid — the system never reaches for a single heavy drop shadow. Instead, it stacks 2–3 low-alpha shadows with different offsets to simulate real-world ambient + direct lighting. The Frap button is the most elevated element on any page.
+| Level | Shadow | 用途         |
+| ----- | ------ | ------------ |
+| 0     | none   | すべての要素 |
 
-### Decorative Depth
+書店の店内が「本棚と本」で立体的に構成されているため、**画面内では平面に徹する**——というインテリア設計の延長としての UI。
 
-- **No gradient system** — surfaces are solid color-block
-- **Color-block banding** carries perceived depth (dark-green bands read as "recessed feature zones" between cream/white body sections)
-- **SVG filter shadows** on Starbucks-Card visuals add a slight 3D physicality without a box-shadow
+---
 
 ## 7. Do's and Don'ts
 
-### Do
-- Use Neutral Warm (`#f2f0eb`) or Ceramic (`#edebe9`) as page canvas instead of pure white — the warm cream is the signature
-- Map the green tiers to their intended surface role — Starbucks Green for headings, Green Accent for CTAs, House Green for deep bands, Uplift for decorative
-- Keep tracking tight at `-0.01em` / `-0.16px` on SoDoSans across the whole system
-- Use 50px full-pill radius on every button without exception
-- Apply `transform: scale(0.95)` as the universal button active state
-- Reserve Gold for Rewards-status ceremony moments only
-- Use SoDoSans for nearly everything; switch to Lander Tall serif only for Rewards editorial headlines; reserve Kalam script for Careers "cup name" moments
-- Layer 2–3 low-alpha shadows instead of one heavier drop shadow for elevation
-- Use the Frap circular CTA as the persistent floating order entry on every shopping surface
-- Let the cream canvas breathe between content cards — use whitespace, not dividers
+### Do（推奨）
 
-### Don't
-- Don't use pure white as the page canvas — the warm cream temperature is load-bearing
-- Don't pick "one brand green" — the four-green system is intentional; using only `#006241` everywhere flattens the brand
-- Don't use Gold as a general-purpose accent — it's a Rewards signal only
-- Don't square the corners on buttons — the 50px pill is universal
-- Don't introduce gradient fills — the system is color-block throughout
-- Don't weight-contrast h1 and h2 by size — the hierarchy comes from weight + color (600 Starbucks-Green vs 400 Text Black)
-- Don't use pure black for body text — `rgba(0,0,0,0.87)` matches the warm canvas
-- Don't skip the `scale(0.95)` active feedback on buttons — it's a signature micro-interaction
-- Don't stack single heavy shadows; always layer 2–3 low-alpha ones
-- Don't introduce serifs or scripts into the main shopping flow — they belong to Rewards and Careers contexts respectively
+- **すべての面要素で `border-radius: 0px`** を徹底（pill や角丸は禁止）
+- 主背景は **`#f6f6f3`（クラフト紙のクリーム色）**。純白は使わない
+- 本文・見出しは **Noto Sans Japanese** に統一。明朝・游ゴシックは使わない
+- 本文は **`color: #000000`（純黒可）**、価格のみ `#333333`
+- 全テキストに **`letter-spacing: 0.1em (1px)`** を適用。極小フォントの可読性を担保
+- 本文は **10px** が標準。情報量を優先する
+- 「NEW」バッジは **#c4002e + Muli フォント + letter-spacing 0.18em**
+- カテゴリ面色は **#93928b（暖灰）+ #ffffff 文字**
+- ナビゲーションの line-height はヘッダー高（64px）に合わせる
+- カレンダーの土曜は **#4f9eef**、日曜は **#ee6a6a**（古典的な配色）
+- ドロップシャドウ・角丸を使わず、紙面的な平面に徹する
+
+### Don't（禁止）
+
+- 角丸 CTA・pill ボタン（`border-radius > 0`）を作らない
+- ドロップシャドウ（`box-shadow`）を使わない
+- ベース背景を純白 `#ffffff` にしない（`#f6f6f3` が標準）
+- 明朝体や游ゴシックを使わない（Noto Sans Japanese 一択）
+- 大型タイトル（28px）以外で **font-weight: 700** を多用しない（300 が標準）
+- 本文を `letter-spacing: normal` で組まない（1px 開ける）
+- ヒーローに大型 CTA ボタンを置かない（書影とテキストリンクで構成）
+- 鮮やかなアクセントカラー（青・緑・黄）をブランド色として導入しない（#c4002e の赤のみ）
+- 行間 1.5 以上で本文を組まない（`normal` ≒ 1.2 が標準）
+
+---
 
 ## 8. Responsive Behavior
 
 ### Breakpoints
 
-Inferred from component width tokens and progressive nav heights:
+| Name    | Width       | 説明                               |
+| ------- | ----------- | ---------------------------------- |
+| Mobile  | ≤ 767px     | スマートフォン（`hide_pc` クラス） |
+| Tablet  | 768〜1024px | iPad                               |
+| Desktop | > 1024px    | デスクトップ（`hide_sp` クラス）   |
 
-| Name | Width | Key Changes |
-|------|-------|-------------|
-| xs | < 480px | Global nav 64px; hamburger menu; single-column layouts; pill buttons full-width |
-| Mobile | 480–767px | Global nav 72px; gift-card grid 2-up; card padding tightens |
-| Tablet | 768–1023px | Global nav 83px; gift-card grid 3-up; hero split begins to appear |
-| Desktop | 1024–1439px | Global nav 99px; gift-card grid 4-up; full asymmetric hero 40/60 |
-| XLarge | 1440px+ | Content caps at `--columnWidthXLarge`; gift-card grid 5-up; extra cream margin |
+### モバイル時の調整
 
-### Touch Targets
+- ヘッダー: PC のグローバルナビ → ハンバーガーメニュー
+- 検索バー: ヘッダー上から専用バナー化（24px / 300 / `#dadada` 背景）
+- 商品グリッド: 4 カラム → 2 カラム
+- カレンダー: 7 カラムのまま、セルサイズが縮小
+- "ENGLISH / 中文 / 法人のお客様" などの言語切替は SP では別レイアウト
 
-- Pill buttons at `7px 16px` padding measure ~32px tall — below 44px WCAG AAA minimum for touch-only surfaces. On mobile, button padding may be visually expanded to meet the minimum.
-- Frap floating circular button at `56px` is well above minimum.
-- Frap uses `--frapTouchOffset: calc(-1 * .8rem)` to extend tap area 8px beyond visual edge.
-- Form float-label inputs grow their label font size on mobile (1.6rem base vs 1.9rem desktop) — easier to tap and read at arm's-length.
+### タッチターゲット
 
-### Collapsing Strategy
+- ナビ link は line-height 64px で確保
+- 商品カードは画像領域 + 18px 行間タイトルで最低 200px 高を確保
 
-- **Global nav height scales progressively**: 64 → 72 → 83 → 99px across breakpoints, not a single value
-- **Hero split collapses**: 40/60 asymmetric split → stacked (image top, content below) at mobile
-- **Gift-card grid**: 5-up → 4-up → 3-up → 2-up → 1-up across breakpoints with adjusted card widths
-- **Feature bands**: Stay full-width but text + imagery stack vertically on mobile
-- **Outer gutter scales**: 16px → 24px → 40px as viewport grows
-- **Rewards 3-column status panels**: Stack to single column on mobile
-
-### Image Behavior
-
-- Hero product photography crops tighter vertically on mobile; content becomes the visual anchor
-- Gift-card illustrations preserve aspect ratio; card grid reflows
-- `opacity 0.3s ease-in` fade-in transition on image load (prevents jarring pop-in)
-- Rewards app-in-hand photography scales proportionally; never stretches
+---
 
 ## 9. Agent Prompt Guide
 
-### Quick Color Reference
+### クイックリファレンス
 
-- Primary CTA: "Green Accent (`#00754A`)"
-- Primary CTA text: "White (`#ffffff`)"
-- Brand heading: "Starbucks Green (`#006241`)"
-- Feature band / footer: "House Green (`#1E3932`)"
-- Page canvas: "Neutral Warm (`#f2f0eb`)"
-- Card canvas: "White (`#ffffff`)"
-- Heading text on light: "Text Black (`rgba(0,0,0,0.87)`)"
-- Body text on light: "Text Black Soft (`rgba(0,0,0,0.58)`)"
-- Body text on dark-green: "Text White Soft (`rgba(255,255,255,0.70)`)"
-- Rewards accent: "Gold (`#cba258`)"
-- Rewards text: "Rewards Green (`#33433d`)"
-- Destructive: "Red (`#c82014`)"
+```
+Brand: 代官山 蔦屋書店 (Daikanyama T-SITE)
+Surface: #f6f6f3 (クラフト紙クリーム、純白不可)
+Card: #ffffff
+Card Alt: #e5e5e1 (イベント・お知らせ)
+Light Surface: #f7f7f7 (TODAY'S EVENT 等)
+Category Tag: #93928b + #ffffff text
+Tsutaya Red: #c4002e (NEW バッジのみ)
+Body Color: #000000 (純黒可)
+Price Color: #333333
+Saturday: #4f9eef
+Sunday: #ee6a6a
+Border: #dadada
+Font: "Noto Sans Japanese", sans-serif
+Badge Font: Muli, sans-serif
+Search Font: Arial
+Body Size: 10px (極小)
+H2 Size: 28px / 700
+Letter Spacing: 1px (0.1em) — 全要素
+Badge Letter Spacing: 2px (0.18em)
+Border Radius: 0px (全要素)
+Shadow: none (フラット)
+Nav Line Height: 64px (ヘッダー高)
+```
 
-### Example Component Prompts
+### プロンプト例
 
-1. "Create a primary Starbucks CTA pill button with Green Accent (`#00754A`) background, white text 'Explore our afternoon menu', SoDoSans font at 16px weight 600 with `-0.01em` letter-spacing, `50px` border-radius (full pill), `7px 16px` padding. Apply `transform: scale(0.95)` as the active state with a `0.2s ease` transition."
+```
+代官山 蔦屋書店のデザインシステムに従って、新刊フェアの紹介ページを作成してください。
+- フォント: "Noto Sans Japanese", sans-serif（明朝・游ゴシック禁止）
+- ベース背景: #f6f6f3 (クリーム、純白禁止)
+- 本文 10px / 300 / letter-spacing 1px / color #000000
+- セクションタイトル 28px / 700 / letter-spacing 1px (RECOMMEND, NEW BOOKS 等は英大文字)
+- NEW バッジ: bg #c4002e + #ffffff text + Muli 11px/700 + letter-spacing 2px
+- カテゴリラベル: bg #93928b + #ffffff text + Noto Sans 10px/300 + padding 4px 12px
+- すべて border-radius: 0px (角丸・pill 禁止)
+- box-shadow: none (フラット)
+- 商品カード: 画像 + 12px タイトル + 12px 価格 + 10px 商品ID の 3 段構成
+- カレンダー: 土曜 #4f9eef、日曜 #ee6a6a、平日 #000000、line-height 50px
+- 検索フィールドは Arial 16px / border 1px solid #dadada / radius 0
+```
 
-2. "Design a content card with White (`#ffffff`) background at `12px` border-radius, layered shadow `0 0 0.5px rgba(0,0,0,0.14), 0 1px 1px rgba(0,0,0,0.24)`. Pad contents `16–24px` (`--space-3` to `--space-4`). Place on a Neutral Warm (`#f2f0eb`) page canvas with `16px` gap to siblings."
+### 字詰め・組版の重要ポイント
 
-3. "Build the Frap floating circular order button — `56px` diameter, Green Accent (`#00754A`) fill, white shopping-bag icon centered. Layered shadow: `0 0 6px rgba(0,0,0,0.24)` + `0 8px 12px rgba(0,0,0,0.14)`. Fixed position bottom-right with `-0.8rem` touch offset. Active state collapses the ambient shadow to `0 8px 12px rgba(0,0,0,0)` with `scale(0.95)`."
+1. **極小フォント主義**: 本文 10px が標準。情報量を優先する書店の網羅性を表現
+2. **letter-spacing 0.1em の徹底**: すべてのテキストに均一適用。極小フォントを読ませるための処置
+3. **完全直角**: border-radius 0px をすべての要素で守る。書棚と本の矩形性を UI に反映
+4. **完全フラット**: box-shadow 不使用。紙面のような平面性
+5. **Noto Sans 一択**: 明朝も游ゴシックも使わない徹底ぶり。書店なのに書体は装飾せず、書籍の装丁を主役にする思想
+6. **クラフト紙クリーム #f6f6f3**: 純白を避け、本のページのような暖かみを基調に
+7. **NEW バッジは英字 Muli フォント**: 和文サイトながら、英字バッジだけ専用フォントを当てる
+8. **カレンダーの土日色**: 4f9eef / ee6a6a の古典的配色を採用。ベタな日本のカレンダー慣習を尊重
 
-4. "Build a dark-green feature band — full-width section with House Green (`#1E3932`) background. Left column: white SoDoSans h2 at 24px weight 600, followed by a Text White Soft (`rgba(255,255,255,0.70)`) body paragraph and a CTA row with two buttons (White-filled with Green Accent text for primary, Outlined-on-Dark white border for secondary). Right column: product photography. Split ratio 40/60, stacked vertically below `768px`."
+---
 
-5. "Create a Rewards status card — House Green (`#1E3932`) panel with `12px` border-radius, colored gradient top stripe (Bronze/Silver/Gold tier). Title in SoDoSans 24px weight 600 in white. Benefits list as white bullets with `rgba(255,255,255,0.70)` secondary captions. Bottom progression text in Text White Soft. Stack 3 panels in a grid at `lg+`, single column on mobile."
-
-6. "Design a gift-card tile — card radius matches `12px`, fills with an illustrated photograph (hand-drawn watercolor-painted feel) as the entire surface. Subtle drop shadow makes it feel like a physical card on the cream canvas. Group under a category label ('Spring', 'Thank You', 'Birthday') in SoDoSans 24px weight 400 above the grid."
-
-7. "Create a Starbucks product-detail header — House Green (`#1E3932`) band with breadcrumb 'Menu / Refreshers / Pink Energy Drink' in 14/400 white above the product title in SoDoSans 32/700 uppercase white. Product photograph centered below title. Below photo: a 4-up size selector row — each cup-icon button shows a vertical cup silhouette, size name ('Tall' / 'Grande' / 'Venti' / 'Trenta') in 16/700 white, and fluid-ounce in 13/400 Text White Soft. Selected size wraps the cup icon in a `2px solid #00754A` circular ring."
-
-8. "Build a Starbucks customize flow — under the size selector, 3 stacked outlined-rectangle input rows (white bg, `1px solid #d6dbde` border, `4px` radius). Each has a floating label ('Add-ins', 'Milk', 'Add-ins') above the top border in 13/700 Text Black uppercase. Value centered (e.g., 'Ice', 'Coconut'). Right side: chevron-down in Text Black Soft. For the scoop row, embed a numeric stepper (`−` `1` `+` with circular `32px` outlined buttons). Below all three fields: outlined green 'Customize' pill with gold sparkle icon, `50px` radius, `14px 40px` padding. Pair with a Green Accent filled 'Add to Order' pill in the same row."
-
-9. "Design a Starbucks product description band — full-width House Green (`#1E3932`) below product header. Top: a gold-outlined '200★ item' Rewards Cost Pill (`50px` radius, `4px 12px` padding, gold `#cba258` border and text). Below: product description in white 16/400/1.5. Nutritional inline summary in white 14/700 ('140 calories, 25g sugar, 2.5g fat') with info-icon tooltip. Outlined-white-on-green pill button 'Full nutrition &amp; ingredients list'. 32px vertical padding."
-
-10. "Create a Starbucks nutrition facts table — two-column layout inside a White card. Left column: 'Ingredients' header (24/400 Text Black), followed by ingredient list or 'Not available for this item' placeholder paragraph in 14/400 Text Black Soft. Right column: 'Nutrition' header, then label/value rows (nutrient name left, value right) separated by `1px solid #e7e7e7` hairlines. Typography: labels in 14/400 Text Black, values in 14/700 Text Black right-aligned. Footnote asterisk markers in 13/400 Text Black Soft at the bottom."
-
-### Iteration Guide
-
-When refining existing screens generated with this design system:
-1. Focus on ONE component at a time
-2. Reference specific color names and hex codes from this document
-3. Use natural language descriptions ("warm cream canvas," "four-tier green system") alongside exact values
-4. Preserve the 50px pill + `scale(0.95)` active state universally
-5. Check that greens are mapped to their correct role (Green Accent for CTA, Starbucks Green for heading, House Green for band)
-6. Don't introduce gradients — the system is color-block
-7. Keep SoDoSans tracking at `-0.01em` / `-0.16px` across the board
-
-### Known Gaps
-
-- SoDoSans is a proprietary typeface not available on Google Fonts — when implementing publicly, use Inter or Manrope as a substitute and document the swap
-- Lander Tall (Rewards serif) is also custom — substitute with Iowan Old Style, Lora, or Source Serif Pro
-- Specific per-component animation timings beyond the few documented (`--duration: 0.4s`, `--iconTransition: all ease-out 0.2s`, `--expanderDuration: 300ms`) are not captured for every interactive surface
-- Form error-state full styling (red border weight, icon placement) visible on the tint token but not exhaustively extracted
-- Careers-page specific components (cup-name card, search radio grid) are referenced in token names but not covered by this extraction
-- Starbucks Visa Card / Starbucks-Card (SVC) detailed mockup specs are hinted at by `--svcRoundedCorners` and `--svcShadowFilter` tokens but not fully documented
+**取得日**: 2026-05-08
+**出典**: https://store.tsite.jp/daikanyama/, https://store.tsite.jp/daikanyama/event/
+**抽出方法**: Headless Chrome (Puppeteer) による computed style 実測 + ユニーク背景色集計

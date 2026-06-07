@@ -1,1625 +1,2314 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
-
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>タイ旅行 2026</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link
-    href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,700;9..144,900&family=DM+Sans:wght@300;400;500;600;700&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,400,0,0&display=swap"
-    rel="stylesheet">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <style>
-    /* ─── Tokens ───────────────────────────────────── */
-    :root {
-      /* DESIGN.md: Starbucks-inspired palette */
-      --canvas: #f2f0eb;
-      /* Neutral Warm */
-      --ceramic: #edebe9;
-      /* Ceramic */
-      --white: #ffffff;
-      --dark: #1E3932;
-      /* House Green — header/footer/dark bands */
-      --green: #006241;
-      /* Starbucks Green — headings/brand */
-      --green-mid: #00754A;
-      /* Green Accent — CTAs/interactive */
-      --green-light: #d4e9e2;
-      /* Green Light */
-      --green-pale: #edf5f1;
-      /* pale surface */
-      --text: rgba(0, 0, 0, 0.87);
-      /* Text Black */
-      --text-soft: rgba(0, 0, 0, 0.58);
-      /* Text Black Soft */
-      --text-dim: rgba(0, 0, 0, 0.35);
-      --border: rgba(0, 0, 0, 0.08);
-      --border-med: rgba(0, 0, 0, 0.15);
-      /* Card shadow from DESIGN.md */
-      --sh-sm: 0 0 0.5px rgba(0, 0, 0, 0.14), 0 1px 1px rgba(0, 0, 0, 0.24);
-      --sh-md: 0 2px 8px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.08);
-      --sh-lg: 0 8px 28px rgba(0, 0, 0, 0.10), 0 2px 8px rgba(0, 0, 0, 0.06);
-      --r-sm: 6px;
-      --r: 12px;
-      --r-lg: 20px;
-      --r-pill: 999px;
-      --font-d: 'Fraunces', 'Iowan Old Style', Georgia, serif;
-      --font-b: 'DM Sans', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
-    }
-
-    html {
-      font-size: 62.5%;
-      scroll-behavior: smooth;
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    body {
-      font-family: var(--font-b);
-      background: var(--canvas);
-      color: var(--text);
-      font-size: 1.5rem;
-      line-height: 1.6;
-      letter-spacing: -0.01em;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    .material-symbols-outlined {
-      font-family: 'Material Symbols Outlined';
-      font-weight: normal;
-      font-style: normal;
-      font-size: inherit;
-      line-height: 1;
-      letter-spacing: normal;
-      text-transform: none;
-      display: inline-block;
-      white-space: nowrap;
-      direction: ltr;
-      -webkit-font-feature-settings: 'liga';
-      font-feature-settings: 'liga';
-      -webkit-font-smoothing: antialiased;
-      vertical-align: middle;
-    }
-
-    /* ─── Animations ────────────────────────────────── */
-    @keyframes fadeUp {
-      from {
-        opacity: 0;
-        transform: translateY(28px);
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>タイ旅行 2026</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Noto+Sans+JP:wght@300;700&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,400,0,0&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <style>
+      /* ─── Tokens ───────────────────────────────────── */
+      :root {
+        /* Daikanyama Tsutaya Bookstore design system */
+        --canvas: #f6f6f3;
+        --ceramic: #e5e5e1;
+        --white: #ffffff;
+        --dark: #000000;
+        --green: #000000;
+        --green-mid: #333333;
+        --green-light: #f7f7f7;
+        --green-pale: #f6f6f3;
+        --text: #000000;
+        --text-soft: #333333;
+        --text-dim: #93928b;
+        --border: #dadada;
+        --border-med: #c0c0c0;
+        --sh-sm: none;
+        --sh-md: none;
+        --sh-lg: none;
+        --r-sm: 0px;
+        --r: 0px;
+        --r-lg: 0px;
+        --r-pill: 0px;
+        --font-d: "Noto Sans JP", sans-serif;
+        --font-b: "Noto Sans JP", sans-serif;
       }
 
-      to {
+      html {
+        font-size: 62.5%;
+        scroll-behavior: smooth;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: var(--font-b);
+        background: var(--canvas);
+        color: var(--text);
+        font-size: 1rem;
+        font-weight: 300;
+        line-height: 1.6;
+        letter-spacing: 0.1em;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .material-symbols-outlined {
+        font-family: "Material Symbols Outlined";
+        font-weight: normal;
+        font-style: normal;
+        font-size: inherit;
+        line-height: 1;
+        letter-spacing: normal;
+        text-transform: none;
+        display: inline-block;
+        white-space: nowrap;
+        direction: ltr;
+        -webkit-font-feature-settings: "liga";
+        font-feature-settings: "liga";
+        -webkit-font-smoothing: antialiased;
+        vertical-align: middle;
+      }
+
+      /* ─── Animations ────────────────────────────────── */
+      @keyframes fadeUp {
+        from {
+          opacity: 0;
+          transform: translateY(28px);
+        }
+
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+        }
+
+        to {
+          opacity: 1;
+        }
+      }
+
+      @keyframes scrollLine {
+        0% {
+          transform: scaleY(0);
+          transform-origin: top;
+        }
+
+        50% {
+          transform: scaleY(1);
+          transform-origin: top;
+        }
+
+        51% {
+          transform: scaleY(1);
+          transform-origin: bottom;
+        }
+
+        100% {
+          transform: scaleY(0);
+          transform-origin: bottom;
+        }
+      }
+
+      .reveal {
+        opacity: 0;
+        transform: translateY(22px);
+        transition:
+          opacity 0.7s ease,
+          transform 0.7s ease;
+      }
+
+      .reveal.visible {
         opacity: 1;
         transform: translateY(0);
       }
-    }
 
-    @keyframes fadeIn {
-      from {
-        opacity: 0;
-      }
-
-      to {
-        opacity: 1;
-      }
-    }
-
-    @keyframes scrollLine {
-      0% {
-        transform: scaleY(0);
-        transform-origin: top;
-      }
-
-      50% {
-        transform: scaleY(1);
-        transform-origin: top;
-      }
-
-      51% {
-        transform: scaleY(1);
-        transform-origin: bottom;
-      }
-
-      100% {
-        transform: scaleY(0);
-        transform-origin: bottom;
-      }
-    }
-
-    .reveal {
-      opacity: 0;
-      transform: translateY(22px);
-      transition: opacity .7s ease, transform .7s ease;
-    }
-
-    .reveal.visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    /* ─── Hero ──────────────────────────────────────── */
-    .hero {
-      position: relative;
-      height: 28vh;
-      min-height: 260px;
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-end;
-      overflow: hidden;
-      background: #0d1f14 url('https://images.unsplash.com/photo-1508009603885-50cf7c579365?auto=format&fit=crop&w=1920&q=80') center 60%/cover no-repeat;
-    }
-
-    .hero::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(to bottom, rgba(8, 18, 8, .12) 0%, rgba(8, 18, 8, .32) 45%, rgba(8, 18, 8, .76) 100%);
-      pointer-events: none;
-    }
-
-    .hero-content {
-      position: relative;
-      padding: 0 6.4rem 2.4rem;
-      max-width: 1280px;
-      width: 100%;
-      margin: 0 auto;
-    }
-
-    .hero-kicker {
-      font-size: 1.15rem;
-      font-weight: 500;
-      letter-spacing: .22em;
-      text-transform: uppercase;
-      color: rgba(255, 255, 255, .55);
-      margin-bottom: 1.4rem;
-      animation: fadeUp .8s ease .1s backwards;
-    }
-
-    .hero-title {
-      display: flex;
-      flex-direction: column;
-      gap: .4rem;
-      margin-bottom: 2.0rem;
-      animation: fadeUp .8s ease .25s backwards;
-    }
-
-    .hero-title-en {
-      font-family: var(--font-d);
-      font-size: clamp(6.4rem, 12vw, 15rem);
-      font-weight: 900;
-      color: #fff;
-      line-height: .88;
-      letter-spacing: -.03em;
-      font-variation-settings: "opsz" 144, "WONK" 1;
-    }
-
-    .hero-title-ja {
-      font-size: clamp(1.8rem, 3vw, 3.2rem);
-      font-weight: 300;
-      color: rgba(255, 255, 255, .68);
-      letter-spacing: .32em;
-      padding-left: .06em;
-      margin-top: .8rem;
-    }
-
-    .hero-scroll {
-      position: absolute;
-      bottom: 3.2rem;
-      right: 6.4rem;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: .8rem;
-      animation: fadeIn 1.2s ease .9s backwards;
-    }
-
-    .hero-scroll-text {
-      font-size: .9rem;
-      font-weight: 700;
-      letter-spacing: .2em;
-      text-transform: uppercase;
-      color: rgba(255, 255, 255, .35);
-      writing-mode: vertical-rl;
-    }
-
-    .hero-scroll-line {
-      width: 1px;
-      height: 48px;
-      background: linear-gradient(to bottom, rgba(255, 255, 255, .4), transparent);
-      animation: scrollLine 2s ease-in-out 1.5s infinite;
-    }
-
-    /* ─── Section ───────────────────────────────────── */
-    .section {
-      padding: 7.2rem 0;
-      background: var(--canvas);
-      position: relative;
-    }
-
-    .section::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      z-index: 0;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.72' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='.045'/%3E%3C/svg%3E");
-      background-size: 220px 220px;
-      background-repeat: repeat;
-    }
-
-    .section.on-white::after {
-      display: none;
-    }
-
-    .section.on-white {
-      background: var(--white);
-    }
-
-    .section-inner {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 0 4.8rem;
-      position: relative;
-      z-index: 1;
-    }
-
-    .section-header {
-      margin-bottom: 4.0rem;
-    }
-
-    .section-eyebrow {
-      font-size: 1.1rem;
-      font-weight: 700;
-      letter-spacing: .22em;
-      text-transform: uppercase;
-      color: var(--green);
-      margin-bottom: .8rem;
-    }
-
-    .section-title {
-      font-family: var(--font-d);
-      font-size: 3.8rem;
-      font-weight: 700;
-      color: var(--dark);
-      letter-spacing: -.02em;
-      line-height: 1.05;
-      font-variation-settings: "opsz" 72, "WONK" 1;
-    }
-
-    /* ─── Schedule ──────────────────────────────────── */
-    .time-controls {
-      display: flex;
-      align-items: center;
-      gap: 1.0rem;
-      margin-bottom: 2.8rem;
-      flex-wrap: wrap;
-    }
-
-    .tc-icon {
-      font-size: 1.6rem;
-      color: var(--text-soft);
-    }
-
-    .tc-label {
-      font-size: 1.2rem;
-      font-weight: 600;
-      color: var(--text-soft);
-      letter-spacing: .03em;
-    }
-
-    .tc-sep {
-      color: var(--text-dim);
-    }
-
-    .tc-divider {
-      width: 1px;
-      height: 1.6rem;
-      background: var(--border-med);
-      margin: 0 .4rem;
-    }
-
-    .time-controls select {
-      font-family: var(--font-b);
-      font-size: 1.3rem;
-      font-weight: 500;
-      color: var(--text);
-      background: var(--white);
-      border: 1px solid var(--border-med);
-      border-radius: var(--r-pill);
-      padding: .6rem 3.0rem .6rem 1.4rem;
-      cursor: pointer;
-      appearance: none;
-      -webkit-appearance: none;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
-      background-repeat: no-repeat;
-      background-position: right .8rem center;
-      background-size: 1.3rem;
-      box-shadow: var(--sh-sm);
-      transition: border-color .15s, box-shadow .15s;
-    }
-
-    .time-controls select:hover {
-      border-color: var(--green-mid);
-    }
-
-    .time-controls select:focus {
-      outline: none;
-      border-color: var(--green);
-      box-shadow: 0 0 0 3px rgba(37, 80, 58, .1);
-    }
-
-    .tc-toggle {
-      display: inline-flex;
-      align-items: center;
-      gap: .6rem;
-      font-family: var(--font-b);
-      font-size: 1.3rem;
-      font-weight: 500;
-      color: var(--text-soft);
-      padding: .6rem 1.4rem;
-      border-radius: var(--r-pill);
-      border: 1px solid var(--border-med);
-      background: var(--white);
-      cursor: pointer;
-      box-shadow: var(--sh-sm);
-      transition: all .15s;
-    }
-
-    .tc-toggle:hover {
-      border-color: var(--green-mid);
-      color: var(--text);
-    }
-
-    .tc-toggle.active {
-      background: var(--green);
-      border-color: var(--green);
-      color: #fff;
-      box-shadow: 0 2px 10px rgba(37, 80, 58, .3);
-    }
-
-    .tc-toggle .material-symbols-outlined {
-      font-size: 1.4rem;
-    }
-
-    /* Calendar */
-    .cal-outer {
-      overflow-x: auto;
-      border-radius: var(--r-lg);
-      box-shadow: var(--sh-lg);
-    }
-
-    .cal {
-      display: flex;
-      flex-direction: column;
-      min-width: 820px;
-      border-radius: var(--r-lg);
-      overflow: hidden;
-      background: var(--white);
-    }
-
-    .cal-hdr-row {
-      display: flex;
-      background: var(--dark);
-      flex-shrink: 0;
-    }
-
-    .cal-gutter {
-      width: 52px;
-      flex-shrink: 0;
-    }
-
-    .cal-days-hdr {
-      flex: 1;
-      display: flex;
-    }
-
-    .day-hdr {
-      flex: 1;
-      padding: 1.8rem .8rem 1.4rem;
-      text-align: center;
-      border-left: 1px solid rgba(255, 255, 255, .07);
-    }
-
-    .day-hdr .dow {
-      font-size: .95rem;
-      font-weight: 600;
-      color: rgba(255, 255, 255, .38);
-      letter-spacing: .12em;
-      text-transform: uppercase;
-    }
-
-    .day-hdr .date {
-      font-family: var(--font-d);
-      font-size: 2.8rem;
-      font-weight: 700;
-      color: #fff;
-      line-height: 1.05;
-      margin-top: .3rem;
-      letter-spacing: -.03em;
-      font-variation-settings: "opsz" 36, "WONK" 1;
-    }
-
-    .cal-allday-row {
-      display: flex;
-      border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
-      background: var(--ceramic);
-    }
-
-    .allday-label {
-      width: 52px;
-      flex-shrink: 0;
-      background: var(--ceramic);
-      border-right: 1px solid var(--border);
-      display: flex;
-      align-items: flex-start;
-      justify-content: flex-end;
-      padding: 6px 8px;
-      font-size: .9rem;
-      font-weight: 700;
-      color: var(--text-dim);
-      letter-spacing: .08em;
-      text-transform: uppercase;
-      min-height: 32px;
-    }
-
-    .cal-allday-cells {
-      flex: 1;
-      display: flex;
-    }
-
-    .allday-cell {
-      flex: 1;
-      border-left: 1px solid var(--border);
-      padding: 4px;
-      min-height: 32px;
-      background: var(--ceramic);
-    }
-
-    .allday-event {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      padding: 3px 10px;
-      border-radius: var(--r-pill);
-      background: var(--dark);
-      color: rgba(255, 255, 255, .82);
-      font-size: .95rem;
-      font-weight: 500;
-      cursor: pointer;
-      margin-bottom: 2px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      transition: background .15s, transform .1s;
-      font-family: var(--font-b);
-    }
-
-    .allday-event:hover {
-      background: var(--green);
-      transform: scale(1.02);
-    }
-
-    .allday-event .ev-icon {
-      font-size: 1.0rem;
-      flex-shrink: 0;
-      opacity: .65;
-    }
-
-    .cal-body-row {
-      display: flex;
-    }
-
-    .cal-time-col {
-      width: 52px;
-      flex-shrink: 0;
-      background: var(--ceramic);
-      border-right: 1px solid var(--border);
-    }
-
-    .time-slot {
-      height: 44px;
-      display: flex;
-      align-items: flex-start;
-      justify-content: flex-end;
-      padding: 4px 8px 0;
-      font-size: .95rem;
-      font-weight: 400;
-      color: var(--text-dim);
-      border-bottom: 1px solid var(--border);
-    }
-
-    .cal-day-cols {
-      flex: 1;
-      display: flex;
-    }
-
-    .cal-day-col {
-      flex: 1;
-      position: relative;
-      border-left: 1px solid var(--border);
-      background-image: repeating-linear-gradient(to bottom, transparent 0px, transparent 43px, var(--border) 43px, var(--border) 44px);
-    }
-
-    .event {
-      position: absolute;
-      left: 4px;
-      right: 4px;
-      border-radius: var(--r-sm);
-      padding: 2px 7px;
-      font-size: 1.0rem;
-      overflow: hidden;
-      background: var(--green-pale);
-      border-left: 3px solid var(--green);
-      color: var(--green);
-      z-index: 2;
-      cursor: pointer;
-      display: flex;
-      align-items: flex-start;
-      gap: 4px;
-      transition: background .12s, box-shadow .12s, transform .1s;
-      font-family: var(--font-b);
-      box-shadow: 0 1px 3px rgba(0, 0, 0, .05);
-    }
-
-    .event:hover {
-      background: var(--green-light);
-      box-shadow: 0 3px 12px rgba(37, 80, 58, .18);
-      transform: scale(1.015);
-    }
-
-    .event:active {
-      transform: scale(.98);
-    }
-
-    .ev-icon {
-      font-size: 1.1rem;
-      flex-shrink: 0;
-      margin-top: 2px;
-      opacity: .7;
-    }
-
-    .ev-content {
-      overflow: hidden;
-      min-width: 0;
-    }
-
-    .ev-title {
-      font-weight: 600;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      line-height: 1.35;
-    }
-
-    .ev-time {
-      font-size: .9rem;
-      opacity: .65;
-      margin-top: 1px;
-      font-weight: 400;
-    }
-
-    /* ─── Detail Panel ──────────────────────────────── */
-    .overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(20, 16, 9, .5);
-      backdrop-filter: blur(6px);
-      -webkit-backdrop-filter: blur(6px);
-      z-index: 300;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity .3s ease;
-    }
-
-    .overlay.open {
-      opacity: 1;
-      pointer-events: all;
-    }
-
-    .detail-panel {
-      position: fixed;
-      top: 0;
-      right: 0;
-      bottom: 0;
-      width: 400px;
-      max-width: 100vw;
-      background: rgba(255, 255, 255, .88);
-      z-index: 400;
-      backdrop-filter: blur(24px) saturate(180%);
-      -webkit-backdrop-filter: blur(24px) saturate(180%);
-      box-shadow: -20px 0 60px rgba(0, 0, 0, .14);
-      transform: translateX(100%);
-      transition: transform .35s cubic-bezier(.25, .46, .45, .94);
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-
-    .detail-panel::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 4px;
-      background: linear-gradient(90deg, var(--dark), var(--green-mid));
-    }
-
-    .detail-panel.open {
-      transform: translateX(0);
-    }
-
-    .panel-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 2.4rem 2.8rem 2.0rem;
-      border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
-      background: var(--canvas);
-    }
-
-    .panel-cat-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: .6rem;
-      font-family: var(--font-b);
-      font-size: 1.1rem;
-      font-weight: 700;
-      padding: .5rem 1.4rem;
-      border-radius: var(--r-pill);
-      background: var(--green-light);
-      color: var(--green);
-      letter-spacing: .05em;
-      text-transform: uppercase;
-    }
-
-    .panel-cat-badge .material-symbols-outlined {
-      font-size: 1.4rem;
-    }
-
-    .panel-close {
-      width: 34px;
-      height: 34px;
-      border-radius: 50%;
-      border: 1px solid var(--border-med);
-      background: var(--white);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--text-soft);
-      transition: all .15s;
-      font-family: inherit;
-      flex-shrink: 0;
-    }
-
-    .panel-close .material-symbols-outlined {
-      font-size: 1.8rem;
-    }
-
-    .panel-close:hover {
-      color: var(--text);
-      background: var(--canvas);
-    }
-
-    .panel-body {
-      flex: 1;
-      overflow-y: auto;
-      padding: 3.2rem 2.8rem;
-    }
-
-    .panel-title {
-      font-family: var(--font-d);
-      font-size: 2.4rem;
-      font-weight: 700;
-      color: var(--dark);
-      line-height: 1.2;
-      letter-spacing: -.02em;
-      margin-bottom: 3.0rem;
-      font-variation-settings: "opsz" 36, "WONK" 1;
-    }
-
-    .panel-meta {
-      display: flex;
-      flex-direction: column;
-      gap: 2.0rem;
-    }
-
-    .panel-meta-row {
-      display: flex;
-      align-items: flex-start;
-      gap: 1.6rem;
-    }
-
-    .panel-meta-icon {
-      width: 36px;
-      height: 36px;
-      border-radius: var(--r-sm);
-      background: var(--green-pale);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      color: var(--green);
-    }
-
-    .panel-meta-icon .material-symbols-outlined {
-      font-size: 1.8rem;
-    }
-
-    .panel-meta-label {
-      font-size: 1.0rem;
-      font-weight: 700;
-      color: var(--text-dim);
-      letter-spacing: .12em;
-      text-transform: uppercase;
-      margin-bottom: .4rem;
-    }
-
-    .panel-meta-value {
-      font-size: 1.5rem;
-      color: var(--text);
-      font-weight: 400;
-      line-height: 1.5;
-    }
-
-    .panel-divider {
-      border: none;
-      border-top: 1px solid var(--border);
-      margin: 3.0rem 0 2.4rem;
-    }
-
-    .panel-notes-label {
-      font-size: 1.0rem;
-      font-weight: 700;
-      color: var(--text-dim);
-      letter-spacing: .12em;
-      text-transform: uppercase;
-      margin-bottom: 1.0rem;
-    }
-
-    .panel-notes {
-      font-size: 1.5rem;
-      color: var(--text-soft);
-      line-height: 1.8;
-      white-space: pre-line;
-    }
-
-    .panel-meta-row--map {
-      cursor: pointer;
-      border-radius: var(--r-sm);
-      padding: 6px;
-      margin: -6px;
-      transition: background .15s;
-    }
-
-    .panel-meta-row--map:hover {
-      background: var(--green-pale);
-    }
-
-    .panel-map-hint {
-      font-size: 1.0rem;
-      font-weight: 600;
-      color: var(--green-mid);
-      letter-spacing: 0;
-      text-transform: none;
-      margin-left: .4rem;
-    }
-
-    /* ─── Map ───────────────────────────────────────── */
-    .map-layout {
-      display: grid;
-      grid-template-columns: 1fr 300px;
-      gap: 2.8rem;
-      align-items: start;
-    }
-
-    .map-container {
-      border-radius: var(--r-lg);
-      overflow: hidden;
-      box-shadow: var(--sh-lg);
-      height: 520px;
-    }
-
-    #leaflet-map {
-      width: 100%;
-      height: 100%;
-    }
-
-    .map-sidebar {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .loc-filters {
-      display: flex;
-      flex-direction: column;
-      gap: .8rem;
-      margin-bottom: 2.0rem;
-    }
-
-    .loc-filter-group {
-      display: flex;
-      flex-wrap: wrap;
-      gap: .6rem;
-    }
-
-    .loc-filter-btn {
-      font-family: var(--font-b);
-      font-size: 1.2rem;
-      font-weight: 500;
-      padding: .5rem 1.2rem;
-      border-radius: var(--r-pill);
-      border: 1px solid var(--border-med);
-      background: var(--white);
-      color: var(--text-soft);
-      cursor: pointer;
-      box-shadow: var(--sh-sm);
-      transition: all .15s;
-    }
-
-    .loc-filter-btn:hover {
-      border-color: var(--green-mid);
-      color: var(--text);
-    }
-
-    .loc-filter-btn.active {
-      background: var(--dark);
-      border-color: var(--dark);
-      color: #fff;
-      box-shadow: 0 2px 8px rgba(30, 57, 50, .25);
-    }
-
-    .location-list {
-      display: flex;
-      flex-direction: column;
-      gap: .8rem;
-    }
-
-    .location-card {
-      background: var(--white);
-      border-radius: var(--r);
-      border: 1px solid var(--border);
-      box-shadow: var(--sh-sm);
-      padding: 1.2rem 1.4rem;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 1.2rem;
-      transition: border-color .15s, box-shadow .15s, transform .1s;
-    }
-
-    .location-card:hover {
-      border-color: var(--border-med);
-      box-shadow: var(--sh-md);
-      transform: translateX(3px);
-    }
-
-    .location-card.active {
-      border-color: var(--green-mid);
-      background: var(--green-pale);
-    }
-
-    .loc-icon {
-      width: 36px;
-      height: 36px;
-      border-radius: var(--r-sm);
-      background: var(--green-pale);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      color: var(--green);
-    }
-
-    .loc-icon .material-symbols-outlined {
-      font-size: 1.8rem;
-    }
-
-    .loc-name {
-      font-size: 1.35rem;
-      font-weight: 600;
-      color: var(--text);
-      letter-spacing: -.01em;
-    }
-
-    /* Leaflet popup */
-    .leaflet-popup-content-wrapper {
-      border-radius: var(--r) !important;
-      box-shadow: var(--sh-md) !important;
-    }
-
-    .leaflet-popup-tip-container {
-      display: none;
-    }
-
-    /* ─── Footer ────────────────────────────────────── */
-    .site-footer {
-      background: var(--dark);
-      padding: 1.6rem 4.0rem;
-      text-align: center;
-    }
-
-    .footer-inner {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 1.6rem;
-      font-size: 1.2rem;
-      color: rgba(255, 255, 255, .3);
-      letter-spacing: .14em;
-      text-transform: uppercase;
-    }
-
-    /* ─── Stagger animations ────────────────────────── */
-    @keyframes cardIn {
-      from {
-        opacity: 0;
-        transform: translateY(16px);
-      }
-
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    .location-card {
-      animation: cardIn .45s ease backwards;
-    }
-
-    .time-controls>* {
-      animation: fadeIn .4s ease backwards;
-    }
-
-    .time-controls>*:nth-child(1) {
-      animation-delay: .05s;
-    }
-
-    .time-controls>*:nth-child(2) {
-      animation-delay: .10s;
-    }
-
-    .time-controls>*:nth-child(3) {
-      animation-delay: .15s;
-    }
-
-    .time-controls>*:nth-child(4) {
-      animation-delay: .20s;
-    }
-
-    .time-controls>*:nth-child(5) {
-      animation-delay: .25s;
-    }
-
-    .time-controls>*:nth-child(6) {
-      animation-delay: .30s;
-    }
-
-    .time-controls>*:nth-child(7) {
-      animation-delay: .35s;
-    }
-
-    .reveal.visible .section-eyebrow {
-      animation: fadeUp .5s ease .0s backwards;
-    }
-
-    .reveal.visible .section-title {
-      animation: fadeUp .5s ease .1s backwards;
-    }
-
-    /* ─── Responsive ────────────────────────────────── */
-    @media (max-width:960px) {
-      .map-layout {
-        grid-template-columns: 1fr;
-      }
-
-      .map-container {
-        height: 380px;
-      }
-
-      .hero-content {
-        padding: 0 2.4rem 2.0rem;
-      }
-
-      .section-inner {
-        padding: 0 3.2rem;
-      }
-    }
-
-    @media (max-width:600px) {
-      .hero-title-en {
-        font-size: 4.4rem;
-      }
-
+      /* ─── Hero ──────────────────────────────────────── */
       .hero {
-        height: 34vh;
+        position: relative;
+        height: 420px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        overflow: hidden;
+        background: var(--canvas);
       }
 
-      .detail-panel {
-        width: 100vw;
+      .hero-img {
+        position: absolute;
+        inset: 0;
+        background: url("https://www.oooh.jp/magazine/wp-content/uploads/2023/12/shutterstock_1886320225-1.jpg")
+          center top / 100% auto no-repeat;
       }
 
-      .section-inner {
-        padding: 0 2.0rem;
+      .hero::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          to bottom,
+          transparent 0%,
+          transparent 40%,
+          var(--canvas) 100%
+        );
+        pointer-events: none;
+        z-index: 1;
       }
 
       .hero-content {
-        padding: 0 2.0rem 4.0rem;
+        position: relative;
+        z-index: 2;
+        padding: 0 6.4rem;
+        max-width: 1280px;
+        width: 100%;
+        margin: 0 auto;
+      }
+
+      .hero-kicker {
+        font-size: 1.6rem;
+        font-weight: 500;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.9);
+        text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+        animation: fadeUp 0.8s ease 0.1s backwards;
+      }
+
+      .hero-title {
+        display: flex;
+        flex-direction: row;
+        align-items: baseline;
+        gap: 1.6rem;
+        margin-bottom: 2rem;
+        animation: fadeUp 0.8s ease 0.25s backwards;
+      }
+
+      .hero-title-en {
+        font-family: "Dancing Script", cursive;
+        font-size: clamp(5.6rem, 10vw, 12rem);
+        font-weight: 700;
+        color: #fff;
+        line-height: 0.95;
+        letter-spacing: 0.01em;
+      }
+
+      .hero-title-ja {
+        font-size: clamp(1.8rem, 3vw, 3.2rem);
+        font-weight: 300;
+        color: rgba(255, 255, 255, 0.68);
+        letter-spacing: 0.32em;
+        padding-left: 0.06em;
+        margin-top: 0.8rem;
       }
 
       .hero-scroll {
+        position: absolute;
+        bottom: 3.2rem;
+        right: 6.4rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.8rem;
+        animation: fadeIn 1.2s ease 0.9s backwards;
+      }
+
+      .hero-scroll-text {
+        font-size: 0.9rem;
+        font-weight: 700;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.35);
+        writing-mode: vertical-rl;
+      }
+
+      .hero-scroll-line {
+        width: 1px;
+        height: 48px;
+        background: linear-gradient(
+          to bottom,
+          rgba(255, 255, 255, 0.4),
+          transparent
+        );
+        animation: scrollLine 2s ease-in-out 1.5s infinite;
+      }
+
+      /* ─── Section ───────────────────────────────────── */
+      .section {
+        padding: 7.2rem 0;
+        background: var(--canvas);
+        position: relative;
+      }
+
+      #schedule {
+        margin-top: -8rem;
+        padding-top: 0;
+        background: transparent;
+        position: relative;
+        z-index: 2;
+      }
+
+      .section::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      .section.on-white::after {
         display: none;
       }
 
-      .section {
-        padding: 5.6rem 0;
+      .section.on-white {
+        background: var(--white);
       }
-    }
-  </style>
-</head>
 
-<body>
+      .section-inner {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 4.8rem;
+        position: relative;
+        z-index: 1;
+      }
 
-  <!-- ─── Hero ───────────────────────────────────── -->
-  <section class="hero">
-    <div class="hero-content">
-      <p class="hero-kicker">August 12 – 17, 2026</p>
-      <h1 class="hero-title">
-        <span class="hero-title-en">THAILAND</span>
-        <span class="hero-title-ja">タイ旅行</span>
-      </h1>
-    </div>
-    <div class="hero-scroll">
-      <div class="hero-scroll-line"></div>
-      <span class="hero-scroll-text">Scroll</span>
-    </div>
-  </section>
+      .section-header {
+        margin-bottom: 4rem;
+      }
 
-  <!-- ─── Schedule ───────────────────────────────── -->
-  <section class="section" id="schedule">
-    <div class="section-inner">
-      <div class="section-header reveal">
-        <p class="section-eyebrow">Schedule</p>
-        <h2 class="section-title">スケジュール</h2>
-      </div>
-      <div class="time-controls reveal">
-        <span class="material-symbols-outlined tc-icon">schedule</span>
-        <span class="tc-label">表示時間</span>
-        <select id="view-start"></select>
-        <span class="tc-sep">〜</span>
-        <select id="view-end"></select>
-        <span class="tc-divider"></span>
-        <button class="tc-toggle" id="toggle-hotel" onclick="toggleHotels()">
-          <span class="material-symbols-outlined">hotel</span>ホテル
-        </button>
-      </div>
-      <div class="cal-outer reveal">
-        <div class="cal" id="cal"></div>
-      </div>
-    </div>
-  </section>
+      .section-eyebrow {
+        font-size: 1.1rem;
+        font-weight: 700;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: #93928b;
+        margin-bottom: 0.8rem;
+      }
 
-  <!-- ─── Map ────────────────────────────────────── -->
-  <section class="section on-white" id="map-section">
-    <div class="section-inner">
-      <div class="section-header reveal">
-        <p class="section-eyebrow">Map</p>
-        <h2 class="section-title">訪問スポット</h2>
+      .section-title {
+        font-family: var(--font-d);
+        font-size: 2.8rem;
+        font-weight: 700;
+        color: var(--dark);
+        letter-spacing: 0.1em;
+        line-height: 1.05;
+      }
+
+      /* ─── Schedule ──────────────────────────────────── */
+      .time-controls {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 2.8rem;
+        flex-wrap: wrap;
+      }
+
+      .tc-icon {
+        font-size: 1.6rem;
+        color: var(--text-soft);
+      }
+
+      .tc-label {
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: var(--text-soft);
+        letter-spacing: 0.03em;
+      }
+
+      .tc-sep {
+        color: var(--text-dim);
+      }
+
+      .tc-divider {
+        width: 1px;
+        height: 1.6rem;
+        background: var(--border-med);
+        margin: 0 0.4rem;
+      }
+
+      .time-controls select {
+        font-family: var(--font-b);
+        font-size: 1.3rem;
+        font-weight: 500;
+        color: var(--text);
+        background: var(--white);
+        border: 1px solid var(--border-med);
+        border-radius: 0px;
+        padding: 0.6rem 3rem 0.6rem 1.4rem;
+        cursor: pointer;
+        appearance: none;
+        -webkit-appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 0.8rem center;
+        background-size: 1.3rem;
+        box-shadow: none;
+        transition: border-color 0.15s;
+      }
+
+      .time-controls select:hover {
+        border-color: var(--dark);
+      }
+
+      .time-controls select:focus {
+        outline: none;
+        border-color: var(--dark);
+        box-shadow: none;
+      }
+
+      .tc-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.6rem;
+        font-family: var(--font-b);
+        font-size: 1.3rem;
+        font-weight: 500;
+        color: var(--text-soft);
+        padding: 0.6rem 1.4rem;
+        border-radius: 0px;
+        border: 1px solid var(--border-med);
+        background: var(--white);
+        cursor: pointer;
+        box-shadow: none;
+        transition: all 0.15s;
+      }
+
+      .tc-toggle:hover {
+        border-color: var(--dark);
+        color: var(--text);
+      }
+
+      .tc-toggle.active {
+        background: #000000;
+        border-color: #000000;
+        color: #fff;
+        box-shadow: none;
+      }
+
+      .tc-toggle .material-symbols-outlined {
+        font-size: 1.4rem;
+      }
+
+      /* Calendar */
+      .cal-outer {
+        overflow-x: auto;
+        border-radius: 0px;
+        box-shadow: none;
+        border: 1px solid var(--border);
+      }
+
+      .cal {
+        display: flex;
+        flex-direction: column;
+        min-width: 820px;
+        border-radius: 0px;
+        overflow: hidden;
+        background: var(--white);
+      }
+
+      .cal-hdr-row {
+        display: flex;
+        background: var(--dark);
+        flex-shrink: 0;
+      }
+
+      .cal-gutter {
+        width: 52px;
+        flex-shrink: 0;
+      }
+
+      .cal-days-hdr {
+        flex: 1;
+        display: flex;
+      }
+
+      .day-hdr {
+        flex: 1;
+        padding: 1.8rem 0.8rem 1.4rem;
+        text-align: center;
+        border-left: 1px solid rgba(255, 255, 255, 0.07);
+      }
+
+      .day-hdr .dow {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.38);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .day-hdr .date {
+        font-family: var(--font-d);
+        font-size: 2.8rem;
+        font-weight: 700;
+        color: #fff;
+        line-height: 1.05;
+        margin-top: 0.3rem;
+        letter-spacing: 0.05em;
+      }
+
+      .cal-allday-row {
+        display: flex;
+        border-bottom: 1px solid var(--border);
+        flex-shrink: 0;
+        background: var(--ceramic);
+      }
+
+      .allday-label {
+        width: 52px;
+        flex-shrink: 0;
+        background: var(--ceramic);
+        border-right: 1px solid var(--border);
+        display: flex;
+        align-items: flex-start;
+        justify-content: flex-end;
+        padding: 6px 8px;
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: var(--text-dim);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        min-height: 32px;
+      }
+
+      .cal-allday-cells {
+        flex: 1;
+        display: flex;
+      }
+
+      .allday-cell {
+        flex: 1;
+        border-left: 1px solid var(--border);
+        padding: 4px;
+        min-height: 32px;
+        background: var(--ceramic);
+      }
+
+      .allday-event {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 10px;
+        border-radius: 0px;
+        background: var(--dark);
+        color: rgba(255, 255, 255, 0.82);
+        font-size: 0.95rem;
+        font-weight: 500;
+        cursor: pointer;
+        margin-bottom: 2px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        transition: background 0.15s;
+        font-family: var(--font-b);
+      }
+
+      .allday-event:hover {
+        background: #333333;
+        transform: none;
+      }
+
+      .allday-event .ev-icon {
+        font-size: 1rem;
+        flex-shrink: 0;
+        opacity: 0.65;
+      }
+
+      .cal-body-row {
+        display: flex;
+      }
+
+      .cal-time-col {
+        width: 52px;
+        flex-shrink: 0;
+        background: var(--ceramic);
+        border-right: 1px solid var(--border);
+      }
+
+      .time-slot {
+        height: 44px;
+        display: flex;
+        align-items: flex-start;
+        justify-content: flex-end;
+        padding: 4px 8px 0;
+        font-size: 0.95rem;
+        font-weight: 400;
+        color: var(--text-dim);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .cal-day-cols {
+        flex: 1;
+        display: flex;
+      }
+
+      .cal-day-col {
+        flex: 1;
+        position: relative;
+        border-left: 1px solid var(--border);
+        background-image: repeating-linear-gradient(
+          to bottom,
+          transparent 0px,
+          transparent 43px,
+          var(--border) 43px,
+          var(--border) 44px
+        );
+      }
+
+      .event {
+        position: absolute;
+        left: 4px;
+        right: 4px;
+        border-radius: 0px;
+        padding: 2px 7px;
+        font-size: 1rem;
+        overflow: hidden;
+        background: #f7f7f7;
+        border-left: 3px solid #000000;
+        color: #000000;
+        z-index: 2;
+        cursor: pointer;
+        display: flex;
+        align-items: flex-start;
+        gap: 4px;
+        transition: background 0.12s;
+        font-family: var(--font-b);
+        box-shadow: none;
+      }
+
+      .event[data-cat="cat-move"] {
+        background: #f7f7f7;
+        border-left-color: #93928b;
+        color: #333333;
+      }
+
+      .event[data-cat="cat-move"]:hover {
+        background: #e5e5e1;
+      }
+
+      .event:hover {
+        background: #e5e5e1;
+        box-shadow: none;
+        transform: none;
+      }
+
+      .event:active {
+        transform: none;
+      }
+
+      .ev-icon {
+        font-size: 1.1rem;
+        flex-shrink: 0;
+        margin-top: 2px;
+        opacity: 0.7;
+      }
+
+      .ev-content {
+        overflow: hidden;
+        min-width: 0;
+      }
+
+      .ev-title {
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        line-height: 1.35;
+      }
+
+      .ev-time {
+        font-size: 0.9rem;
+        opacity: 0.65;
+        margin-top: 1px;
+        font-weight: 400;
+      }
+
+      /* ─── Detail Panel ──────────────────────────────── */
+      .overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(20, 16, 9, 0.5);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        z-index: 300;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+      }
+
+      .overlay.open {
+        opacity: 1;
+        pointer-events: all;
+      }
+
+      .detail-panel {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 400px;
+        max-width: 100vw;
+        background: #ffffff;
+        z-index: 400;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        box-shadow: none;
+        border-left: 1px solid var(--border);
+        transform: translateX(100%);
+        transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .detail-panel::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: var(--border);
+      }
+
+      .detail-panel.open {
+        transform: translateX(0);
+      }
+
+      .panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 2.4rem 2.8rem 2rem;
+        border-bottom: 1px solid var(--border);
+        flex-shrink: 0;
+        background: var(--canvas);
+      }
+
+      .panel-cat-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.6rem;
+        font-family: var(--font-b);
+        font-size: 1.1rem;
+        font-weight: 700;
+        padding: 0.5rem 1.4rem;
+        border-radius: 0px;
+        background: #93928b;
+        color: #ffffff;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      .panel-cat-badge .material-symbols-outlined {
+        font-size: 1.4rem;
+      }
+
+      .panel-close {
+        width: 34px;
+        height: 34px;
+        border-radius: 0px;
+        border: 1px solid var(--border-med);
+        background: var(--white);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-soft);
+        transition: all 0.15s;
+        font-family: inherit;
+        flex-shrink: 0;
+      }
+
+      .panel-close .material-symbols-outlined {
+        font-size: 1.8rem;
+      }
+
+      .panel-close:hover {
+        color: var(--text);
+        background: var(--canvas);
+      }
+
+      .panel-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 3.2rem 2.8rem;
+      }
+
+      .panel-image {
+        display: none;
+        margin: -3.2rem -2.8rem 2.4rem;
+        overflow: hidden;
+        border-radius: 0px;
+      }
+
+      .panel-image.visible {
+        display: block;
+      }
+
+      .panel-image img {
+        width: 100%;
+        height: 200px;
+        object-fit: cover;
+        object-position: center;
+      }
+
+      .panel-title {
+        font-family: var(--font-d);
+        font-size: 2.4rem;
+        font-weight: 700;
+        color: var(--dark);
+        line-height: 1.2;
+        letter-spacing: 0.1em;
+        margin-bottom: 3rem;
+      }
+
+      .panel-meta {
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+      }
+
+      .panel-meta-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 1.6rem;
+      }
+
+      .panel-meta-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 0px;
+        background: var(--green-pale);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        color: var(--green);
+      }
+
+      .panel-meta-icon .material-symbols-outlined {
+        font-size: 1.8rem;
+      }
+
+      .panel-meta-label {
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--text-dim);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        margin-bottom: 0.4rem;
+      }
+
+      .panel-meta-value {
+        font-size: 1.5rem;
+        color: var(--text);
+        font-weight: 400;
+        line-height: 1.5;
+      }
+
+      .panel-divider {
+        border: none;
+        border-top: 1px solid var(--border);
+        margin: 3rem 0 2.4rem;
+      }
+
+      .panel-notes-label {
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--text-dim);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        margin-bottom: 1rem;
+      }
+
+      .panel-notes {
+        font-size: 1.5rem;
+        color: var(--text-soft);
+        line-height: 1.8;
+        white-space: pre-line;
+      }
+
+      .panel-meta-row--map {
+        cursor: pointer;
+        border-radius: 0px;
+        padding: 6px;
+        margin: -6px;
+        transition: background 0.15s;
+      }
+
+      .panel-meta-row--map:hover {
+        background: var(--green-pale);
+      }
+
+      .panel-map-hint {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #333333;
+        letter-spacing: 0;
+        text-transform: none;
+        margin-left: 0.4rem;
+      }
+
+      /* ─── Map ───────────────────────────────────────── */
+      .map-filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.8rem;
+        margin-bottom: 1.6rem;
+        align-items: center;
+      }
+
+      .map-layout {
+        display: block;
+      }
+
+      .map-container {
+        position: relative;
+        border-radius: 0px;
+        overflow: hidden;
+        box-shadow: none;
+        border: 1px solid var(--border);
+        height: 360px;
+      }
+
+      .location-scroll {
+        margin-top: 1.6rem;
+        max-height: 240px;
+        overflow-y: auto;
+        border-radius: 0px;
+        border: 1px solid var(--border);
+        padding: 1rem;
+      }
+
+      .map-fit-btn {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        z-index: 1000;
+        width: 36px;
+        height: 36px;
+        border: 1px solid var(--border);
+        border-radius: 0px;
+        background: var(--white);
+        box-shadow: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text);
+        transition: background 0.15s;
+      }
+
+      .map-fit-btn:hover {
+        background: var(--ceramic);
+      }
+
+      .map-fit-btn .material-symbols-outlined {
+        font-size: 20px;
+      }
+
+      #leaflet-map {
+        width: 100%;
+        height: 100%;
+      }
+
+      .loc-filter-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+      }
+
+      .loc-filter-btn {
+        font-family: var(--font-b);
+        font-size: 1.2rem;
+        font-weight: 500;
+        padding: 0.5rem 1.2rem;
+        border-radius: 0px;
+        border: 1px solid var(--border-med);
+        background: var(--white);
+        color: var(--text-soft);
+        cursor: pointer;
+        box-shadow: none;
+        transition: all 0.15s;
+      }
+
+      .loc-filter-btn:hover {
+        border-color: #000000;
+        color: var(--text);
+      }
+
+      .loc-filter-btn.active {
+        background: #000000;
+        border-color: #000000;
+        color: #fff;
+        box-shadow: none;
+      }
+
+      .location-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+      }
+
+      .location-card {
+        background: var(--white);
+        border-radius: 0px;
+        border: 1px solid var(--border);
+        padding: 0.8rem 1.2rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        transition:
+          border-color 0.15s,
+          background 0.15s;
+      }
+
+      .location-card:hover {
+        border-color: #000000;
+        background: var(--ceramic);
+      }
+
+      .location-card.active {
+        border-color: #000000;
+        background: var(--ceramic);
+      }
+
+      .loc-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 0px;
+        background: var(--green-pale);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        color: var(--green);
+      }
+
+      .loc-icon .material-symbols-outlined {
+        font-size: 1.8rem;
+      }
+
+      .loc-name {
+        font-size: 1.35rem;
+        font-weight: 700;
+        color: var(--text);
+        letter-spacing: 0.1em;
+      }
+
+      /* Leaflet popup */
+      .leaflet-popup-content-wrapper {
+        border-radius: 0px !important;
+        box-shadow: none !important;
+        border: 1px solid var(--border);
+      }
+
+      .leaflet-popup-tip-container {
+        display: none;
+      }
+
+      /* ─── Footer ────────────────────────────────────── */
+      .site-footer {
+        background: #000000;
+        padding: 1.6rem 4rem;
+        text-align: center;
+      }
+
+      .footer-inner {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 1.6rem;
+        font-size: 1.2rem;
+        color: rgba(255, 255, 255, 0.3);
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      /* ─── Stagger animations ────────────────────────── */
+      @keyframes cardIn {
+        from {
+          opacity: 0;
+          transform: translateY(16px);
+        }
+
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .location-card {
+        animation: cardIn 0.45s ease backwards;
+      }
+
+      .time-controls > * {
+        animation: fadeIn 0.4s ease backwards;
+      }
+
+      .time-controls > *:nth-child(1) {
+        animation-delay: 0.05s;
+      }
+
+      .time-controls > *:nth-child(2) {
+        animation-delay: 0.1s;
+      }
+
+      .time-controls > *:nth-child(3) {
+        animation-delay: 0.15s;
+      }
+
+      .time-controls > *:nth-child(4) {
+        animation-delay: 0.2s;
+      }
+
+      .time-controls > *:nth-child(5) {
+        animation-delay: 0.25s;
+      }
+
+      .time-controls > *:nth-child(6) {
+        animation-delay: 0.3s;
+      }
+
+      .time-controls > *:nth-child(7) {
+        animation-delay: 0.35s;
+      }
+
+      .reveal.visible .section-eyebrow {
+        animation: fadeUp 0.5s ease 0s backwards;
+      }
+
+      .reveal.visible .section-title {
+        animation: fadeUp 0.5s ease 0.1s backwards;
+      }
+
+      /* ─── Responsive ────────────────────────────────── */
+      @media (max-width: 960px) {
+        .map-layout {
+          grid-template-columns: 1fr;
+        }
+
+        .map-container {
+          height: 380px;
+        }
+
+        .hero-content {
+          padding: 0 2.4rem 2rem;
+        }
+
+        .section-inner {
+          padding: 0 3.2rem;
+        }
+      }
+
+      @media (max-width: 600px) {
+        .hero-title-en {
+          font-size: 4.4rem;
+        }
+
+        .hero {
+          height: 280px;
+        }
+
+        .detail-panel {
+          width: 100vw;
+        }
+
+        .section-inner {
+          padding: 0 2rem;
+        }
+
+        .hero-content {
+          padding: 0 2rem 4rem;
+        }
+
+        .hero-scroll {
+          display: none;
+        }
+
+        .section {
+          padding: 5.6rem 0;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- ─── Hero ───────────────────────────────────── -->
+    <section class="hero">
+      <div class="hero-img"></div>
+      <div class="hero-content">
+        <h1 class="hero-title">
+          <span class="hero-title-en">THAILAND</span>
+          <span class="hero-kicker">August 12 – 17, 2026</span>
+        </h1>
       </div>
-      <div class="map-layout reveal">
-        <div class="map-container">
-          <div id="leaflet-map"></div>
+      <div class="hero-scroll">
+        <div class="hero-scroll-line"></div>
+        <span class="hero-scroll-text">Scroll</span>
+      </div>
+    </section>
+
+    <!-- ─── Schedule ───────────────────────────────── -->
+    <section class="section" id="schedule">
+      <div class="section-inner">
+        <div class="section-header reveal">
+          <p class="section-eyebrow">Schedule</p>
+          <h2 class="section-title">スケジュール</h2>
         </div>
-        <div class="map-sidebar">
-          <div class="loc-filters">
-            <div class="loc-filter-group" id="loc-cat-filters"></div>
-            <div class="loc-filter-group" id="loc-day-filters"></div>
+        <div class="time-controls reveal">
+          <span class="material-symbols-outlined tc-icon">schedule</span>
+          <span class="tc-label">表示時間</span>
+          <select id="view-start"></select>
+          <span class="tc-sep">〜</span>
+          <select id="view-end"></select>
+          <span class="tc-divider"></span>
+          <button class="tc-toggle" id="toggle-hotel" onclick="toggleHotels()">
+            <span class="material-symbols-outlined">hotel</span>ホテル
+          </button>
+        </div>
+        <div class="cal-outer reveal">
+          <div class="cal" id="cal"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── Map ────────────────────────────────────── -->
+    <section class="section on-white" id="map-section">
+      <div class="section-inner">
+        <div class="section-header reveal">
+          <p class="section-eyebrow">Map</p>
+          <h2 class="section-title">マップ</h2>
+        </div>
+        <div class="map-filters reveal">
+          <div class="loc-filter-group" id="loc-cat-filters"></div>
+          <div class="loc-filter-group" id="loc-day-filters"></div>
+        </div>
+        <div class="map-layout reveal">
+          <div class="map-container">
+            <div id="leaflet-map"></div>
+            <button
+              class="map-fit-btn"
+              onclick="fitMapToMarkers()"
+              title="全体表示"
+            >
+              <span class="material-symbols-outlined">fit_screen</span>
+            </button>
           </div>
+        </div>
+        <div class="location-scroll reveal">
           <div class="location-list" id="location-list"></div>
         </div>
       </div>
+    </section>
+
+    <!-- ─── Footer ─────────────────────────────────── -->
+    <footer class="site-footer">
+      <div class="footer-inner">
+        <span>更新: 2026年6月7日</span>
+      </div>
+    </footer>
+
+    <!-- ─── Detail Panel ───────────────────────────── -->
+    <div class="overlay" id="overlay" onclick="closePanel()"></div>
+    <div class="detail-panel" id="detail-panel">
+      <div class="panel-header">
+        <span class="panel-cat-badge" id="panel-cat-badge"></span>
+        <button class="panel-close" onclick="closePanel()">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+      <div class="panel-body">
+        <div class="panel-image" id="panel-image"></div>
+        <p class="panel-title" id="panel-title"></p>
+        <div class="panel-meta" id="panel-meta"></div>
+        <hr class="panel-divider" />
+        <p class="panel-notes-label">メモ</p>
+        <p class="panel-notes" id="panel-notes"></p>
+      </div>
     </div>
-  </section>
 
-  <!-- ─── Footer ─────────────────────────────────── -->
-  <footer class="site-footer">
-    <div class="footer-inner">
-      <span>更新: 2026年6月7日</span>
-    </div>
-  </footer>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+      // ─── Data ──────────────────────────────────────────
 
-  <!-- ─── Detail Panel ───────────────────────────── -->
-  <div class="overlay" id="overlay" onclick="closePanel()"></div>
-  <div class="detail-panel" id="detail-panel">
-    <div class="panel-header">
-      <span class="panel-cat-badge" id="panel-cat-badge"></span>
-      <button class="panel-close" onclick="closePanel()">
-        <span class="material-symbols-outlined">close</span>
-      </button>
-    </div>
-    <div class="panel-body">
-      <p class="panel-title" id="panel-title"></p>
-      <div class="panel-meta" id="panel-meta"></div>
-      <hr class="panel-divider">
-      <p class="panel-notes-label">メモ</p>
-      <p class="panel-notes" id="panel-notes"></p>
-    </div>
-  </div>
+      const HOUR_H = 44;
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script>
-    // ─── Data ──────────────────────────────────────────
+      const days = [
+        { dow: "水", date: "8/12" },
+        { dow: "木", date: "8/13" },
+        { dow: "金", date: "8/14" },
+        { dow: "土", date: "8/15" },
+        { dow: "日", date: "8/16" },
+        { dow: "月", date: "8/17" },
+      ];
 
-    const HOUR_H = 44;
+      const catMeta = {
+        "cat-move": { icon: "flight", label: "移動" },
+        "cat-sight": { icon: "photo_camera", label: "観光" },
+        "cat-food": { icon: "restaurant", label: "食事" },
+        "cat-hotel": { icon: "hotel", label: "宿泊" },
+        "cat-shop": { icon: "shopping_bag", label: "ショッピング" },
+      };
 
-    const days = [
-      { dow: '水', date: '8/12' },
-      { dow: '木', date: '8/13' },
-      { dow: '金', date: '8/14' },
-      { dow: '土', date: '8/15' },
-      { dow: '日', date: '8/16' },
-      { dow: '月', date: '8/17' },
-    ];
+      // lat/lng を持つイベントはマップにピンが立つ
+      // multiDay:true のイベントは expandEvents() で各日セグメントに分解される
+      const events = [
+        // ─ 終日（宿泊）
+        {
+          d: 0,
+          icon: "hotel",
+          title: "バンコク1泊目",
+          allDay: true,
+          time: "終日",
+          location: "137 ピラーズ レジデンス バンコク",
+          image:
+            "https://res.cloudinary.com/pillarshotels/image/upload/f_auto,q_auto/web/cms/resources/outlet/nimitr-terrace.jpeg",
+          notes: "",
+        },
+        {
+          d: 1,
+          icon: "hotel",
+          title: "バンコク2泊目",
+          allDay: true,
+          time: "終日",
+          location: "137 ピラーズ レジデンス バンコク",
+          image:
+            "https://res.cloudinary.com/pillarshotels/image/upload/f_auto,q_auto/web/cms/resources/outlet/nimitr-terrace.jpeg",
+          notes: "",
+        },
+        {
+          d: 2,
+          icon: "hotel",
+          title: "パタヤ1泊目",
+          allDay: true,
+          time: "終日",
+          location: "グランデ センター ポイント パタヤ",
+          image:
+            "https://dynamic-media-cdn.tripadvisor.com/media/photo-o/14/fb/da/18/grande-centre-point-pattaya.jpg?w=900&h=500&s=1",
+          notes: "",
+        },
+        {
+          d: 3,
+          icon: "hotel",
+          title: "パタヤ2泊目",
+          allDay: true,
+          time: "終日",
+          location: "グランデ センター ポイント パタヤ",
+          image:
+            "https://dynamic-media-cdn.tripadvisor.com/media/photo-o/14/fb/da/18/grande-centre-point-pattaya.jpg?w=900&h=500&s=1",
+          notes: "",
+        },
+        {
+          d: 4,
+          icon: "flight",
+          title: "機内泊",
+          allDay: true,
+          time: "終日",
+          location: "機内",
+          image:
+            "https://www.thailandtravel.or.jp/wp-content/uploads/2017/03/01871-808x538.jpg",
+          notes: "",
+        },
 
-    const catMeta = {
-      'cat-move': { icon: 'flight', label: '移動' },
-      'cat-sight': { icon: 'photo_camera', label: '観光' },
-      'cat-food': { icon: 'restaurant', label: '食事' },
-      'cat-hotel': { icon: 'hotel', label: '宿泊' },
-      'cat-shop': { icon: 'shopping_bag', label: 'ショッピング' },
-    };
+        // ─ 出国フライト（同日完結）
+        {
+          d: 0,
+          cat: "cat-move",
+          icon: "flight",
+          title: "出国フライト（依田家）",
+          start: 10.58,
+          end: 15.08,
+          time: "10:35 → 15:05",
+          location: "スワンナプーム国際空港",
+          lat: 13.69,
+          lng: 100.7501,
+          notes: "便名: タイ国際航空 TG683 (HND→BKK)\n所要時間: 6時間30分",
+        },
+        {
+          d: 0,
+          cat: "cat-move",
+          icon: "flight",
+          title: "出国フライト（篠崎家）",
+          start: 11.0,
+          end: 15.0,
+          time: "11:00 → 15:00",
+          location: "スワンナプーム国際空港",
+          lat: 13.69,
+          lng: 100.7501,
+          notes: "便名: タイ国際航空 TG645 (NGO→BKK)\n所要時間: 6時間",
+        },
 
-    // lat/lng を持つイベントはマップにピンが立つ
-    // multiDay:true のイベントは expandEvents() で各日セグメントに分解される
-    const events = [
-      // ─ 終日（宿泊）
-      { d: 0, icon: 'hotel', title: 'バンコク1泊目', allDay: true, time: '終日', location: '137 ピラーズ レジデンス バンコク', notes: '' },
-      { d: 1, icon: 'hotel', title: 'バンコク2泊目', allDay: true, time: '終日', location: '137 ピラーズ レジデンス バンコク', notes: '' },
-      { d: 2, icon: 'hotel', title: 'パタヤ1泊目', allDay: true, time: '終日', location: 'グランデ センター ポイント パタヤ', notes: '' },
-      { d: 3, icon: 'hotel', title: 'パタヤ2泊目', allDay: true, time: '終日', location: 'グランデ センター ポイント パタヤ', notes: '' },
-      { d: 4, icon: 'flight', title: '機内泊', allDay: true, time: '終日', location: '機内', notes: '' },
+        // ─ バンコクホテル（8/12 15:00 → 8/14 11:00、日またぎ）
+        {
+          multiDay: true,
+          startDay: 0,
+          endDay: 2,
+          startHour: 15.0,
+          endHour: 11.0,
+          cat: "cat-hotel",
+          icon: "hotel",
+          title: "バンコクホテル",
+          time: "8/12 15:00 → 8/14 11:00",
+          location: "137 ピラーズ レジデンス バンコク",
+          lat: 13.7278,
+          lng: 100.5601,
+          image:
+            "https://res.cloudinary.com/pillarshotels/image/upload/f_auto,q_auto/web/cms/resources/outlet/nimitr-terrace.jpeg",
+          notes:
+            "予約番号: 30522440（ホテル番号: 1005423858）\n客室: ザ・ピラーズ エグゼクティブ スタジオ レジデンス\n特典: 無料WiFi・駐車場・コーヒー/ティー・飲料水・フィットネス",
+          url: "https://137pillarshotels.com/ja/bangkok/",
+        },
 
-      // ─ 出国フライト（同日完結）
-      {
-        d: 0, cat: 'cat-move', icon: 'flight', title: '出国フライト（依田家）',
-        start: 10.58, end: 15.08, time: '10:35 → 15:05',
-        location: 'スワンナプーム国際空港', lat: 13.6900, lng: 100.7501,
-        notes: '便名: タイ国際航空 TG683 (HND→BKK)\n所要時間: 6時間30分'
-      },
-      {
-        d: 0, cat: 'cat-move', icon: 'flight', title: '出国フライト（篠崎家）',
-        start: 11.00, end: 15.00, time: '11:00 → 15:00',
-        location: 'スワンナプーム国際空港', lat: 13.6900, lng: 100.7501,
-        notes: '便名: タイ国際航空 TG645 (NGO→BKK)\n所要時間: 6時間'
-      },
+        // ─ パタヤホテル（8/14 14:00 → 8/16 12:00、日またぎ）
+        {
+          multiDay: true,
+          startDay: 2,
+          endDay: 4,
+          startHour: 14.0,
+          endHour: 12.0,
+          cat: "cat-hotel",
+          icon: "hotel",
+          title: "パタヤホテル",
+          time: "8/14 14:00 → 8/16 12:00",
+          location: "グランデ センター ポイント パタヤ",
+          lat: 12.943,
+          lng: 100.882,
+          image:
+            "https://dynamic-media-cdn.tripadvisor.com/media/photo-o/14/fb/da/18/grande-centre-point-pattaya.jpg?w=900&h=500&s=1",
+          notes:
+            "予約番号: 1734816045\n客室: デラックス シービュールーム 2部屋\n特典: 無料WiFi・駐車場・朝食",
+          url: "https://www.grandecentrepointpattaya.com/ja/",
+        },
 
-      // ─ バンコクホテル（8/12 15:00 → 8/14 11:00、日またぎ）
-      {
-        multiDay: true, startDay: 0, endDay: 2, startHour: 15.00, endHour: 11.00,
-        cat: 'cat-hotel', icon: 'hotel', title: 'バンコクホテル',
-        time: '8/12 15:00 → 8/14 11:00',
-        location: '137 ピラーズ レジデンス バンコク', lat: 13.7278, lng: 100.5601,
-        notes: '予約番号: 30522440（ホテル番号: 1005423858）\n客室: ザ・ピラーズ エグゼクティブ スタジオ レジデンス\n特典: 無料WiFi・駐車場・コーヒー/ティー・飲料水・フィットネス',
-        url: 'https://137pillarshotels.com/ja/bangkok/'
-      },
+        // ─ 帰国フライト 依田家（8/16 22:10 → 8/17 06:20、日またぎ）
+        {
+          multiDay: true,
+          startDay: 4,
+          endDay: 5,
+          startHour: 22.17,
+          endHour: 6.33,
+          cat: "cat-move",
+          icon: "flight",
+          title: "帰国フライト（依田家）",
+          time: "22:10 → 翌6:20",
+          location: "スワンナプーム国際空港",
+          lat: 13.69,
+          lng: 100.7501,
+          notes: "便名: タイ国際航空 TG640 (BKK→NRT)\n所要時間: 6時間10分",
+        },
 
-      // ─ パタヤホテル（8/14 14:00 → 8/16 12:00、日またぎ）
-      {
-        multiDay: true, startDay: 2, endDay: 4, startHour: 14.00, endHour: 12.00,
-        cat: 'cat-hotel', icon: 'hotel', title: 'パタヤホテル',
-        time: '8/14 14:00 → 8/16 12:00',
-        location: 'グランデ センター ポイント パタヤ', lat: 12.9430, lng: 100.8820,
-        notes: '予約番号: 1734816045\n客室: デラックス シービュールーム 2部屋\n特典: 無料WiFi・駐車場・朝食',
-        url: 'https://www.grandecentrepointpattaya.com/ja/'
-      },
+        // ─ 帰国フライト 篠崎家（8/17 0:05 → 08:00、同日完結）
+        {
+          d: 5,
+          cat: "cat-move",
+          icon: "flight",
+          title: "帰国フライト（篠崎家）",
+          start: 0.08,
+          end: 8.0,
+          time: "0:05 → 8:00",
+          location: "スワンナプーム国際空港",
+          lat: 13.69,
+          lng: 100.7501,
+          notes: "便名: タイ国際航空 TG644 (BKK→NGO)\n所要時間: 5時間55分",
+        },
 
-      // ─ 帰国フライト 依田家（8/16 22:10 → 8/17 06:20、日またぎ）
-      {
-        multiDay: true, startDay: 4, endDay: 5, startHour: 22.17, endHour: 6.33,
-        cat: 'cat-move', icon: 'flight', title: '帰国フライト（依田家）',
-        time: '22:10 → 翌6:20',
-        location: 'スワンナプーム国際空港', lat: 13.6900, lng: 100.7501,
-        notes: '便名: タイ国際航空 TG640 (BKK→NRT)\n所要時間: 6時間10分'
-      },
+        // ─ 移動
+        // 8/12 移動
+        {
+          d: 0,
+          cat: "cat-move",
+          icon: "directions_car",
+          title: "移動",
+          start: 15.08,
+          end: 17.0,
+          time: "15:05 → 17:00",
+          location: "",
+          notes: "",
+        },
 
-      // ─ 帰国フライト 篠崎家（8/17 0:05 → 08:00、同日完結）
-      {
-        d: 5, cat: 'cat-move', icon: 'flight', title: '帰国フライト（篠崎家）',
-        start: 0.08, end: 8.00, time: '0:05 → 8:00',
-        location: 'スワンナプーム国際空港', lat: 13.6900, lng: 100.7501,
-        notes: '便名: タイ国際航空 TG644 (BKK→NGO)\n所要時間: 5時間55分'
-      },
-    ];
+        // ─ 8/13
+        // 朝: Tiengna Viennoiserie
+        {
+          d: 1,
+          cat: "cat-food",
+          icon: "restaurant",
+          title: "Tiengna Viennoiserie",
+          start: 7.5,
+          end: 9.0,
+          time: "7:30 → 9:00",
+          location: "Tiengna Viennoiserie（スクンビット39）",
+          lat: 13.7364,
+          lng: 100.5729,
+          url: "https://www.facebook.com/Tiengna.BKK",
+          image:
+            "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQfV5O44TTtHSFg5-Ux4FaEtf3myrW91P1M5A&s",
+          notes: "ベーカリーカフェ\n営業: 7:00〜17:00",
+        },
+        // 移動
+        {
+          d: 1,
+          cat: "cat-move",
+          icon: "directions_car",
+          title: "移動",
+          start: 9.0,
+          end: 10.0,
+          time: "9:00 → 10:00",
+          location: "",
+          notes: "",
+        },
+        // 観光: ワット パークナムパーシーチャルーン
+        {
+          d: 1,
+          cat: "cat-sight",
+          icon: "photo_camera",
+          title: "ワット パークナムパーシーチャルーン",
+          start: 10.0,
+          end: 11.0,
+          time: "10:00 → 11:00",
+          location: "Wat Paknam Phasi Charoen",
+          lat: 13.721776,
+          lng: 100.470358,
+          url: "https://www.google.com/maps/search/Wat+Paknam+Phasi+Charoen",
+          image:
+            "https://www.thailandtravel.or.jp/wp-content/uploads/2017/07/241531199_1074098326727081_2405869266411881148_nSNSre.jpg",
+          imagePos: "center 30%",
+          notes: "",
+        },
+        // 移動
+        {
+          d: 1,
+          cat: "cat-move",
+          icon: "directions_car",
+          title: "移動",
+          start: 11.0,
+          end: 11.5,
+          time: "11:00 → 11:30",
+          location: "",
+          notes: "",
+        },
+        // 観光: ワット アルン
+        {
+          d: 1,
+          cat: "cat-sight",
+          icon: "photo_camera",
+          title: "ワット アルン",
+          start: 11.5,
+          end: 13.0,
+          time: "11:30 → 13:00",
+          location: "Wat Arun Ratchawararam",
+          lat: 13.743865,
+          lng: 100.488444,
+          url: "https://www.google.com/maps/search/Wat+Arun+Bangkok",
+          image:
+            "https://www.thailandtravel.or.jp/wp-content/uploads/2017/03/e80e52ddc3c9cafa754f4bcd981f509a-808x539.jpg",
+          imagePos: "center 40%",
+          notes: "",
+        },
+        // 昼: スパンニガ
+        {
+          d: 1,
+          cat: "cat-food",
+          icon: "restaurant",
+          title: "スパンニガ・イーティング・ルーム",
+          start: 13.0,
+          end: 14.5,
+          time: "13:00 → 14:30",
+          location: "Supanniga Eating Room Tha Tien",
+          lat: 13.744135,
+          lng: 100.491735,
+          url: "https://www.supannigaeatingroom.com",
+          image:
+            "https://www.bangkok-pukuko.com/wp-content/uploads/2021/06/supanniga-eating-room12.jpg",
+          notes: "タイ東北料理の人気レストラン",
+        },
+        // 移動
+        {
+          d: 1,
+          cat: "cat-move",
+          icon: "directions_car",
+          title: "移動",
+          start: 14.5,
+          end: 15.5,
+          time: "14:30 → 15:30",
+          location: "",
+          notes: "",
+        },
+        // ショッピング: エムクオーティエ
+        {
+          d: 1,
+          cat: "cat-shop",
+          icon: "shopping_bag",
+          title: "エムクオーティエ",
+          start: 15.5,
+          end: 17.0,
+          time: "15:30 → 17:00",
+          location: "EmQuartier",
+          lat: 13.731225,
+          lng: 100.569476,
+          url: "https://www.google.com/maps/search/EmQuartier+Bangkok",
+          image:
+            "https://enjoy-bkk.com/wp-content/uploads/2016/10/EmQuartier-1200-628.jpg",
+          notes: "お土産購入",
+        },
+        // 8/14 朝: Horme Cafe Bangna
+        {
+          d: 2,
+          cat: "cat-food",
+          icon: "restaurant",
+          title: "Horme Cafe Bangna",
+          start: 7.75,
+          end: 9.0,
+          time: "7:45 → 9:00",
+          location: "Horme Cafe Bangna",
+          lat: 13.6579166,
+          lng: 100.668526,
+          url: "https://www.facebook.com/HormeCafeBangna",
+          image:
+            "https://www.saku-bangkok.net/wp-content/uploads/2020/08/logoIMG_20200807_093447-1024x768.jpg",
+          notes: "",
+        },
+        // 8/14 昼: Tuang Dim Sum
+        {
+          d: 2,
+          cat: "cat-food",
+          icon: "restaurant",
+          title: "Tuang Dim Sum",
+          start: 11.5,
+          end: 13.0,
+          time: "11:30 → 13:00",
+          location: "Tuang Dim Sum",
+          lat: 13.7050706,
+          lng: 100.5059022,
+          url: "https://www.google.com/maps/search/Tuang+Dim+Sum+Bangkok",
+          image:
+            "https://dynamic-media-cdn.tripadvisor.com/media/photo-o/2a/e9/c2/f1/caption.jpg?w=900&h=500&s=1",
+          notes: "",
+        },
+        // 8/14 移動: →ワットサマーン
+        {
+          d: 2,
+          cat: "cat-move",
+          icon: "directions_car",
+          title: "移動（Grab）",
+          start: 13.0,
+          end: 14.25,
+          time: "13:00 → 14:15",
+          location: "",
+          notes: "",
+        },
+        // 8/14 観光: ワットサマーンラッタナーラーム
+        {
+          d: 2,
+          cat: "cat-sight",
+          icon: "photo_camera",
+          title: "ワット サマーン ラッタナーラーム",
+          start: 14.25,
+          end: 15.25,
+          time: "14:15 → 15:15",
+          location: "Wat Saman Rattanaram",
+          lat: 13.7014064,
+          lng: 101.1414795,
+          url: "https://www.google.com/maps/search/Wat+Saman+Rattanaram",
+          image:
+            "https://www.thailandtravel.or.jp/wp-content/uploads/2017/11/Small_Chachoengsao-00024224.jpg",
+          notes: "",
+        },
+        // 8/14 移動: →パタヤ
+        {
+          d: 2,
+          cat: "cat-move",
+          icon: "directions_car",
+          title: "移動（Grab）",
+          start: 15.25,
+          end: 16.5,
+          time: "15:15 → 16:30",
+          location: "",
+          notes: "",
+        },
+        // 8/14 夜: ナイトマーケット
+        {
+          d: 2,
+          cat: "cat-food",
+          icon: "restaurant",
+          title: "Marina Night Market",
+          start: 19.0,
+          end: 21.0,
+          time: "19:00 → 21:00",
+          location: "Marina Night Market（Central Marina）",
+          lat: 12.9457,
+          lng: 100.8901,
+          url: "https://www.facebook.com/pattayamarinanightmarket/",
+          image:
+            "https://dynamic-media-cdn.tripadvisor.com/media/photo-o/19/f2/01/f7/loy-kratong-festival.jpg?w=900&h=500&s=1",
+          notes: "パタヤ Central Marina 屋外ナイトマーケット",
+        },
 
-    // multiDay イベントを各日のセグメントに展開する
-    function expandEvents(evs) {
-      const result = [];
-      evs.forEach(ev => {
-        if (!ev.multiDay) { result.push(ev); return; }
-        for (let d = ev.startDay; d <= ev.endDay; d++) {
-          const start = d === ev.startDay ? ev.startHour : 0;
-          const end = d === ev.endDay ? ev.endHour : 24;
-          result.push({ ...ev, d, start, end, multiDay: false });
-        }
-      });
-      return result;
-    }
+        // ─ 8/15
+        // 朝: ホテル
+        {
+          d: 3,
+          cat: "cat-food",
+          icon: "restaurant",
+          title: "朝ごはん（ホテル）",
+          start: 7.0,
+          end: 8.0,
+          time: "7:00 → 8:00",
+          location: "Grande Centre Point Pattaya",
+          image:
+            "https://dynamic-media-cdn.tripadvisor.com/media/photo-o/14/fb/da/18/grande-centre-point-pattaya.jpg?w=900&h=500&s=1",
+          imagePos: "center 70%",
+          notes: "",
+        },
+        // 移動: ホテル→Bali Hai Pier
+        {
+          d: 3,
+          cat: "cat-move",
+          icon: "directions_car",
+          title: "移動（Grab）",
+          start: 8.0,
+          end: 8.5,
+          time: "8:00 → 8:30",
+          location: "",
+          notes: "",
+        },
+        // フェリー: パタヤ→ラン島
+        {
+          d: 3,
+          cat: "cat-move",
+          icon: "directions_boat",
+          title: "フェリー",
+          start: 9.0,
+          end: 9.75,
+          time: "9:00 → 9:45",
+          location: "Bali Hai Pier",
+          lat: 12.9272,
+          lng: 100.8773,
+          notes: "公共フェリー 30THB/人",
+        },
+        // マリンアクティビティ
+        {
+          d: 3,
+          cat: "cat-sight",
+          icon: "pool",
+          title: "マリンアクティビティ",
+          start: 10.0,
+          end: 15.0,
+          time: "10:00 → 15:00",
+          location: "Tawaen Beach, ラン島",
+          lat: 12.9196,
+          lng: 100.7833,
+          image:
+            "https://res.klook.com/images/fl_lossy.progressive,q_65/c_fill,w_1200,h_630/w_80,x_15,y_15,g_south_west,l_Klook_water_br_trans_yhcmh3/activities/ijrfqmhxxofzzmpdrftp/%E3%83%91%E3%82%BF%E3%83%A4%E7%99%BA%E3%83%A9%E3%83%B3%E5%B3%B6(%E3%82%B3%E3%83%BC%E3%83%A9%E3%83%AB%E5%B3%B6)%E3%82%B5%E3%82%AF%E5%B3%B6%E3%82%B9%E3%83%94%E3%83%BC%E3%83%89%E3%83%9C%E3%83%BC%E3%83%88%E3%81%A7%E8%A1%8C%E3%81%8F%E6%97%A5%E5%B8%B0%E3%82%8A%E3%83%84%E3%82%A2%E3%83%BC(%E3%83%9E%E3%83%AA%E3%83%B3%E3%82%A2%E3%82%AF%E3%83%86%E3%82%A3%E3%83%93%E3%83%86%E3%82%A3%E4%BB%98%E3%81%8D)%7CKlook.jpg",
+          notes: "パラセーリング、ジェットスキー、バナナボート等",
+        },
+        // フェリー: ラン島→パタヤ
+        {
+          d: 3,
+          cat: "cat-move",
+          icon: "directions_boat",
+          title: "フェリー",
+          start: 15.5,
+          end: 16.25,
+          time: "15:30 → 16:15",
+          location: "Na Ban Pier（ラン島）",
+          notes: "公共フェリー 30THB/人",
+        },
+        // 移動: Bali Hai Pier→ホテル
+        {
+          d: 3,
+          cat: "cat-move",
+          icon: "directions_car",
+          title: "移動（Grab）",
+          start: 16.25,
+          end: 16.75,
+          time: "16:15 → 16:45",
+          location: "",
+          notes: "",
+        },
+        // 夜: The Sky Gallery（仮）
+        {
+          d: 3,
+          cat: "cat-food",
+          icon: "restaurant",
+          title: "The Sky Gallery（仮）",
+          start: 19.0,
+          end: 21.0,
+          time: "19:00 → 21:00",
+          location: "The Sky Gallery Pattaya",
+          lat: 12.9215,
+          lng: 100.8594,
+          url: "https://www.google.com/maps/search/The+Sky+Gallery+Pattaya",
+          image:
+            "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSK9gYvVdp5p8zfLd2iyaG7ldcf-2gtwg8N1w&s",
+          notes: "仮設定。プラタムナックヒル、ホテルから車5分",
+        },
 
-    // multiDay を展開したイベントを一度だけ計算してキャッシュ
-    const expandedEvents = expandEvents(events);
+        // ─ 8/16
+        // 朝: ホテル
+        {
+          d: 4,
+          cat: "cat-food",
+          icon: "restaurant",
+          title: "朝ごはん（ホテル）",
+          start: 7.0,
+          end: 8.0,
+          time: "7:00 → 8:00",
+          location: "Grande Centre Point Pattaya",
+          image:
+            "https://dynamic-media-cdn.tripadvisor.com/media/photo-o/14/fb/da/18/grande-centre-point-pattaya.jpg?w=900&h=500&s=1",
+          notes: "",
+        },
+        // プール
+        {
+          d: 4,
+          cat: "cat-sight",
+          icon: "pool",
+          title: "プール",
+          start: 8.0,
+          end: 10.0,
+          time: "8:00 → 10:00",
+          location: "Grande Centre Point Pattaya",
+          image:
+            "https://www.grandecentrepointpattaya.com/upload/findex-acilitie/mobile/4-index-facilitie.webp?v=95",
+          notes: "",
+        },
+        // チェックアウト
+        {
+          d: 4,
+          cat: "cat-move",
+          icon: "luggage",
+          title: "チェックアウト",
+          start: 10.0,
+          end: 11.0,
+          time: "10:00 → 11:00",
+          location: "Grande Centre Point Pattaya",
+          notes: "",
+        },
+        // ショッピング: Terminal 21
+        {
+          d: 4,
+          cat: "cat-shop",
+          icon: "shopping_bag",
+          title: "Terminal 21",
+          start: 11.0,
+          end: 12.5,
+          time: "11:00 → 12:30",
+          location: "Terminal 21 Pattaya",
+          lat: 12.9467,
+          lng: 100.8895,
+          url: "https://www.terminal21.co.th/pattaya",
+          image:
+            "https://enjoy-bkk.com/wp-content/uploads/2016/10/EmQuartier-1200-628.jpg",
+          notes: "営業: 11:00〜23:00",
+        },
+        // 昼: Robin Hood Tavern（仮）
+        {
+          d: 4,
+          cat: "cat-food",
+          icon: "restaurant",
+          title: "Robin Hood Tavern（仮）",
+          start: 12.5,
+          end: 13.5,
+          time: "12:30 → 13:30",
+          location: "Robin Hood Tavern",
+          lat: 12.9266,
+          lng: 100.883,
+          url: "https://www.robinhoodtavern.com",
+          image:
+            "https://dynamic-media-cdn.tripadvisor.com/media/photo-o/2e/83/96/cc/welcome-to-robin-hood.jpg?w=900&h=500&s=1",
+          notes: "仮設定。英国パブ、ラム肉が名物。T21から徒歩圏内",
+        },
+        // 移動: パタヤ→空港
+        {
+          d: 4,
+          cat: "cat-move",
+          icon: "directions_car",
+          title: "移動（Grab）",
+          start: 14.0,
+          end: 16.0,
+          time: "14:00 → 16:00",
+          location: "",
+          notes: "パタヤ→スワンナプーム空港 約2時間",
+        },
+        // 夜: 空港
+        {
+          d: 4,
+          cat: "cat-food",
+          icon: "restaurant",
+          title: "夜ごはん（空港）",
+          start: 18.0,
+          end: 20.0,
+          time: "18:00 → 20:00",
+          location: "スワンナプーム国際空港",
+          lat: 13.69,
+          lng: 100.7501,
+          image:
+            "https://www.thailandtravel.or.jp/wp-content/uploads/2017/03/01871-808x538.jpg",
+          notes: "",
+        },
+      ];
 
-    // lat/lng を持つイベントを集約し、座標ごとにユニーク化する
-    function collectLocations(filter = () => true) {
-      const seen = new Map();
-      events.forEach(ev => {
-        if (ev.lat == null || ev.lng == null) return;
-        if (!filter(ev)) return;
-        const key = `${ev.lat},${ev.lng}`;
-        if (!seen.has(key)) {
-          seen.set(key, { name: ev.location, icon: ev.icon, lat: ev.lat, lng: ev.lng, evs: [] });
-        }
-        seen.get(key).evs.push(ev);
-      });
-      return [...seen.values()];
-    }
-
-    // ─── Calendar ──────────────────────────────────────
-
-    let viewStart = 6, viewEnd = 22;
-    let showHotels = false;
-
-    function makeHourLabel(h) {
-      return `${String(h % 24).padStart(2, '0')}:00`;
-    }
-
-    function renderCalendar() {
-      const cal = document.getElementById('cal');
-      if (!cal) {
-        console.error('[renderCalendar] Element #cal not found');
-        return;
+      // multiDay イベントを各日のセグメントに展開する
+      function expandEvents(evs) {
+        const result = [];
+        evs.forEach((ev) => {
+          if (!ev.multiDay) {
+            result.push(ev);
+            return;
+          }
+          for (let d = ev.startDay; d <= ev.endDay; d++) {
+            const start = d === ev.startDay ? ev.startHour : 0;
+            const end = d === ev.endDay ? ev.endHour : 24;
+            result.push({ ...ev, d, start, end, multiDay: false });
+          }
+        });
+        return result;
       }
-      cal.innerHTML = '';
 
-      // ─ ヘッダー行
-      const hdrRow = document.createElement('div');
-      hdrRow.className = 'cal-hdr-row';
-      const gutter = document.createElement('div');
-      gutter.className = 'cal-gutter';
-      hdrRow.appendChild(gutter);
-      const daysHdr = document.createElement('div');
-      daysHdr.className = 'cal-days-hdr';
-      days.forEach(d => {
-        const el = document.createElement('div');
-        el.className = 'day-hdr';
-        el.innerHTML = `<div class="dow">${d.dow}</div><div class="date">${d.date}</div>`;
-        daysHdr.appendChild(el);
-      });
-      hdrRow.appendChild(daysHdr);
-      cal.appendChild(hdrRow);
+      // multiDay を展開したイベントを一度だけ計算してキャッシュ
+      const expandedEvents = expandEvents(events);
 
-      // ─ 終日行
-      const alRow = document.createElement('div');
-      alRow.className = 'cal-allday-row';
-      const alLabel = document.createElement('div');
-      alLabel.className = 'allday-label';
-      alLabel.textContent = '終日';
-      alRow.appendChild(alLabel);
-      const alCells = document.createElement('div');
-      alCells.className = 'cal-allday-cells';
-      days.forEach((_, di) => {
-        const cell = document.createElement('div');
-        cell.className = 'allday-cell';
-        events.filter(e => e.d === di && e.allDay && (showHotels || e.cat !== 'cat-hotel')).forEach(ev => {
-          const evEl = document.createElement('div');
-          evEl.className = 'allday-event';
-          evEl.innerHTML = `<span class="material-symbols-outlined ev-icon">${ev.icon}</span><span>${ev.title}</span>`;
-          evEl.addEventListener('click', () => openPanel(ev));
-          cell.appendChild(evEl);
+      // lat/lng を持つイベントを集約し、座標ごとにユニーク化する
+      function collectLocations(filter = () => true) {
+        const seen = new Map();
+        events.forEach((ev) => {
+          if (ev.lat == null || ev.lng == null) return;
+          if (!filter(ev)) return;
+          const key = `${ev.lat},${ev.lng}`;
+          if (!seen.has(key)) {
+            seen.set(key, {
+              name: ev.location,
+              icon: ev.icon,
+              lat: ev.lat,
+              lng: ev.lng,
+              evs: [],
+            });
+          }
+          seen.get(key).evs.push(ev);
         });
-        alCells.appendChild(cell);
-      });
-      alRow.appendChild(alCells);
-      cal.appendChild(alRow);
-
-      // ─ ボディ行（時間列 + 日列）
-      const bodyRow = document.createElement('div');
-      bodyRow.className = 'cal-body-row';
-
-      // 時間列
-      const timeCol = document.createElement('div');
-      timeCol.className = 'cal-time-col';
-      for (let h = viewStart; h < viewEnd; h++) {
-        const slot = document.createElement('div');
-        slot.className = 'time-slot';
-        slot.textContent = makeHourLabel(h);
-        timeCol.appendChild(slot);
+        return [...seen.values()];
       }
-      bodyRow.appendChild(timeCol);
 
-      // 日列（1列 = 1日、イベントを絶対配置）
-      const dayCols = document.createElement('div');
-      dayCols.className = 'cal-day-cols';
-      const totalH = (viewEnd - viewStart) * HOUR_H;
+      // ─── Calendar ──────────────────────────────────────
 
-      days.forEach((_, di) => {
-        const col = document.createElement('div');
-        col.className = 'cal-day-col';
-        col.style.height = totalH + 'px';
+      let viewStart = 6,
+        viewEnd = 22;
+      let showHotels = false;
 
-        // 重なりを考慮したレーン割り当て（multiDay を展開済みのリストを使用）
-        const timedEvs = expandedEvents
-          .filter(e => e.d === di && !e.allDay && e.end > viewStart && e.start < viewEnd
-            && (showHotels || e.cat !== 'cat-hotel'))
-          .sort((a, b) => a.start - b.start);
+      function makeHourLabel(h) {
+        return `${String(h % 24).padStart(2, "0")}:00`;
+      }
 
-        const lanes = []; // lanes[i] = その列に入ったイベントの end 時刻
-        timedEvs.forEach(ev => {
-          let lane = lanes.findIndex(endTime => endTime <= ev.start);
-          if (lane === -1) { lane = lanes.length; lanes.push(0); }
-          lanes[lane] = ev.end;
-          ev._lane = lane;
+      function renderCalendar() {
+        const cal = document.getElementById("cal");
+        if (!cal) {
+          console.error("[renderCalendar] Element #cal not found");
+          return;
+        }
+        cal.innerHTML = "";
+
+        // ─ ヘッダー行
+        const hdrRow = document.createElement("div");
+        hdrRow.className = "cal-hdr-row";
+        const gutter = document.createElement("div");
+        gutter.className = "cal-gutter";
+        hdrRow.appendChild(gutter);
+        const daysHdr = document.createElement("div");
+        daysHdr.className = "cal-days-hdr";
+        days.forEach((d) => {
+          const el = document.createElement("div");
+          el.className = "day-hdr";
+          el.innerHTML = `<div class="dow">${d.dow}</div><div class="date">${d.date}</div>`;
+          daysHdr.appendChild(el);
         });
-        // 同時刻に重なるイベントの最大列数を計算
-        timedEvs.forEach(ev => {
-          ev._totalLanes = timedEvs.reduce((max, o) => (
-            o.start < ev.end && o.end > ev.start ? Math.max(max, o._lane + 1) : max
-          ), 1);
+        hdrRow.appendChild(daysHdr);
+        cal.appendChild(hdrRow);
+
+        // ─ 終日行
+        const alRow = document.createElement("div");
+        alRow.className = "cal-allday-row";
+        const alLabel = document.createElement("div");
+        alLabel.className = "allday-label";
+        alLabel.textContent = "終日";
+        alRow.appendChild(alLabel);
+        const alCells = document.createElement("div");
+        alCells.className = "cal-allday-cells";
+        days.forEach((_, di) => {
+          const cell = document.createElement("div");
+          cell.className = "allday-cell";
+          events
+            .filter(
+              (e) =>
+                e.d === di && e.allDay && (showHotels || e.cat !== "cat-hotel"),
+            )
+            .forEach((ev) => {
+              const evEl = document.createElement("div");
+              evEl.className = "allday-event";
+              evEl.innerHTML = `<span class="material-symbols-outlined ev-icon">${ev.icon}</span><span>${ev.title}</span>`;
+              evEl.addEventListener("click", () => openPanel(ev));
+              cell.appendChild(evEl);
+            });
+          alCells.appendChild(cell);
         });
+        alRow.appendChild(alCells);
+        cal.appendChild(alRow);
 
-        timedEvs.forEach(ev => {
-          const visStart = Math.max(ev.start, viewStart);
-          const visEnd = Math.min(ev.end, viewEnd);
-          const top = (visStart - viewStart) * HOUR_H;
-          const ht = Math.max((visEnd - visStart) * HOUR_H - 2, 18);
-          const nLanes = ev._totalLanes || 1;
-          const w = 100 / nLanes;
+        // ─ ボディ行（時間列 + 日列）
+        const bodyRow = document.createElement("div");
+        bodyRow.className = "cal-body-row";
 
-          const evEl = document.createElement('div');
-          evEl.className = 'event';
-          evEl.style.top = top + 'px';
-          evEl.style.height = ht + 'px';
-          evEl.style.left = `calc(3px + ${ev._lane * w}%)`;
-          evEl.style.right = `calc(3px + ${(nLanes - ev._lane - 1) * w}%)`;
+        // 時間列
+        const timeCol = document.createElement("div");
+        timeCol.className = "cal-time-col";
+        for (let h = viewStart; h < viewEnd; h++) {
+          const slot = document.createElement("div");
+          slot.className = "time-slot";
+          slot.textContent = makeHourLabel(h);
+          timeCol.appendChild(slot);
+        }
+        bodyRow.appendChild(timeCol);
 
-          evEl.innerHTML = `
+        // 日列（1列 = 1日、イベントを絶対配置）
+        const dayCols = document.createElement("div");
+        dayCols.className = "cal-day-cols";
+        const totalH = (viewEnd - viewStart) * HOUR_H;
+
+        days.forEach((_, di) => {
+          const col = document.createElement("div");
+          col.className = "cal-day-col";
+          col.style.height = totalH + "px";
+
+          // 重なりを考慮したレーン割り当て（multiDay を展開済みのリストを使用）
+          const timedEvs = expandedEvents
+            .filter(
+              (e) =>
+                e.d === di &&
+                !e.allDay &&
+                e.end > viewStart &&
+                e.start < viewEnd &&
+                (showHotels || e.cat !== "cat-hotel"),
+            )
+            .sort((a, b) => a.start - b.start);
+
+          const lanes = []; // lanes[i] = その列に入ったイベントの end 時刻
+          timedEvs.forEach((ev) => {
+            let lane = lanes.findIndex((endTime) => endTime <= ev.start);
+            if (lane === -1) {
+              lane = lanes.length;
+              lanes.push(0);
+            }
+            lanes[lane] = ev.end;
+            ev._lane = lane;
+          });
+          // 同時刻に重なるイベントの最大列数を計算
+          timedEvs.forEach((ev) => {
+            ev._totalLanes = timedEvs.reduce(
+              (max, o) =>
+                o.start < ev.end && o.end > ev.start
+                  ? Math.max(max, o._lane + 1)
+                  : max,
+              1,
+            );
+          });
+
+          timedEvs.forEach((ev) => {
+            const visStart = Math.max(ev.start, viewStart);
+            const visEnd = Math.min(ev.end, viewEnd);
+            const top = (visStart - viewStart) * HOUR_H;
+            const ht = Math.max((visEnd - visStart) * HOUR_H - 2, 18);
+            const nLanes = ev._totalLanes || 1;
+            const w = 100 / nLanes;
+
+            const evEl = document.createElement("div");
+            evEl.className = "event";
+            if (ev.cat) evEl.dataset.cat = ev.cat;
+            evEl.style.top = top + "px";
+            evEl.style.height = ht + "px";
+            evEl.style.left = `calc(3px + ${ev._lane * w}%)`;
+            evEl.style.right = `calc(3px + ${(nLanes - ev._lane - 1) * w}%)`;
+
+            evEl.innerHTML = `
         <span class="material-symbols-outlined ev-icon">${ev.icon}</span>
         <div class="ev-content">
           <div class="ev-title">${ev.title}</div>
-          ${ht > 26 ? `<div class="ev-time">${ev.time}</div>` : ''}
+          ${ht > 26 ? `<div class="ev-time">${ev.time}</div>` : ""}
         </div>`;
-          evEl.addEventListener('click', () => openPanel(ev));
-          col.appendChild(evEl);
+            evEl.addEventListener("click", () => openPanel(ev));
+            col.appendChild(evEl);
+          });
+
+          dayCols.appendChild(col);
         });
 
-        dayCols.appendChild(col);
-      });
-
-      bodyRow.appendChild(dayCols);
-      cal.appendChild(bodyRow);
-    }
-
-    // 表示時間セレクターの初期化
-    function buildOptions(elId, min, max, selected) {
-      const sel = document.getElementById(elId);
-      if (!sel) {
-        console.error(`[buildOptions] Element #${elId} not found`);
-        return;
+        bodyRow.appendChild(dayCols);
+        cal.appendChild(bodyRow);
       }
-      for (let h = min; h <= max; h++) {
-        const opt = document.createElement('option');
-        opt.value = h;
-        opt.textContent = makeHourLabel(h);
-        if (h === selected) opt.selected = true;
-        sel.appendChild(opt);
-      }
-    }
 
-    buildOptions('view-start', 0, 23, viewStart);
-    buildOptions('view-end', 1, 24, viewEnd);
-
-    const viewStartEl = document.getElementById('view-start');
-    if (viewStartEl) {
-      viewStartEl.addEventListener('change', e => {
-        try {
-          viewStart = parseInt(e.target.value);
-          if (viewStart >= viewEnd) {
-            viewEnd = viewStart + 1;
-            const viewEndEl = document.getElementById('view-end');
-            if (viewEndEl) viewEndEl.value = viewEnd;
-          }
-          renderCalendar();
-        } catch (err) {
-          console.error('[view-start change] Error:', err);
-        }
-      });
-    }
-
-    if (viewEndEl) {
-      viewEndEl.addEventListener('change', e => {
-        try {
-          viewEnd = parseInt(e.target.value);
-          if (viewEnd <= viewStart) {
-            viewStart = viewEnd - 1;
-            const viewStartEl = document.getElementById('view-start');
-            if (viewStartEl) viewStartEl.value = viewStart;
-          }
-          renderCalendar();
-        } catch (err) {
-          console.error('[view-end change] Error:', err);
-        }
-      });
-    }
-
-    function toggleHotels() {
-      try {
-        showHotels = !showHotels;
-        const toggleBtn = document.getElementById('toggle-hotel');
-        if (toggleBtn) toggleBtn.classList.toggle('active', showHotels);
-        renderCalendar();
-      } catch (err) {
-        console.error('[toggleHotels] Error:', err);
-      }
-    }
-
-    renderCalendar();
-
-    // ─── Panel ─────────────────────────────────────────
-
-    function openPanel(ev) {
-      try {
-        const meta = catMeta[ev.cat] || { icon: 'location_on', label: '' };
-        const badge = document.getElementById('panel-cat-badge');
-        const title = document.getElementById('panel-title');
-        const notes = document.getElementById('panel-notes');
-
-        if (!badge || !title || !notes) {
-          console.error('[openPanel] Required panel elements not found');
+      // 表示時間セレクターの初期化
+      function buildOptions(elId, min, max, selected) {
+        const sel = document.getElementById(elId);
+        if (!sel) {
+          console.error(`[buildOptions] Element #${elId} not found`);
           return;
         }
+        for (let h = min; h <= max; h++) {
+          const opt = document.createElement("option");
+          opt.value = h;
+          opt.textContent = makeHourLabel(h);
+          if (h === selected) opt.selected = true;
+          sel.appendChild(opt);
+        }
+      }
 
-        badge.innerHTML = `<span class="material-symbols-outlined">${ev.icon || meta.icon}</span>${meta.label}`;
-        title.textContent = ev.title;
-        notes.textContent = (ev.notes || '—').replace(/\\n/g, '\n');
+      buildOptions("view-start", 0, 23, viewStart);
+      buildOptions("view-end", 1, 24, viewEnd);
 
-      const hasCoords = ev.lat != null && ev.lng != null;
-      const locRow = hasCoords
-        ? `<div class="panel-meta-row panel-meta-row--map" onclick="flyToLocation(${ev.lat},${ev.lng})">
+      const viewStartEl = document.getElementById("view-start");
+      if (viewStartEl) {
+        viewStartEl.addEventListener("change", (e) => {
+          try {
+            viewStart = parseInt(e.target.value);
+            if (viewStart >= viewEnd) {
+              viewEnd = viewStart + 1;
+              const viewEndEl = document.getElementById("view-end");
+              if (viewEndEl) viewEndEl.value = viewEnd;
+            }
+            renderCalendar();
+          } catch (err) {
+            console.error("[view-start change] Error:", err);
+          }
+        });
+      }
+
+      const viewEndEl = document.getElementById("view-end");
+      if (viewEndEl) {
+        viewEndEl.addEventListener("change", (e) => {
+          try {
+            viewEnd = parseInt(e.target.value);
+            if (viewEnd <= viewStart) {
+              viewStart = viewEnd - 1;
+              const viewStartEl = document.getElementById("view-start");
+              if (viewStartEl) viewStartEl.value = viewStart;
+            }
+            renderCalendar();
+          } catch (err) {
+            console.error("[view-end change] Error:", err);
+          }
+        });
+      }
+
+      function toggleHotels() {
+        try {
+          showHotels = !showHotels;
+          const toggleBtn = document.getElementById("toggle-hotel");
+          if (toggleBtn) toggleBtn.classList.toggle("active", showHotels);
+          renderCalendar();
+        } catch (err) {
+          console.error("[toggleHotels] Error:", err);
+        }
+      }
+
+      renderCalendar();
+
+      // ─── Panel ─────────────────────────────────────────
+
+      function openPanel(ev) {
+        try {
+          const meta = catMeta[ev.cat] || { icon: "location_on", label: "" };
+          const badge = document.getElementById("panel-cat-badge");
+          const title = document.getElementById("panel-title");
+          const notes = document.getElementById("panel-notes");
+
+          if (!badge || !title || !notes) {
+            console.error("[openPanel] Required panel elements not found");
+            return;
+          }
+
+          const panelImage = document.getElementById("panel-image");
+          if (panelImage) {
+            if (ev.image) {
+              const pos = ev.imagePos || "center";
+              panelImage.innerHTML = `<img src="${ev.image}" alt="${ev.title}" style="object-position:${pos}">`;
+              panelImage.classList.add("visible");
+            } else {
+              panelImage.innerHTML = "";
+              panelImage.classList.remove("visible");
+            }
+          }
+
+          badge.innerHTML = `<span class="material-symbols-outlined">${ev.icon || meta.icon}</span>${meta.label}`;
+          title.textContent = ev.title;
+          notes.textContent = (ev.notes || "—").replace(/\\n/g, "\n");
+
+          const hasCoords = ev.lat != null && ev.lng != null;
+          const locRow = hasCoords
+            ? `<div class="panel-meta-row panel-meta-row--map" onclick="flyToLocation(${ev.lat},${ev.lng})">
          <div class="panel-meta-icon"><span class="material-symbols-outlined">location_on</span></div>
          <div>
            <div class="panel-meta-label">場所 <span class="panel-map-hint">マップで見る</span></div>
            <div class="panel-meta-value">${ev.location}</div>
          </div>
        </div>`
-        : `<div class="panel-meta-row">
+            : `<div class="panel-meta-row">
          <div class="panel-meta-icon"><span class="material-symbols-outlined">location_on</span></div>
          <div><div class="panel-meta-label">場所</div><div class="panel-meta-value">${ev.location}</div></div>
        </div>`;
 
-      const urlRow = ev.url
-        ? `<div class="panel-meta-row">
+          const urlRow = ev.url
+            ? `<div class="panel-meta-row">
          <div class="panel-meta-icon"><span class="material-symbols-outlined">open_in_new</span></div>
          <div><div class="panel-meta-label">リンク</div>
-           <div class="panel-meta-value"><a href="${ev.url}" target="_blank" rel="noopener" style="color:var(--green);text-decoration:none;border-bottom:1px solid var(--green-pale)">${ev.url.replace(/^https?:\/\//, '').split('/')[0]}</a></div>
+           <div class="panel-meta-value"><a href="${ev.url}" target="_blank" rel="noopener" style="color:var(--green);text-decoration:none;border-bottom:1px solid var(--green-pale)">${ev.url.replace(/^https?:\/\//, "").split("/")[0]}</a></div>
          </div>
        </div>`
-        : '';
-        const panelMeta = document.getElementById('panel-meta');
-        if (panelMeta) {
-          panelMeta.innerHTML = `
+            : "";
+          const panelMeta = document.getElementById("panel-meta");
+          if (panelMeta) {
+            panelMeta.innerHTML = `
       <div class="panel-meta-row">
         <div class="panel-meta-icon"><span class="material-symbols-outlined">schedule</span></div>
         <div><div class="panel-meta-label">時間</div><div class="panel-meta-value">${ev.time}</div></div>
       </div>
       ${locRow}
       ${urlRow}`;
-        }
+          }
 
-        // 座標があればマップに反映
-        if (hasCoords) flyToLocation(ev.lat, ev.lng, false);
-
-        const detailPanel = document.getElementById('detail-panel');
-        const overlay = document.getElementById('overlay');
-        if (detailPanel && overlay) {
-          detailPanel.classList.add('open');
-          overlay.classList.add('open');
+          const detailPanel = document.getElementById("detail-panel");
+          const overlay = document.getElementById("overlay");
+          if (detailPanel && overlay) {
+            detailPanel.classList.add("open");
+            overlay.classList.add("open");
+          }
+        } catch (err) {
+          console.error("[openPanel] Error:", err);
         }
-      } catch (err) {
-        console.error('[openPanel] Error:', err);
       }
-    }
 
-    function flyToLocation(lat, lng, animate = true) {
-      try {
-        if (!map) {
-          console.warn('[flyToLocation] Map not initialized yet');
+      function flyToLocation(lat, lng, animate = true) {
+        try {
+          if (!map) {
+            console.warn("[flyToLocation] Map not initialized yet");
+            return;
+          }
+          const key = `${lat},${lng}`;
+          document.querySelectorAll(".location-card").forEach((c) => {
+            c.classList.toggle("active", c.dataset.locKey === key);
+          });
+          if (animate) {
+            map.flyTo([lat, lng], 15, { duration: 0.8 });
+            window.markerMap?.get(key)?.openPopup();
+          } else {
+            map.setView([lat, lng], 14, { animate: false });
+          }
+        } catch (err) {
+          console.error("[flyToLocation] Error:", err);
+        }
+      }
+
+      function fitMapToMarkers() {
+        try {
+          if (!map || !window.markerMap || window.markerMap.size === 0) return;
+          const visibleMarkers = [];
+          window.markerMap.forEach((marker) => {
+            if (map.hasLayer(marker)) {
+              visibleMarkers.push(marker.getLatLng());
+            }
+          });
+          if (visibleMarkers.length === 0) return;
+          const bounds = L.latLngBounds(visibleMarkers);
+          map.flyToBounds(bounds, { padding: [40, 40], duration: 0.6 });
+        } catch (err) {
+          console.error("[fitMapToMarkers] Error:", err);
+        }
+      }
+
+      function closePanel() {
+        try {
+          const detailPanel = document.getElementById("detail-panel");
+          const overlay = document.getElementById("overlay");
+          if (detailPanel && overlay) {
+            detailPanel.classList.remove("open");
+            overlay.classList.remove("open");
+          }
+        } catch (err) {
+          console.error("[closePanel] Error:", err);
+        }
+      }
+
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+          try {
+            closePanel();
+          } catch (err) {
+            console.error("[keydown] Error closing panel:", err);
+          }
+        }
+      });
+
+      // ─── Map ───────────────────────────────────────────
+
+      let map;
+
+      function initMap() {
+        // Leaflet ライブラリ読み込み検証
+        if (!window.L) {
+          console.error("Leaflet library failed to load from CDN.");
+          const mapEl = document.getElementById("leaflet-map");
+          if (mapEl) {
+            mapEl.innerHTML =
+              '<div style="padding:2rem;background:var(--canvas);color:var(--text);">マップを読み込めませんでした。ページを再読み込みしてください。</div>';
+          }
           return;
         }
-        const key = `${lat},${lng}`;
-        document.querySelectorAll('.location-card').forEach(c => {
-          c.classList.toggle('active', c.dataset.locKey === key);
-        });
-        if (animate) {
-          map.flyTo([lat, lng], 15, { duration: 0.8 });
-          window.markerMap?.get(key)?.openPopup();
-        } else {
-          map.setView([lat, lng], 14, { animate: false });
-        }
-      } catch (err) {
-        console.error('[flyToLocation] Error:', err);
-      }
-    }
 
-    function closePanel() {
-      try {
-        const detailPanel = document.getElementById('detail-panel');
-        const overlay = document.getElementById('overlay');
-        if (detailPanel && overlay) {
-          detailPanel.classList.remove('open');
-          overlay.classList.remove('open');
-        }
-      } catch (err) {
-        console.error('[closePanel] Error:', err);
-      }
-    }
-
-    document.addEventListener('keydown', e => {
-      if (e.key === 'Escape') {
         try {
-          closePanel();
+          map = L.map("leaflet-map", { zoomControl: false });
+          L.control.zoom({ position: "bottomright" }).addTo(map);
         } catch (err) {
-          console.error('[keydown] Error closing panel:', err);
+          console.error("[initMap] Map initialization failed:", err);
+          const mapEl = document.getElementById("leaflet-map");
+          if (mapEl) {
+            mapEl.innerHTML =
+              '<div style="padding:2rem;background:var(--canvas);color:var(--text);">マップの初期化に失敗しました。</div>';
+          }
+          return;
         }
-      }
-    });
 
-    // ─── Map ───────────────────────────────────────────
+        L.tileLayer(
+          "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+          {
+            attribution:
+              '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
+            subdomains: "abcd",
+            maxZoom: 19,
+          },
+        ).addTo(map);
 
-    let map;
+        const mapLocations = collectLocations();
+        window.markerMap = new Map(); // key: "lat,lng" → L.marker
 
-    function initMap() {
-      // Leaflet ライブラリ読み込み検証
-      if (!window.L) {
-        console.error('Leaflet library failed to load from CDN.');
-        const mapEl = document.getElementById('leaflet-map');
-        if (mapEl) {
-          mapEl.innerHTML = '<div style="padding:2rem;background:var(--canvas);color:var(--text);">マップを読み込めませんでした。ページを再読み込みしてください。</div>';
-        }
-        return;
-      }
-
-      try {
-        map = L.map('leaflet-map', { zoomControl: false });
-        L.control.zoom({ position: 'bottomright' }).addTo(map);
-      } catch (err) {
-        console.error('[initMap] Map initialization failed:', err);
-        const mapEl = document.getElementById('leaflet-map');
-        if (mapEl) {
-          mapEl.innerHTML = '<div style="padding:2rem;background:var(--canvas);color:var(--text);">マップの初期化に失敗しました。</div>';
-        }
-        return;
-      }
-
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
-        subdomains: 'abcd', maxZoom: 19,
-      }).addTo(map);
-
-      const mapLocations = collectLocations();
-      window.markerMap = new Map(); // key: "lat,lng" → L.marker
-
-      mapLocations.forEach(loc => {
-        const key = `${loc.lat},${loc.lng}`;
-        const pin = L.divIcon({
-          html: `<div style="
+        mapLocations.forEach((loc) => {
+          const key = `${loc.lat},${loc.lng}`;
+          const pin = L.divIcon({
+            html: `<div style="
         background:var(--green);border:2px solid var(--green-mid);
         border-radius:50% 50% 50% 0;transform:rotate(-45deg);
         width:32px;height:32px;
@@ -1628,200 +2317,233 @@
       "><span class="material-symbols-outlined" style="
         transform:rotate(45deg);font-size:15px;color:var(--white);line-height:1;
       ">${loc.icon}</span></div>`,
-          className: '',
-          iconSize: [32, 32],
-          iconAnchor: [16, 32],
-          popupAnchor: [0, -36],
+            className: "",
+            iconSize: [32, 32],
+            iconAnchor: [16, 32],
+            popupAnchor: [0, -36],
+          });
+
+          const marker = L.marker([loc.lat, loc.lng], { icon: pin })
+            .addTo(map)
+            .bindPopup(
+              `<strong style="font-size:13px">${loc.name}</strong><br><span style="font-size:12px;color:var(--text-dim)">${loc.evs.length}件のイベント</span>`,
+            );
+          window.markerMap.set(key, marker);
         });
 
-        const marker = L.marker([loc.lat, loc.lng], { icon: pin })
-          .addTo(map)
-          .bindPopup(`<strong style="font-size:13px">${loc.name}</strong><br><span style="font-size:12px;color:var(--text-dim)">${loc.evs.length}件のイベント</span>`);
-        window.markerMap.set(key, marker);
-      });
-
-      // 登録済みの全スポットが収まるよう初期ビューを調整
-      if (mapLocations.length > 0) {
-        const bounds = L.latLngBounds(mapLocations.map(loc => [loc.lat, loc.lng]));
-        map.fitBounds(bounds, { padding: [48, 48] });
-      } else {
-        map.setView([13.736, 100.523], 11);
-      }
-    }
-
-    // ページ読み込み完了後にマップを初期化
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initMap);
-    } else {
-      initMap();
-    }
-
-    // ─── ロケーションフィルター ────────────────────────
-
-    let locFilter = { cat: null, day: null };
-
-    // 指定された日にイベントが該当するか（multiDay レンジを考慮）
-    function eventOccursOnDay(ev, dayIdx) {
-      if (ev.multiDay) return dayIdx >= ev.startDay && dayIdx <= ev.endDay;
-      return ev.d === dayIdx;
-    }
-
-    function buildFilteredLocations() {
-      return collectLocations(ev => {
-        if (locFilter.cat && ev.cat !== locFilter.cat) return false;
-        if (locFilter.day !== null && !eventOccursOnDay(ev, locFilter.day)) return false;
-        return true;
-      });
-    }
-
-    function buildLocationList() {
-      try {
-        const locs = buildFilteredLocations();
-        const listEl = document.getElementById('location-list');
-        if (!listEl) {
-          console.error('[buildLocationList] Element #location-list not found');
-          return;
+        // 登録済みの全スポットが収まるよう初期ビューを調整
+        if (mapLocations.length > 0) {
+          const bounds = L.latLngBounds(
+            mapLocations.map((loc) => [loc.lat, loc.lng]),
+          );
+          map.fitBounds(bounds, { padding: [48, 48] });
+        } else {
+          map.setView([13.736, 100.523], 11);
         }
-        listEl.innerHTML = '';
-        locs.forEach((loc, i) => {
-          const key = `${loc.lat},${loc.lng}`;
-          const card = document.createElement('div');
-          card.className = 'location-card';
-          card.dataset.locKey = key;
-          card.style.animationDelay = `${i * 0.07}s`;
-          card.innerHTML = `
+      }
+
+      // ページ読み込み完了後にマップを初期化
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", initMap);
+      } else {
+        initMap();
+      }
+
+      // ─── ロケーションフィルター ────────────────────────
+
+      let locFilter = { cat: null, day: null };
+
+      // 指定された日にイベントが該当するか（multiDay レンジを考慮）
+      function eventOccursOnDay(ev, dayIdx) {
+        if (ev.multiDay) return dayIdx >= ev.startDay && dayIdx <= ev.endDay;
+        return ev.d === dayIdx;
+      }
+
+      function buildFilteredLocations() {
+        return collectLocations((ev) => {
+          if (locFilter.cat && ev.cat !== locFilter.cat) return false;
+          if (locFilter.day !== null && !eventOccursOnDay(ev, locFilter.day))
+            return false;
+          return true;
+        });
+      }
+
+      function buildLocationList() {
+        try {
+          const locs = buildFilteredLocations();
+          const listEl = document.getElementById("location-list");
+          if (!listEl) {
+            console.error(
+              "[buildLocationList] Element #location-list not found",
+            );
+            return;
+          }
+          listEl.innerHTML = "";
+          locs.forEach((loc, i) => {
+            const key = `${loc.lat},${loc.lng}`;
+            const card = document.createElement("div");
+            card.className = "location-card";
+            card.dataset.locKey = key;
+            card.style.animationDelay = `${i * 0.07}s`;
+            card.innerHTML = `
         <div class="loc-icon"><span class="material-symbols-outlined">${loc.icon}</span></div>
         <div class="loc-name">${loc.name}</div>`;
-          card.addEventListener('click', () => {
-            try {
-              document.querySelectorAll('.location-card').forEach(c => c.classList.remove('active'));
-              card.classList.add('active');
-              flyToLocation(loc.lat, loc.lng, true);
-            } catch (err) {
-              console.error('[location-card click] Error:', err);
-            }
+            card.addEventListener("click", () => {
+              try {
+                document
+                  .querySelectorAll(".location-card")
+                  .forEach((c) => c.classList.remove("active"));
+                card.classList.add("active");
+                flyToLocation(loc.lat, loc.lng, true);
+              } catch (err) {
+                console.error("[location-card click] Error:", err);
+              }
+            });
+            listEl.appendChild(card);
           });
-          listEl.appendChild(card);
-        });
-        // マーカーの表示・非表示
-        if (map && window.markerMap) {
-          const visibleKeys = new Set(locs.map(l => `${l.lat},${l.lng}`));
-          window.markerMap.forEach((marker, key) => {
-            try {
-              if (visibleKeys.has(key)) map.addLayer(marker);
-              else map.removeLayer(marker);
-            } catch (err) {
-              console.error('[marker visibility] Error:', err);
-            }
-          });
-        }
-      } catch (err) {
-        console.error('[buildLocationList] Error:', err);
-      }
-    }
-
-    function setLocFilterBtn(groupId, value) {
-      document.querySelectorAll(`#${groupId} .loc-filter-btn`).forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.val === String(value ?? ''));
-      });
-    }
-
-    function buildLocFilterUI() {
-      try {
-        // カテゴリフィルター
-        const catEl = document.getElementById('loc-cat-filters');
-        if (!catEl) {
-          console.error('[buildLocFilterUI] Element #loc-cat-filters not found');
-          return;
-        }
-      const availCats = [...new Set(events.filter(e => e.lat && e.lng && e.cat).map(e => e.cat))];
-      [{ val: '', label: '全て' }, ...availCats.map(c => ({ val: c, label: catMeta[c]?.label || c }))]
-        .forEach(({ val, label }) => {
-          const btn = document.createElement('button');
-          btn.className = 'loc-filter-btn' + (val === '' ? ' active' : '');
-          btn.textContent = label;
-          btn.dataset.val = val;
-          btn.addEventListener('click', () => {
-            try {
-              locFilter.cat = val || null;
-              setLocFilterBtn('loc-cat-filters', locFilter.cat);
-              buildLocationList();
-            } catch (err) {
-              console.error('[cat-filter click] Error:', err);
-            }
-          });
-          catEl.appendChild(btn);
-        });
-
-        // 日付フィルター
-        const dayEl = document.getElementById('loc-day-filters');
-        if (!dayEl) {
-          console.error('[buildLocFilterUI] Element #loc-day-filters not found');
-          return;
-        }
-
-        const allDayBtn = document.createElement('button');
-        allDayBtn.className = 'loc-filter-btn active';
-        allDayBtn.textContent = '全日程';
-        allDayBtn.dataset.val = '';
-        allDayBtn.addEventListener('click', () => {
-          try {
-            locFilter.day = null;
-            setLocFilterBtn('loc-day-filters', null);
-            buildLocationList();
-          } catch (err) {
-            console.error('[day-filter click] Error:', err);
-          }
-        });
-        dayEl.appendChild(allDayBtn);
-
-        days.forEach((d, i) => {
-          const hasLoc = events.some(ev => ev.lat && ev.lng && eventOccursOnDay(ev, i));
-          if (!hasLoc) return;
-          const btn = document.createElement('button');
-          btn.className = 'loc-filter-btn';
-          btn.textContent = d.date;
-          btn.dataset.val = String(i);
-          btn.addEventListener('click', () => {
-            try {
-              locFilter.day = i;
-              setLocFilterBtn('loc-day-filters', i);
-              buildLocationList();
-            } catch (err) {
-              console.error('[day-filter click] Error:', err);
-            }
-          });
-          dayEl.appendChild(btn);
-        });
-      } catch (err) {
-        console.error('[buildLocFilterUI] Error:', err);
-      }
-    }
-
-    try {
-      buildLocFilterUI();
-      buildLocationList();
-    } catch (err) {
-      console.error('[init location UI] Error:', err);
-    }
-
-    // ─── Reveal ────────────────────────────────────────
-
-    const revealObs = new IntersectionObserver((entries, obs) => {
-      entries.forEach(e => {
-        try {
-          if (e.isIntersecting) {
-            e.target.classList.add('visible');
-            obs.unobserve(e.target);
+          // マーカーの表示・非表示
+          if (map && window.markerMap) {
+            const visibleKeys = new Set(locs.map((l) => `${l.lat},${l.lng}`));
+            window.markerMap.forEach((marker, key) => {
+              try {
+                if (visibleKeys.has(key)) map.addLayer(marker);
+                else map.removeLayer(marker);
+              } catch (err) {
+                console.error("[marker visibility] Error:", err);
+              }
+            });
           }
         } catch (err) {
-          console.error('[IntersectionObserver] Error:', err);
+          console.error("[buildLocationList] Error:", err);
         }
-      });
-    }, { threshold: 0.1 });
+      }
 
-    document.querySelectorAll('.reveal').forEach(el => revealObs.observe(el));
-  </script>
-</body>
+      function setLocFilterBtn(groupId, value) {
+        document
+          .querySelectorAll(`#${groupId} .loc-filter-btn`)
+          .forEach((btn) => {
+            btn.classList.toggle(
+              "active",
+              btn.dataset.val === String(value ?? ""),
+            );
+          });
+      }
 
+      function buildLocFilterUI() {
+        try {
+          // カテゴリフィルター
+          const catEl = document.getElementById("loc-cat-filters");
+          if (!catEl) {
+            console.error(
+              "[buildLocFilterUI] Element #loc-cat-filters not found",
+            );
+            return;
+          }
+          const availCats = [
+            ...new Set(
+              events.filter((e) => e.lat && e.lng && e.cat).map((e) => e.cat),
+            ),
+          ];
+          [
+            { val: "", label: "全て" },
+            ...availCats.map((c) => ({
+              val: c,
+              label: catMeta[c]?.label || c,
+            })),
+          ].forEach(({ val, label }) => {
+            const btn = document.createElement("button");
+            btn.className = "loc-filter-btn" + (val === "" ? " active" : "");
+            btn.textContent = label;
+            btn.dataset.val = val;
+            btn.addEventListener("click", () => {
+              try {
+                locFilter.cat = val || null;
+                setLocFilterBtn("loc-cat-filters", locFilter.cat);
+                buildLocationList();
+              } catch (err) {
+                console.error("[cat-filter click] Error:", err);
+              }
+            });
+            catEl.appendChild(btn);
+          });
+
+          // 日付フィルター
+          const dayEl = document.getElementById("loc-day-filters");
+          if (!dayEl) {
+            console.error(
+              "[buildLocFilterUI] Element #loc-day-filters not found",
+            );
+            return;
+          }
+
+          const allDayBtn = document.createElement("button");
+          allDayBtn.className = "loc-filter-btn active";
+          allDayBtn.textContent = "全日程";
+          allDayBtn.dataset.val = "";
+          allDayBtn.addEventListener("click", () => {
+            try {
+              locFilter.day = null;
+              setLocFilterBtn("loc-day-filters", null);
+              buildLocationList();
+            } catch (err) {
+              console.error("[day-filter click] Error:", err);
+            }
+          });
+          dayEl.appendChild(allDayBtn);
+
+          days.forEach((d, i) => {
+            const hasLoc = events.some(
+              (ev) => ev.lat && ev.lng && eventOccursOnDay(ev, i),
+            );
+            if (!hasLoc) return;
+            const btn = document.createElement("button");
+            btn.className = "loc-filter-btn";
+            btn.textContent = d.date;
+            btn.dataset.val = String(i);
+            btn.addEventListener("click", () => {
+              try {
+                locFilter.day = i;
+                setLocFilterBtn("loc-day-filters", i);
+                buildLocationList();
+              } catch (err) {
+                console.error("[day-filter click] Error:", err);
+              }
+            });
+            dayEl.appendChild(btn);
+          });
+        } catch (err) {
+          console.error("[buildLocFilterUI] Error:", err);
+        }
+      }
+
+      try {
+        buildLocFilterUI();
+        buildLocationList();
+      } catch (err) {
+        console.error("[init location UI] Error:", err);
+      }
+
+      // ─── Reveal ────────────────────────────────────────
+
+      const revealObs = new IntersectionObserver(
+        (entries, obs) => {
+          entries.forEach((e) => {
+            try {
+              if (e.isIntersecting) {
+                e.target.classList.add("visible");
+                obs.unobserve(e.target);
+              }
+            } catch (err) {
+              console.error("[IntersectionObserver] Error:", err);
+            }
+          });
+        },
+        { threshold: 0.1 },
+      );
+
+      document
+        .querySelectorAll(".reveal")
+        .forEach((el) => revealObs.observe(el));
+    </script>
+  </body>
 </html>

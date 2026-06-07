@@ -29,4 +29,12 @@ build/
 *.log
 npm-debug.log*
 
+# Screenshots & Playwright
+*.png
+*.jpg
+.playwright-mcp/
+
+# Temp
+.tmp/
+
 # Local development (but keep .claude/settings.json and .mcp.json for project config)
