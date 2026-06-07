@@ -1,106 +1,189 @@
 # Thailand 2026 Travel Plan
 
-タイ旅行（2026年8月12日～17日）のスケジュール＆マップサイト。
+A single-page schedule and map application for planning a trip to Thailand (August 12-17, 2026).
 
-**[Live →](https://y-shinozaki.github.io/travel-plans/)**
+**Live Site**: https://y-shinozaki.github.io/travel-plans/
 
 ## Features
 
-- 📅 **Weekly Calendar**: 時間別スケジュール表示（カスタマイズ可能な表示時間）
-- 🗺️ **Interactive Map**: CartoDB Voyager タイル、マップクリック連動
-- 🎯 **Event Details**: サイドパネルで詳細情報表示
-- 🏨 **Hotel Toggle**: ホテル表示/非表示の切り替え
-- 🔍 **Location Filters**: カテゴリと日付でスポット検索
-- 📱 **Responsive**: モバイル・タブレット対応
+- Weekly calendar view with hourly time slots and customizable time range
+- Interactive map powered by Leaflet and CartoDB Voyager tiles
+- Location filtering by category and date
+- Event details panel with quick access to information
+- Hotel/accommodation toggle on the map
+- Fully responsive design for mobile, tablet, and desktop
+- No build process required—just open `index.html`
 
-## Tech Stack
+## Technology
 
-- **HTML5** / **CSS3** (No build process required)
-- **Vanilla JavaScript** (Framework-free)
-- **Leaflet.js** (Interactive mapping)
-- **Google Fonts**: Fraunces (display), DM Sans (body)
-- **Material Symbols** (Icons)
+- **HTML5, CSS3**: Single-file application with semantic structure
+- **JavaScript**: Vanilla JavaScript, no frameworks
+- **Leaflet.js**: Interactive map library
+- **Google Fonts**: Fraunces (serif display), DM Sans (sans-serif body)
+- **Material Symbols**: Icon library for events
 
-## Design System
+## Getting Started
 
-[DESIGN.md](./DESIGN.md) に従う Starbucks 風の暖色中立パレット：
-- **Primary**: Starbucks Green (`#006241`), Green Accent (`#00754A`)
-- **Dark**: House Green (`#1E3932`, headers/footers)
-- **Canvas**: Neutral Warm (`#f2f0eb`)
-- **Typography**: Fraunces (serif, WONK variation), DM Sans (sans-serif)
+### Local Development
+
+No build tools needed. Simply:
+
+```bash
+# Open directly in browser
+open index.html
+
+# Or serve locally with Python
+python3 -m http.server 8000
+# Then visit http://localhost:8000
+```
 
 ## Project Structure
 
 ```
-.
-├── index.html           # Single-page application
-├── DESIGN.md            # Design system documentation
-├── schedule.csv         # Event data (parsed in HTML)
-├── README.md            # This file
+travel-plans/
+├── index.html          Single-page application with all code
+├── DESIGN.md           Design system and color palette documentation
+├── schedule.csv        Event data (embedded in HTML <script>)
+├── README.md           This file
+├── .claude/settings.json
+├── .mcp.json
 └── .gitignore
 ```
 
-## Local Development
+## Design System
 
-No build tools required. Simply open `index.html` in a browser:
+See [DESIGN.md](./DESIGN.md) for the complete design system.
 
-```bash
-open index.html
-```
+**Color Palette**:
+- Primary: Starbucks Green (#006241)
+- Accent: Green (#00754A)
+- Dark: House Green (#1E3932)
+- Canvas: Neutral Warm (#f2f0eb)
 
-Or serve locally with Python:
+**Typography**:
+- Display: Fraunces (serif with WONK variation for unique character styling)
+- Body: DM Sans (sans-serif)
 
-```bash
-python3 -m http.server 8000
-# http://localhost:8000
-```
+## Key Features
 
-## GitHub Pages Deployment
+### Calendar View
+- Horizontal timeline with hourly slots (configurable view range: 6am–10pm)
+- Multi-day events span across calendar cells
+- Click events to show details in the side panel
 
-This repository is published to GitHub Pages. To deploy:
-
-1. Push changes to `main` branch
-2. GitHub Actions automatically publishes to `gh-pages`
-3. Live site: `https://<username>.github.io/travel-plans/`
-
-**Enable Pages in repository settings:**
-- Go to Settings → Pages
-- Source: `gh-pages` branch (or `main` if deploying from root)
-
-## File Format: schedule.csv
-
-Events are stored in `schedule.csv` with the following columns:
-
-```csv
-title,icon,all_day,start_date,end_date,location,description,url
-```
-
-- **title**: イベント名（表示用）
-- **icon**: Material Symbol icon name
-- **all_day**: `true` = 終日イベント（ホテル宿泊など）
-- **start_date / end_date**: ISO 8601 形式 (`YYYY-MM-DD` or `YYYY/MM/DD HH:MM`)
-- **location**: スポット名（マップに表示）
-- **description**: 詳細説明（改行: `\n` エスケープ）
-- **url**: リンク先（オプション）
-
-**例:**
-```csv
-バンコクホテル,ホテル,false,2026/08/12 15:00,2026/08/14 11:00,137 ピラーズ レジデンス バンコク,- 予約番号: 30522440,https://example.com
-```
-
-## Key Code Sections
-
-### Calendar Rendering
-`renderCalendar()` - Time-slot grid with event layout
-
-### Map Initialization
-`L.tileLayer('...CartoDB Voyager...')` - Map tiles
+### Map Integration
+- Location markers for all timed events
+- Hotels and all-day accommodations appear in a separate list
+- Toggle hotel visibility on/off
+- Click markers to highlight location details
 
 ### Event Filtering
-`buildFilteredLocations()` - Location filtering by category + date
+- Filter by category (food, sightseeing, etc.)
+- Filter by date
+- Real-time update of map markers and location list
 
-### Detail Panel
-`showPanel(event)` - Slide-in sidebar with event details
+### Responsive Design
+- Stacks vertically on screens below 960px
+- Detail panel goes full-width below 600px
+- Mobile-friendly touch targets
+
+## Architecture
+
+### Data Flow
+
+```
+Events (defined in <script>)
+  ↓
+expandEvents() → convert multi-day events to daily segments
+  ↓
+renderCalendar() → time-slot grid
+deriveMapLocations() → extract lat/lng, deduplicate
+  ↓
+buildFilteredLocations() → apply filters
+  ↓
+buildLocationList() → render cards and update map
+```
+
+### Event Structure
+
+Events support two formats:
+
+**Time-based event** (appears on calendar and map):
+```javascript
+{
+  title: "Lunch at Restaurant",
+  icon: "restaurant",
+  start: "2026/08/13 12:00",
+  end: "2026/08/13 13:30",
+  location: "Bangkok",
+  lat: 13.7563,
+  lng: 100.5018,
+  category: "food"
+}
+```
+
+**Multi-day event** (spans multiple calendar days):
+```javascript
+{
+  title: "Bangkok Hotel",
+  icon: "hotel",
+  multiDay: true,
+  startDay: 0,
+  endDay: 2,
+  startHour: 15,
+  endHour: 11,
+  location: "137 Pillars House Bangkok",
+  lat: 13.7325,
+  lng: 100.5064
+}
+```
+
+**All-day event** (no map marker, hotels list only):
+```javascript
+{
+  title: "Hotel Stay",
+  icon: "hotel",
+  allDay: true,
+  start: "2026/08/12",
+  end: "2026/08/14",
+  location: "Bangkok"
+  // Note: no lat/lng, so does not appear on map
+}
+```
+
+## Customization
+
+### Change Colors
+Update CSS variables in `:root` in `index.html`:
+```css
+--dark: #1E3932;
+--green: #006241;
+--green-mid: #00754A;
+--canvas: #f2f0eb;
+```
+
+All colors must be defined as CSS variables. Never use hardcoded hex values.
+
+### Adjust Calendar Grid Height
+Change `HOUR_H = 44` in the `<script>` section, then update the repeating-linear-gradient background in `.cal-day-col` CSS to match.
+
+### Change Time Range
+Edit `viewStart` and `viewEnd` variables in the `<script>` block, and update the dropdown options in `buildOptions()`.
+
+### Update Map Tiles
+Replace the `L.tileLayer()` URL in the `<script>` section. Currently uses CartoDB Voyager. Alternatives: Stamen Watercolor, Esri World Imagery, OpenStreetMap.
+
+## Deployment
+
+This repository is deployed to GitHub Pages.
+
+### First-time setup:
+1. Go to repository Settings → Pages
+2. Select source: `main` branch, root directory
+3. Save
+
+### To deploy:
+Push to the `main` branch. The site updates automatically.
 
 ## Browser Support
 
@@ -118,4 +201,4 @@ y-shinozaki
 
 ---
 
-**Last updated**: 2026-06-07
+**Last updated**: June 7, 2026
