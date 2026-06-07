@@ -208,24 +208,6 @@
       margin-top: .8rem;
     }
 
-    .hero-meta {
-      display: flex;
-      align-items: center;
-      gap: 1.6rem;
-      animation: fadeUp .8s ease .45s backwards;
-    }
-
-    .hero-meta-item {
-      font-size: 1.35rem;
-      font-weight: 400;
-      color: rgba(255, 255, 255, .65);
-      letter-spacing: .04em;
-    }
-
-    .hero-meta-sep {
-      color: rgba(255, 255, 255, .25);
-    }
-
     .hero-scroll {
       position: absolute;
       bottom: 3.2rem;
@@ -892,7 +874,7 @@
     .loc-filter-btn.active {
       background: var(--dark);
       border-color: var(--dark);
-      color: rgba(255, 255, 255, 1);
+      color: #fff;
       box-shadow: 0 2px 8px rgba(30, 57, 50, .25);
     }
 
@@ -1095,7 +1077,6 @@
 
 <body>
 
-  <!-- ─── Header ─────────────────────────────────── -->
   <!-- ─── Hero ───────────────────────────────────── -->
   <section class="hero">
     <div class="hero-content">
@@ -1280,14 +1261,19 @@
       });
       return result;
     }
-    // events から lat/lng を持つ場所を抽出・重複除去
-    function deriveMapLocations() {
+
+    // multiDay を展開したイベントを一度だけ計算してキャッシュ
+    const expandedEvents = expandEvents(events);
+
+    // lat/lng を持つイベントを集約し、座標ごとにユニーク化する
+    function collectLocations(filter = () => true) {
       const seen = new Map();
       events.forEach(ev => {
         if (ev.lat == null || ev.lng == null) return;
+        if (!filter(ev)) return;
         const key = `${ev.lat},${ev.lng}`;
         if (!seen.has(key)) {
-          seen.set(key, { name: ev.location, icon: ev.icon, cat: catMeta[ev.cat]?.label || '', lat: ev.lat, lng: ev.lng, evs: [] });
+          seen.set(key, { name: ev.location, icon: ev.icon, lat: ev.lat, lng: ev.lng, evs: [] });
         }
         seen.get(key).evs.push(ev);
       });
@@ -1374,25 +1360,23 @@
         col.style.height = totalH + 'px';
 
         // 重なりを考慮したレーン割り当て（multiDay を展開済みのリストを使用）
-        const timedEvs = expandEvents(events)
+        const timedEvs = expandedEvents
           .filter(e => e.d === di && !e.allDay && e.end > viewStart && e.start < viewEnd
             && (showHotels || e.cat !== 'cat-hotel'))
           .sort((a, b) => a.start - b.start);
 
-        const lanes = []; // lanes[i] = その列に入ったイベントの end リスト
+        const lanes = []; // lanes[i] = その列に入ったイベントの end 時刻
         timedEvs.forEach(ev => {
           let lane = lanes.findIndex(endTime => endTime <= ev.start);
           if (lane === -1) { lane = lanes.length; lanes.push(0); }
           lanes[lane] = ev.end;
           ev._lane = lane;
-          ev._totalLanes = null; // 後で確定
         });
         // 同時刻に重なるイベントの最大列数を計算
         timedEvs.forEach(ev => {
-          const concurrent = timedEvs.filter(
-            o => o.start < ev.end && o.end > ev.start
-          );
-          ev._totalLanes = Math.max(...concurrent.map(o => o._lane + 1));
+          ev._totalLanes = timedEvs.reduce((max, o) => (
+            o.start < ev.end && o.end > ev.start ? Math.max(max, o._lane + 1) : max
+          ), 1);
         });
 
         timedEvs.forEach(ev => {
@@ -1544,7 +1528,7 @@
       subdomains: 'abcd', maxZoom: 19,
     }).addTo(map);
 
-    const mapLocations = deriveMapLocations();
+    const mapLocations = collectLocations();
     const markerMap = new Map(); // key: "lat,lng" → L.marker
 
     mapLocations.forEach(loc => {
@@ -1583,32 +1567,30 @@
 
     let locFilter = { cat: null, day: null };
 
+    // 指定された日にイベントが該当するか（multiDay レンジを考慮）
+    function eventOccursOnDay(ev, dayIdx) {
+      if (ev.multiDay) return dayIdx >= ev.startDay && dayIdx <= ev.endDay;
+      return ev.d === dayIdx;
+    }
+
     function buildFilteredLocations() {
-      const seen = new Map();
-      events.forEach(ev => {
-        if (!ev.lat || !ev.lng) return;
-        if (locFilter.cat && ev.cat !== locFilter.cat) return;
-        if (locFilter.day !== null) {
-          const d = locFilter.day;
-          if (ev.multiDay) { if (d < ev.startDay || d > ev.endDay) return; }
-          else { if (ev.d !== d) return; }
-        }
-        const key = `${ev.lat},${ev.lng}`;
-        if (!seen.has(key)) seen.set(key, { name: ev.location, icon: ev.icon, lat: ev.lat, lng: ev.lng });
+      return collectLocations(ev => {
+        if (locFilter.cat && ev.cat !== locFilter.cat) return false;
+        if (locFilter.day !== null && !eventOccursOnDay(ev, locFilter.day)) return false;
+        return true;
       });
-      return [...seen.values()];
     }
 
     function buildLocationList() {
       const locs = buildFilteredLocations();
       const listEl = document.getElementById('location-list');
       listEl.innerHTML = '';
-      locs.forEach(loc => {
+      locs.forEach((loc, i) => {
         const key = `${loc.lat},${loc.lng}`;
         const card = document.createElement('div');
         card.className = 'location-card';
         card.dataset.locKey = key;
-        card.style.animationDelay = `${Array.from(listEl.children).length * 0.07}s`;
+        card.style.animationDelay = `${i * 0.07}s`;
         card.innerHTML = `
       <div class="loc-icon"><span class="material-symbols-outlined">${loc.icon}</span></div>
       <div class="loc-name">${loc.name}</div>`;
@@ -1620,10 +1602,10 @@
         listEl.appendChild(card);
       });
       // マーカーの表示・非表示
+      const visibleKeys = new Set(locs.map(l => `${l.lat},${l.lng}`));
       markerMap.forEach((marker, key) => {
-        const visible = locs.some(l => `${l.lat},${l.lng}` === key);
-        if (visible) { if (!map.hasLayer(marker)) map.addLayer(marker); }
-        else { if (map.hasLayer(marker)) map.removeLayer(marker); }
+        if (visibleKeys.has(key)) map.addLayer(marker);
+        else map.removeLayer(marker);
       });
     }
 
@@ -1665,11 +1647,7 @@
       dayEl.appendChild(allDayBtn);
 
       days.forEach((d, i) => {
-        const hasLoc = events.some(ev => {
-          if (!ev.lat || !ev.lng) return false;
-          if (ev.multiDay) return i >= ev.startDay && i <= ev.endDay;
-          return ev.d === i;
-        });
+        const hasLoc = events.some(ev => ev.lat && ev.lng && eventOccursOnDay(ev, i));
         if (!hasLoc) return;
         const btn = document.createElement('button');
         btn.className = 'loc-filter-btn';
