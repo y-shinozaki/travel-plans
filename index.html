@@ -1998,10 +1998,7 @@
           const cell = document.createElement("div");
           cell.className = "allday-cell";
           events
-            .filter(
-              (e) =>
-                e.d === di && e.allDay && (showHotels || e.cat !== "cat-hotel"),
-            )
+            .filter((e) => e.d === di && e.allDay)
             .forEach((ev) => {
               const evEl = document.createElement("div");
               evEl.className = "allday-event";
