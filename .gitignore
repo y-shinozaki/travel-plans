@@ -37,4 +37,4 @@ npm-debug.log*
 # Temp
 .tmp/
 
-# Local development (but keep .claude/settings.json and .mcp.json for project config)
+# Local development (but keep .claude/settings.json for project config)
