@@ -46,7 +46,6 @@ travel-plans/
 ├── schedule.csv        イベントデータ（HTML の <script> 内に埋め込み）
 ├── README.md           このファイル
 ├── .claude/settings.json
-├── .mcp.json
 └── .gitignore
 ```
 

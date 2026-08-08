@@ -1,7 +1,6 @@
 {
   "permissions": {
     "allow": [
-      "Bash(set -e)",
       "Bash(git branch *)",
       "Bash(git fetch *)",
       "Bash(git push origin --delete *)",
