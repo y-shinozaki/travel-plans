@@ -217,8 +217,11 @@ button {
   padding: 0 var(--gut);
 }
 
+/* .wrap の左右パディングを潰さないよう、上下だけをロングハンドで指定する。
+   padding ショートハンドで書くと後勝ちで左右が 0 になる。 */
 .sec {
-  padding: var(--s8) 0;
+  padding-top: var(--s8);
+  padding-bottom: var(--s8);
 }
 
 /* セクション見出しの共通レイアウト（左にラベル、右に本体） */
