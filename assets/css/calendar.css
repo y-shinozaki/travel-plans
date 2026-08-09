@@ -92,7 +92,7 @@
   align-items: center;
   justify-content: flex-end;
   padding: 0 12px;
-  font-size: 9.5px;
+  font-size: 10px;
   letter-spacing: 1.6px;
   text-transform: uppercase;
   color: var(--ink-2);
@@ -133,6 +133,15 @@
 }
 .allday-pill:hover {
   transform: translateX(3px);
+}
+/* role="button" の div はブラウザ既定のフォーカスリングを持たないため、
+   キーボード操作時のみ明示的に描画する（マウスクリックでは出さない） */
+.allday-pill:focus {
+  outline: none;
+}
+.allday-pill:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
 }
 .allday-pill span {
   overflow: hidden;
@@ -181,6 +190,16 @@
 .ev:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 14px rgba(49, 49, 49, 0.14);
+  z-index: 5;
+}
+/* role="button" の div はブラウザ既定のフォーカスリングを持たないため、
+   キーボード操作時のみ明示的に描画する（マウスクリックでは出さない） */
+.ev:focus {
+  outline: none;
+}
+.ev:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
   z-index: 5;
 }
 .ev__hd {
@@ -294,7 +313,7 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 9.5px;
+  font-size: 10px;
   letter-spacing: 1.6px;
   text-transform: uppercase;
 }
