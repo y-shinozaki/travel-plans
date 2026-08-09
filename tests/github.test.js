@@ -57,6 +57,7 @@ test("認証ヘッダとブランチが付く", async () => {
   assert.match(url, /ref=main/);
   assert.equal(init.headers.Authorization, "Bearer tkn");
   assert.equal(init.headers["X-GitHub-Api-Version"], "2022-11-28");
+  assert.equal(init.headers.Accept, "application/vnd.github+json");
 });
 
 test("putFile は base64 と sha を送る", async () => {
@@ -113,6 +114,40 @@ test("ネットワーク断は GitHubError になる", async () => {
 
 test("トークンが空なら呼ぶ前に落とす", async () => {
   const impl = fakeFetch(() => json(200, {}));
-  assert.throws(() => createGitHub({ ...CONF, token: "", fetchImpl: impl }), /トークン/);
+  assert.throws(
+    () => createGitHub({ ...CONF, token: "", fetchImpl: impl }),
+    (e) => e instanceof GitHubError && e.status === 0 && /トークン/.test(e.message)
+  );
   assert.equal(impl.calls.length, 0);
+});
+
+test("getFile は成功応答の本文が壊れていると GitHubError を投げる", async () => {
+  // 2xx でも本文が JSON として読めないことがある（プロキシの介在など）。
+  // call() はそれを body = null として握りつぶすので、getFile 側で形を確認しないと
+  // body.sha の参照で素の TypeError が画面に出てしまう。
+  const impl = fakeFetch(() => new Response("not json", { status: 200 }));
+  await assert.rejects(
+    () => createGitHub({ ...CONF, fetchImpl: impl }).getFile("p"),
+    (e) => e instanceof GitHubError && /予期しない/.test(e.message)
+  );
+});
+
+test("putFile は成功応答の本文が壊れていると GitHubError を投げる", async () => {
+  const impl = fakeFetch(() => new Response("not json", { status: 200 }));
+  await assert.rejects(
+    () =>
+      createGitHub({ ...CONF, fetchImpl: impl }).putFile({ path: "p", text: "x", sha: null, message: "m" }),
+    (e) => e instanceof GitHubError && /予期しない/.test(e.message)
+  );
+});
+
+test("putFile の 404 はパスとブランチの確認を促す", async () => {
+  // getFile の 404 は null を返す経路で処理されるため explain() には来ない。
+  // ここに来るのは putFile だけ。
+  const impl = fakeFetch(() => json(404, { message: "Not Found" }));
+  await assert.rejects(
+    () =>
+      createGitHub({ ...CONF, fetchImpl: impl }).putFile({ path: "p", text: "x", sha: null, message: "m" }),
+    (e) => e instanceof GitHubError && e.status === 404 && /パス|ブランチ/.test(e.message)
+  );
 });

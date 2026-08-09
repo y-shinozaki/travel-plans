@@ -30,6 +30,9 @@ function explain(status, body) {
       return `権限が足りません。トークンに Contents の書き込み権限があるか確認してください${detail}`;
     case 409:
       return `リモートが更新されています。取り込んでから公開し直してください${detail}`;
+    case 404:
+      // getFile の 404 は null を返す経路で処理するため、ここに来るのは putFile だけ。
+      return `対象が見つかりません。パスとブランチ名を確認してください${detail}`;
     case 422:
       return `内容を受け付けてもらえませんでした${detail}`;
     default:
@@ -38,7 +41,9 @@ function explain(status, body) {
 }
 
 export function createGitHub({ owner, repo, branch, token, fetchImpl = fetch }) {
-  if (!token) throw new Error("createGitHub: トークンがありません");
+  // status: 0 は「HTTP のやり取りに至っていない」の意。通信断と同じ扱いにしておくと、
+  // 呼び出し側は常に error.status を見るだけでよくなる。
+  if (!token) throw new GitHubError(0, "トークンがありません。設定してください");
 
   const base = `${API}/repos/${owner}/${repo}/contents/`;
   const headers = {
@@ -68,9 +73,15 @@ export function createGitHub({ owner, repo, branch, token, fetchImpl = fetch }) 
     const { response, body } = await call(url, { method: "GET", headers });
     if (response.status === 404) return null;
     if (!response.ok) throw new GitHubError(response.status, explain(response.status, body));
+    // 2xx でも本文が JSON として読めない、または想定の形でないことがある
+    // （プロキシの介在など）。ここで確かめないと下の参照が素の TypeError を投げ、
+    // 「生のエラーを画面に出さない」というこのモジュールの方針が破れる。
+    if (!body || typeof body.sha !== "string" || typeof body.content !== "string") {
+      throw new GitHubError(response.status, "GitHub から予期しない応答が返りました");
+    }
     // Contents API は base64 に 60 文字ごとの改行を挟むことがあるが、
     // atob は仕様上 ASCII 空白を読み飛ばすので、ここで除去する必要はない。
-    return { sha: body.sha, text: fromBase64Utf8(String(body.content)) };
+    return { sha: body.sha, text: fromBase64Utf8(body.content) };
   }
 
   async function putFile({ path, text, sha, message }) {
@@ -83,6 +94,9 @@ export function createGitHub({ owner, repo, branch, token, fetchImpl = fetch }) 
       body: JSON.stringify(payload),
     });
     if (!response.ok) throw new GitHubError(response.status, explain(response.status, body));
+    if (!body?.content?.sha || !body?.commit?.html_url) {
+      throw new GitHubError(response.status, "GitHub から予期しない応答が返りました");
+    }
     return { sha: body.content.sha, commitUrl: body.commit.html_url };
   }
 
