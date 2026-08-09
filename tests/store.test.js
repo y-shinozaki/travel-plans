@@ -108,6 +108,49 @@ test("localStorage が使えない環境でも生成自体は成功する", () =
   }
 });
 
+test("readText / writeText は JSON を通さず生の文字列を扱う", () => {
+  const backend = memoryBackend();
+  const store = createStore(backend);
+  store.writeText("gh-token", "ghp_secret");
+  // 引用符が付かない ＝ JSON.parse を通していない
+  assert.equal(backend._dump()["tp:gh-token"], "ghp_secret");
+  assert.equal(store.readText("gh-token"), "ghp_secret");
+  assert.equal(store.has("gh-token"), true);
+});
+
+test("readText は未設定なら null を返す", () => {
+  assert.equal(createStore(memoryBackend()).readText("nope"), null);
+});
+
+test("readText は JSON として壊れた値でも中身を console に出さない", () => {
+  // read は SyntaxError の文言に中身の先頭を載せてしまう。
+  // 秘密を扱う側（token.js）はそれを避けるために readText を使う
+  const seen = [];
+  const original = console.warn;
+  console.warn = (...args) => seen.push(args.join(" "));
+  try {
+    const store = createStore(memoryBackend({ "tp:secret": "ghp_liveSecretValue" }));
+    assert.equal(store.readText("secret"), "ghp_liveSecretValue");
+  } finally {
+    console.warn = original;
+  }
+  assert.deepEqual(seen, []);
+});
+
+test("writeText の失敗も StoreWriteError で知らせ、値は文言に載せない", () => {
+  const backend = memoryBackend();
+  backend.setItem = () => {
+    throw new Error("quota");
+  };
+  assert.throws(
+    () => createStore(backend).writeText("gh-token", "ghp_liveSecretValue"),
+    (error) =>
+      error instanceof StoreWriteError &&
+      /tp:gh-token/.test(error.message) &&
+      !error.message.includes("ghp_liveSecretValue")
+  );
+});
+
 test("remove が例外を投げても外に出さない", () => {
   // removeItem が投げるバックエンドでも remove は静かに失敗する
   const original = console.warn;

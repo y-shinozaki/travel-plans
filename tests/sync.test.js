@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { createSync, DEFAULT_CONFIG } from "../assets/js/sync.js";
 import { readToken, writeToken, clearToken, hasToken } from "../assets/js/token.js";
-import { createStore } from "../assets/js/store.js";
+import { createStore, StoreWriteError } from "../assets/js/store.js";
 import { EventDataError } from "../assets/js/validate.js";
 import { GitHubError } from "../assets/js/github.js";
 import { toBase64Utf8, fromBase64Utf8 } from "../assets/js/base64.js";
@@ -70,6 +70,25 @@ const BROKEN = { updatedAt: "2026-08-09T09:00:00.000Z", days: [], events: [] };
 
 const DRAFT_KEY = "tp:events";
 const BASE_KEY = "tp:events-base";
+
+/** リモートに置かれている版の時刻。 */
+const REMOTE_STAMP = "2026-08-09T10:00:00.000Z";
+/** その版を取り込み済み ＝ 競合していない store の初期状態。 */
+const SYNCED = { [BASE_KEY]: JSON.stringify(REMOTE_STAMP) };
+
+const OK_PUT = () =>
+  jsonResponse(201, {
+    content: { sha: "new-sha" },
+    commit: { html_url: "https://github.com/acme/trip/commit/abc" },
+  });
+
+/** GET はリモートの現物（sha と本文）を返し、PUT は put() を返す GitHub。 */
+function github({ remote = plan(REMOTE_STAMP), sha = "old-sha", put = OK_PUT } = {}) {
+  return (url, init) =>
+    init.method === "PUT"
+      ? put()
+      : jsonResponse(200, { sha, content: toBase64Utf8(JSON.stringify(remote)) });
+}
 
 /** store と sync を一組で用意する。initial は tp: 付きの生キーで渡す。 */
 function setup({ initial = {}, handler = () => jsonResponse(500, {}) } = {}) {
@@ -139,17 +158,50 @@ test("空文字は保存しない（使えないトークンを「設定済み�
   assert.deepEqual(Object.keys(backend._dump()), []);
 });
 
-test("文字列でない値が入っていてもトークン扱いしない", () => {
-  const store = createStore(memoryBackend({ "tp:gh-token": "123" }));
+test("空白だけの値はトークン扱いしない", () => {
+  const store = createStore(memoryBackend({ "tp:gh-token": "  \n" }));
   assert.equal(readToken(store), null);
   assert.equal(hasToken(store), false);
+});
+
+test("トークンは JSON として解釈しない（中身が console に出る経路を作らない）", async () => {
+  // store.read は壊れた値を JSON.parse に掛け、SyntaxError の文言に中身の先頭が
+  // 埋め込まれる（Unexpected token 'g', "ghp_liveSe"... ）。それが console.warn に出る。
+  // トークンだけは平文で読み書きし、この経路自体を作らない
+  const TOKEN = "ghp_liveSecretValue0123456789";
+  const store = createStore(memoryBackend({ "tp:gh-token": TOKEN }));
+
+  const { result, seen } = await captureConsole(async () => ({
+    token: readToken(store),
+    has: hasToken(store),
+  }));
+
+  assert.equal(result.token, TOKEN);
+  assert.equal(result.has, true);
+  assert.equal(seen.length, 0, `console に出力があった: ${seen.join(" / ")}`);
+});
+
+test("保存に失敗してもトークンを例外文に出さない", () => {
+  const TOKEN = "ghp_liveSecretValue0123456789";
+  const backend = memoryBackend();
+  backend.setItem = () => {
+    throw new Error("quota");
+  };
+  assert.throws(
+    () => writeToken(createStore(backend), TOKEN),
+    (error) =>
+      error instanceof StoreWriteError &&
+      !error.message.includes(TOKEN) &&
+      /tp:gh-token/.test(error.message)
+  );
 });
 
 // ------------------------------------------------------------ sync: 既定値
 
 test("DEFAULT_CONFIG は実在するファイルを指す", () => {
   assert.equal(DEFAULT_CONFIG.path, "assets/data/events.json");
-  assert.equal(existsSync(DEFAULT_CONFIG.path), true);
+  // cwd に依存させない。リポジトリのルートはこのファイルの 1 つ上
+  assert.equal(existsSync(new URL(`../${DEFAULT_CONFIG.path}`, import.meta.url)), true);
   assert.equal(DEFAULT_CONFIG.owner, "y-shinozaki");
   assert.equal(DEFAULT_CONFIG.repo, "travel-plans");
   assert.equal(DEFAULT_CONFIG.branch, "main");
@@ -157,7 +209,7 @@ test("DEFAULT_CONFIG は実在するファイルを指す", () => {
 
 // -------------------------------------------------------------- sync: load
 
-test("load() はリモートを検証してから返す", async () => {
+test("下書きが無ければリモートを取り込んで返す", async () => {
   const remote = plan("2026-08-09T10:00:00.000Z");
   const { sync, fetchImpl, raw } = setup({ handler: () => jsonResponse(200, remote) });
 
@@ -189,6 +241,49 @@ test("壊れたリモートは例外にし、下書きを書き換えない", as
   // 壊れたデータで手元の下書きを潰さない
   assert.deepEqual(JSON.parse(raw(DRAFT_KEY)), draft);
   assert.equal(JSON.parse(raw(BASE_KEY)), "2026-08-09T10:00:00.000Z");
+});
+
+test("リモート本文がリテラルの null でも検証で弾く", async () => {
+  // null をセンチネルに使うと「取れなかった」と区別が付かず、
+  // 最後に throw null をやってしまう（呼び出し側の error.message が TypeError になる）
+  const { sync } = setup({ handler: () => jsonResponse(200, null) });
+  await assert.rejects(() => sync.load(), EventDataError);
+});
+
+test("壊れた下書きは使わずリモートへ落とし、値は消さない", async () => {
+  // 旅程の日数を減らすだけで、他の端末に残っている下書きは範囲外になる。
+  // 手で書き換えなくても起こるので「アプリ経由なら壊れない」とは言えない。
+  // 壊れたリモートを画面に出さないのに壊れた下書きは出す、では筋が通らない
+  const broken = plan("2026-08-09T11:00:00.000Z", [ev({ cat: "cat-NOPE", startDay: 99 })]);
+  const remote = plan("2026-08-09T10:00:00.000Z");
+  const { sync, raw } = setup({
+    initial: {
+      [DRAFT_KEY]: JSON.stringify(broken),
+      [BASE_KEY]: JSON.stringify("2026-08-09T09:00:00.000Z"),
+    },
+    handler: () => jsonResponse(200, remote),
+  });
+
+  const { result: out, seen } = await captureConsole(() => sync.load());
+
+  assert.deepEqual(out.data, remote);
+  assert.equal(out.source, "use-remote");
+  assert.equal(seen.length, 1); // 黙って捨てない
+  // 救い出せるよう、保存されている値には触らない
+  assert.deepEqual(JSON.parse(raw(DRAFT_KEY)), broken);
+});
+
+test("壊れた下書きしかなくリモートも取れなければ例外", async () => {
+  const broken = plan("2026-08-09T11:00:00.000Z", [ev({ cat: "cat-NOPE", startDay: 99 })]);
+  const { sync, raw } = setup({
+    initial: { [DRAFT_KEY]: JSON.stringify(broken) },
+    handler: () => {
+      throw new TypeError("Failed to fetch");
+    },
+  });
+
+  await assert.rejects(() => captureConsole(() => sync.load()), /取得できません/);
+  assert.deepEqual(JSON.parse(raw(DRAFT_KEY)), broken);
 });
 
 test("リモートが取れなければローカルへ落ちる（source === 'offline'）", async () => {
@@ -335,18 +430,8 @@ test("publish() は検証に通らなければ API を一度も叩かない", as
 });
 
 test("publish() は GET で sha を取り、PUT で送り、base を更新する", async () => {
-  const data = plan("2026-08-09T10:00:00.000Z");
-  const { sync, store, fetchImpl, raw } = setup({
-    handler: (url, init) => {
-      if (init.method === "PUT") {
-        return jsonResponse(201, {
-          content: { sha: "new-sha" },
-          commit: { html_url: "https://github.com/acme/trip/commit/abc" },
-        });
-      }
-      return jsonResponse(200, { sha: "old-sha", content: toBase64Utf8(JSON.stringify(data)) });
-    },
-  });
+  const data = plan(REMOTE_STAMP);
+  const { sync, store, fetchImpl, raw } = setup({ initial: SYNCED, handler: github() });
   writeToken(store, "ghp_secret");
 
   const out = await sync.publish(data);
@@ -373,16 +458,11 @@ test("publish() は GET で sha を取り、PUT で送り、base を更新する
 });
 
 test("publish() は日本語を壊さずに送る", async () => {
-  const data = plan("2026-08-09T10:00:00.000Z", [
+  const data = plan(REMOTE_STAMP, [
     ev({ title: "ワット アルン 🛕" }),
     ev({ id: "ev-2", title: "夕食" }),
   ]);
-  const { sync, store, fetchImpl } = setup({
-    handler: (url, init) =>
-      init.method === "PUT"
-        ? jsonResponse(201, { content: { sha: "s" }, commit: { html_url: "https://x/1" } })
-        : jsonResponse(200, { sha: "old", content: toBase64Utf8("{}") }),
-  });
+  const { sync, store, fetchImpl } = setup({ initial: SYNCED, handler: github() });
   writeToken(store, "ghp_secret");
   await sync.publish(data);
   const body = JSON.parse(fetchImpl.calls[1].init.body);
@@ -391,12 +471,10 @@ test("publish() は日本語を壊さずに送る", async () => {
 });
 
 test("リモートにファイルが無ければ sha なしで作成する", async () => {
-  const data = plan("2026-08-09T10:00:00.000Z");
+  const data = plan(REMOTE_STAMP);
   const { sync, store, fetchImpl } = setup({
     handler: (url, init) =>
-      init.method === "PUT"
-        ? jsonResponse(201, { content: { sha: "s" }, commit: { html_url: "https://x/1" } })
-        : jsonResponse(404, { message: "Not Found" }),
+      init.method === "PUT" ? OK_PUT() : jsonResponse(404, { message: "Not Found" }),
   });
   writeToken(store, "ghp_secret");
 
@@ -405,18 +483,76 @@ test("リモートにファイルが無ければ sha なしで作成する", asy
   assert.equal("sha" in body, false);
 });
 
+test("開いたあとに別端末が公開していたら PUT へ進まない", async () => {
+  // 現実の競合はこれ。sha は公開の直前に取り直すので常に最新であり、
+  // sha 任せでは 201 で通ってしまって相手の作業が黙って消える。
+  // 起動時の decideSync は開いたままの 30 分を見張れない
+  const draft = plan("2026-08-09T11:00:00.000Z", [ev({ title: "手元で直した昼食" })]);
+  const { sync, store, fetchImpl, raw } = setup({
+    initial: {
+      [DRAFT_KEY]: JSON.stringify(draft),
+      [BASE_KEY]: JSON.stringify(REMOTE_STAMP), // 取り込んだのは 10:00 の版
+    },
+    // が、その後に相手が 11:30 の版を公開している
+    handler: github({ remote: plan("2026-08-09T11:30:00.000Z"), sha: "brand-new-sha" }),
+  });
+  writeToken(store, "ghp_secret");
+
+  await assert.rejects(
+    () => sync.publish(draft),
+    (error) => error instanceof GitHubError && error.status === 409
+  );
+
+  // GET だけで止まる。相手の版を踏まない
+  assert.equal(fetchImpl.calls.length, 1);
+  assert.equal(fetchImpl.calls[0].method, "GET");
+  // 取り込んでから公開し直せるよう、下書きも base もそのまま
+  assert.deepEqual(JSON.parse(raw(DRAFT_KEY)), draft);
+  assert.equal(JSON.parse(raw(BASE_KEY)), REMOTE_STAMP);
+});
+
+test("取り込んだ証拠（base）が無ければ公開しない", async () => {
+  // 上書きしてよい根拠がない状態。迷ったら人に決めさせる側へ倒す
+  const data = plan(REMOTE_STAMP);
+  const { sync, store, fetchImpl } = setup({ handler: github() });
+  writeToken(store, "ghp_secret");
+
+  await assert.rejects(
+    () => sync.publish(data),
+    (error) => error instanceof GitHubError && error.status === 409
+  );
+  assert.equal(fetchImpl.calls.length, 1);
+});
+
+test("リモートの updatedAt が読めないときは突き合わせを省いて公開する", async () => {
+  // リモートが壊れているとき、公開そのものが復旧手段になる。
+  // ここで止めるとブラウザから直せなくなるので通す（ただし黙って通さない）
+  const data = plan(REMOTE_STAMP);
+  const { sync, store, fetchImpl } = setup({
+    initial: SYNCED,
+    handler: (url, init) =>
+      init.method === "PUT"
+        ? OK_PUT()
+        : jsonResponse(200, { sha: "old", content: toBase64Utf8("こわれている") }),
+  });
+  writeToken(store, "ghp_secret");
+
+  const { seen } = await captureConsole(() => sync.publish(data));
+  assert.equal(fetchImpl.calls.length, 2);
+  assert.equal(fetchImpl.calls[1].method, "PUT");
+  assert.equal(seen.length, 1);
+});
+
 test("409 は握りつぶさず、下書きも base も残す", async () => {
+  // GET と PUT の間に滑り込まれた場合の最後の保険。
   // Task 9 は「取り込んでから公開し直す」導線を出す。下書きを消すとその道が塞がる
   const draft = plan("2026-08-09T11:00:00.000Z", [ev({ title: "手元で直した昼食" })]);
   const { sync, store, raw } = setup({
     initial: {
       [DRAFT_KEY]: JSON.stringify(draft),
-      [BASE_KEY]: JSON.stringify("2026-08-09T10:00:00.000Z"),
+      [BASE_KEY]: JSON.stringify(REMOTE_STAMP),
     },
-    handler: (url, init) =>
-      init.method === "PUT"
-        ? jsonResponse(409, { message: "does not match" })
-        : jsonResponse(200, { sha: "old", content: toBase64Utf8("{}") }),
+    handler: github({ put: () => jsonResponse(409, { message: "does not match" }) }),
   });
   writeToken(store, "ghp_secret");
 
@@ -427,11 +563,11 @@ test("409 は握りつぶさず、下書きも base も残す", async () => {
 
   assert.deepEqual(JSON.parse(raw(DRAFT_KEY)), draft);
   // 失敗した公開を「同期済み」に見せない
-  assert.equal(JSON.parse(raw(BASE_KEY)), "2026-08-09T10:00:00.000Z");
+  assert.equal(JSON.parse(raw(BASE_KEY)), REMOTE_STAMP);
 });
 
 test("GET が失敗した時点で PUT へ進まない", async () => {
-  const data = plan("2026-08-09T10:00:00.000Z");
+  const data = plan(REMOTE_STAMP);
   const { sync, store, fetchImpl, raw } = setup({
     handler: () => jsonResponse(401, { message: "Bad credentials" }),
   });
@@ -446,13 +582,8 @@ test("GET が失敗した時点で PUT へ進まない", async () => {
 });
 
 test("トークンが無ければ通信せずに GitHubError になる", async () => {
-  const data = plan("2026-08-09T10:00:00.000Z");
-  const { sync, store, fetchImpl } = setup({
-    handler: (url, init) =>
-      init.method === "PUT"
-        ? jsonResponse(201, { content: { sha: "s" }, commit: { html_url: "https://x/1" } })
-        : jsonResponse(200, { sha: "old", content: toBase64Utf8("{}") }),
-  });
+  const data = plan(REMOTE_STAMP);
+  const { sync, store, fetchImpl } = setup({ initial: SYNCED, handler: github() });
 
   await assert.rejects(
     () => sync.publish(data),
@@ -462,17 +593,18 @@ test("トークンが無ければ通信せずに GitHubError になる", async (
 
   // トークンは公開のたびに読む。createSync のあとに設定しても効く
   writeToken(store, "ghp_secret");
-  assert.equal((await sync.publish(data)).commitUrl, "https://x/1");
+  assert.equal(
+    (await sync.publish(data)).commitUrl,
+    "https://github.com/acme/trip/commit/abc"
+  );
 });
 
 test("トークンは Authorization 以外のどこにも出さない", async () => {
   const TOKEN = "ghp_do_not_leak_0123456789";
-  const data = plan("2026-08-09T10:00:00.000Z");
+  const data = plan(REMOTE_STAMP);
   const { sync, store, fetchImpl } = setup({
-    handler: (url, init) =>
-      init.method === "PUT"
-        ? jsonResponse(409, { message: "does not match" })
-        : jsonResponse(200, { sha: "old", content: toBase64Utf8("{}") }),
+    initial: SYNCED,
+    handler: github({ put: () => jsonResponse(409, { message: "does not match" }) }),
   });
   writeToken(store, TOKEN);
 

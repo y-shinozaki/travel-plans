@@ -8,6 +8,12 @@
  * 2. トークンの出口を 1 か所にする。読んだ値は github.js の Authorization ヘッダ
  *    にしか渡さない。ログにも DOM にも例外文にも出さないこと
  *
+ * store.read / store.write ではなく readText / writeText を使うのは 2 のため。
+ * read は JSON.parse を通すので、キーに JSON でない値が入っていると
+ * SyntaxError の文言に中身の先頭が埋め込まれ（`Unexpected token 'g', "ghp_liveSe"...`）、
+ * それが console.warn へ出る。トークンを平文で書き込んでおけばパースは起こらない。
+ * localStorage は元々平文なので、JSON で包んでも秘匿性は 1 ミリも変わらない。
+ *
  * 設計書 §5.4 に対応。
  */
 
@@ -15,12 +21,13 @@ const KEY = "gh-token";
 
 /**
  * 使えるトークンだけを返す（無ければ null）。
- * 空文字や文字列でない値は「無い」と同じ扱いにする。createGitHub は
+ * 空文字や空白だけの値は「無い」と同じ扱いにする。createGitHub は
  * 空のトークンを拒むので、ここで通すと「設定済みなのに必ず失敗する」状態になる。
  */
 export function readToken(store) {
-  const value = store.read(KEY, null);
-  return typeof value === "string" && value ? value : null;
+  const value = store.readText(KEY);
+  const trimmed = typeof value === "string" ? value.trim() : "";
+  return trimmed || null;
 }
 
 /**
@@ -36,7 +43,7 @@ export function writeToken(store, value) {
     clearToken(store);
     return;
   }
-  store.write(KEY, trimmed);
+  store.writeText(KEY, trimmed);
 }
 
 export function clearToken(store) {
