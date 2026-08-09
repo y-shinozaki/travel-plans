@@ -12,6 +12,14 @@ function readTokens(src) {
   return map;
 }
 
+function readLengthTokens(src) {
+  const map = new Map();
+  for (const m of src.matchAll(/--([a-z0-9-]+)\s*:\s*(-?[\d.]+(?:px|rem|em|%)|0)\s*;/g)) {
+    map.set(m[1], m[2]);
+  }
+  return map;
+}
+
 const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
 
 function relativeLuminance(hex) {
@@ -35,7 +43,14 @@ function distance(a, b) {
 }
 
 const T = readTokens(css);
+const L = readLengthTokens(css);
 const CATEGORIES = ["move", "sight", "food", "hotel", "shop"];
+
+test("パースが壊れていない（主要な色トークンが十分な数取れている）", () => {
+  // readTokens が空／ほぼ空でも他のテストはループ0回で素通りしてしまうため、
+  // パーサが機能していることを別途チェックする。
+  assert.ok(T.size >= 20, `カラートークンが ${T.size} 件しか取れていません（20件未満）`);
+});
 
 test("基本トークンがすべて定義されている", () => {
   for (const name of ["sand", "sand-lt", "paper", "ink", "ink-2", "ink-3", "line",
@@ -99,7 +114,11 @@ test("本文が主背景に対して十分な明暗差がある", () => {
 });
 
 test("角丸トークンが5段階そろっている", () => {
-  for (const name of ["--r-xs", "--r-sm", "--r-md", "--r-lg", "--r-pill"]) {
-    assert.ok(css.includes(name), `${name} が定義されていません`);
+  // css.includes() だとコメント内の文字列一致でも通ってしまうため、
+  // 実際の宣言として値を持つかを readLengthTokens() のパース結果で検証する。
+  for (const name of ["r-xs", "r-sm", "r-md", "r-lg", "r-pill"]) {
+    assert.ok(L.has(name), `--${name} が宣言として定義されていません`);
   }
+  // 999px のような3桁の値も正しく拾えることを確認する
+  assert.equal(L.get("r-pill"), "999px", `--r-pill の値が想定と異なります: ${L.get("r-pill")}`);
 });
