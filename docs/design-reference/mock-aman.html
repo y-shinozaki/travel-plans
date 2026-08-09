@@ -1,0 +1,4312 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thailand 2026 — Aman デザイン案モック v2</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,200;0,6..72,300;0,6..72,400;1,6..72,300&family=Inter:wght@300;400;500&family=Noto+Sans+JP:wght@200;300;400;500&family=Noto+Serif+JP:wght@200;300;400&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <style>
+      /* ══════════════════════════════════════════════════════════
+         TOKENS — aman.com の computed style 実測値ベース
+         ══════════════════════════════════════════════════════════ */
+      :root {
+        --sand: #f3eee7;
+        --sand-lt: #fdf9f5;
+        --paper: #ffffff;
+        --ink: #313131;
+        --ink-2: #585858;
+        --ink-3: #404040;
+        --line: #aaa6a3;
+        --line-soft: #ddd7ce;
+        --line-faint: #e8e2d9;
+        --reverse: #f3eee7;
+
+        /* Category — bar（アクセント）/ bg（ティント地）/ tx（文字）の 3 値セット。
+           ベタ塗りを並べると混色して濁るため、面はティント・線と文字で識別させる */
+        --c-move: #3f5c50;
+        --c-move-bg: #d6e8db;
+        --c-move-tx: #22352d;
+        --c-sight: #7e5318;
+        --c-sight-bg: #f6e7c0;
+        --c-sight-tx: #4a3212;
+        --c-food: #a54a2c;
+        --c-food-bg: #f9e2d7;
+        --c-food-tx: #58281a;
+        --c-hotel: #2f566f;
+        --c-hotel-bg: #d8e6f4;
+        --c-hotel-tx: #1c3446;
+        --c-shop: #6a4c78;
+        --c-shop-bg: #ede2f2;
+        --c-shop-tx: #38263f;
+
+        /* Radius — Aman は 0px だが、柔らかさを出すため控えめに丸める */
+        --r-xs: 5px;
+        --r-sm: 8px;
+        --r-md: 12px;
+        --r-lg: 18px;
+        --r-pill: 999px;
+
+        --serif: "Newsreader", "Noto Serif JP", "Times New Roman", serif;
+        --sans: "Inter", "Noto Sans JP", sans-serif;
+
+        /* 14px グリッド */
+        --s1: 7px;
+        --s2: 14px;
+        --s3: 28px;
+        --s4: 42px;
+        --s5: 56px;
+        --s6: 84px;
+        --s7: 112px;
+        --s8: 154px; /* セクション間 */
+        --s9: 210px; /* 大きな呼吸 */
+
+        --maxw: 1440px;
+        --gut: clamp(20px, 5vw, 84px); /* 左右の余白を大きく */
+
+        /* Motion */
+        --e-out: cubic-bezier(0.22, 1, 0.36, 1);
+        --e-io: cubic-bezier(0.65, 0, 0.35, 1);
+        --t-fast: 0.32s;
+        --t-mid: 0.55s;
+        --t-slow: 0.9s;
+      }
+
+      /* ══════════════════════════════════════════════════════════
+         BASE
+         ══════════════════════════════════════════════════════════ */
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        margin: 0;
+        background: var(--sand);
+        color: var(--ink);
+        font-family: var(--sans);
+        font-size: 14px;
+        font-weight: 300;
+        line-height: 1.45;
+        letter-spacing: 0.8px;
+        -webkit-font-smoothing: antialiased;
+        overflow-x: hidden;
+      }
+      img {
+        max-width: 100%;
+        display: block;
+      }
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+      button {
+        font: inherit;
+        letter-spacing: inherit;
+        cursor: pointer;
+      }
+      ::selection {
+        background: var(--ink);
+        color: var(--sand);
+      }
+
+      /* ── inline SVG icon ── */
+      .ico {
+        width: 20px;
+        height: 20px;
+        flex: none;
+        stroke: currentColor;
+        stroke-width: 1.25;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        fill: none;
+        vector-effect: non-scaling-stroke;
+      }
+      .ico--sm {
+        width: 15px;
+        height: 15px;
+        stroke-width: 1.4;
+      }
+      .ico--lg {
+        width: 28px;
+        height: 28px;
+        stroke-width: 1;
+      }
+      .sprite {
+        position: absolute;
+        width: 0;
+        height: 0;
+        overflow: hidden;
+      }
+
+      /* ── type roles ── */
+      .eyebrow {
+        font-family: var(--sans);
+        font-size: 10px;
+        font-weight: 500;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        line-height: 1.45;
+        color: var(--ink-2);
+        margin: 0;
+      }
+      .display {
+        font-family: var(--serif);
+        font-weight: 200;
+        font-size: clamp(44px, 7.4vw, 96px);
+        letter-spacing: -0.5px;
+        line-height: 1.04;
+        margin: 0;
+      }
+      .h2 {
+        font-family: var(--serif);
+        font-weight: 300;
+        font-size: clamp(28px, 3.4vw, 42px);
+        letter-spacing: 0.2px;
+        line-height: 1.28;
+        margin: 0;
+      }
+      .h3 {
+        font-family: var(--serif);
+        font-weight: 400;
+        font-size: 19.6px;
+        letter-spacing: 0.98px;
+        line-height: 1.45;
+        margin: 0;
+      }
+      .body {
+        font-size: 14px;
+        letter-spacing: 0.8px;
+        line-height: 1.7;
+        color: var(--ink-2);
+        max-width: 58ch;
+      }
+      .micro {
+        font-size: 12.95px;
+        letter-spacing: 0.3px;
+        line-height: 1.6;
+        color: var(--ink-2);
+      }
+      .num {
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* ══════════════════════════════════════════════════════════
+         MOTION
+         ══════════════════════════════════════════════════════════ */
+      @keyframes riseIn {
+        from {
+          opacity: 0;
+          transform: translateY(22px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      @keyframes slowZoom {
+        from {
+          transform: scale(1.1);
+        }
+        to {
+          transform: scale(1);
+        }
+      }
+      @keyframes drawX {
+        from {
+          transform: scaleX(0);
+        }
+        to {
+          transform: scaleX(1);
+        }
+      }
+
+      .reveal {
+        opacity: 0;
+      }
+      .reveal.is-in {
+        animation: riseIn var(--t-slow) var(--e-out) forwards;
+        animation-delay: var(--d, 0s);
+      }
+
+      /* 行マスクで見出しをせり上げる */
+      .lines .ln {
+        display: block;
+        overflow: hidden;
+      }
+      .lines .ln > i {
+        display: block;
+        font-style: normal;
+        transform: translateY(108%);
+        transition: transform 1.05s var(--e-out);
+        transition-delay: var(--d, 0s);
+      }
+      .is-in.lines .ln > i,
+      .is-in .lines .ln > i {
+        transform: none;
+      }
+
+      /* ヘアラインを引く演出 */
+      .drawline {
+        transform: scaleX(0);
+        transform-origin: left;
+      }
+      .is-in .drawline,
+      .drawline.is-in {
+        animation: drawX 1s var(--e-out) forwards;
+        animation-delay: var(--d, 0s);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.01ms !important;
+          animation-delay: 0ms !important;
+          transition-duration: 0.01ms !important;
+        }
+        .reveal {
+          opacity: 1;
+        }
+        .lines .ln > i {
+          transform: none;
+        }
+        .drawline {
+          transform: scaleX(1);
+        }
+        html {
+          scroll-behavior: auto;
+        }
+      }
+
+      /* ══════════════════════════════════════════════════════════
+         CONTROLS
+         ══════════════════════════════════════════════════════════ */
+      .btn {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 15px 30px;
+        background: transparent;
+        color: var(--reverse);
+        border: 1px solid var(--ink);
+        border-radius: var(--r-pill);
+        font-size: 12px;
+        font-weight: 400;
+        letter-spacing: 1.6px;
+        text-transform: uppercase;
+        overflow: hidden;
+        isolation: isolate;
+        transition: color var(--t-mid) var(--e-out);
+      }
+      .btn::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: var(--ink);
+        transform-origin: right;
+        transition: transform var(--t-mid) var(--e-out);
+        z-index: -1;
+      }
+      .btn:hover {
+        color: var(--ink);
+      }
+      .btn:hover::before {
+        transform: scaleX(0);
+      }
+      .btn .ico {
+        transition: transform var(--t-mid) var(--e-out);
+      }
+      .btn:hover .ico {
+        transform: translateX(5px);
+      }
+      .btn--ghost {
+        color: var(--ink);
+      }
+      .btn--ghost::before {
+        transform: scaleX(0);
+        transform-origin: left;
+      }
+      .btn--ghost:hover {
+        color: var(--reverse);
+      }
+      .btn--ghost:hover::before {
+        transform: scaleX(1);
+      }
+
+      .chip {
+        position: relative;
+        padding: 9px 18px;
+        font-size: 11px;
+        letter-spacing: 1.4px;
+        text-transform: uppercase;
+        border: 1px solid var(--line-soft);
+        border-radius: var(--r-pill);
+        background: transparent;
+        color: var(--ink-2);
+        overflow: hidden;
+        isolation: isolate;
+        transition: color var(--t-fast) var(--e-out),
+          border-color var(--t-fast) var(--e-out);
+      }
+      .chip::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: var(--ink);
+        transform: scaleX(0);
+        transform-origin: left;
+        transition: transform var(--t-fast) var(--e-out);
+        z-index: -1;
+      }
+      .chip:hover {
+        color: var(--ink);
+        border-color: var(--ink);
+      }
+      .chip[aria-pressed="true"] {
+        color: var(--reverse);
+        border-color: var(--ink);
+      }
+      .chip[aria-pressed="true"]::before {
+        transform: scaleX(1);
+      }
+
+      /* リンク下線のスイープ */
+      .swipe {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 10px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        padding-bottom: 7px;
+      }
+      .swipe::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 1px;
+        background: var(--ink);
+        transform: scaleX(1);
+        transform-origin: right;
+        transition: transform var(--t-mid) var(--e-io);
+      }
+      .swipe:hover::after {
+        transform: scaleX(0);
+      }
+      .swipe .ico {
+        transition: transform var(--t-mid) var(--e-out);
+      }
+      .swipe:hover .ico {
+        transform: translateX(6px);
+      }
+
+      /* チェックボックス — チェックを描画するアニメーション */
+      .check {
+        display: inline-flex;
+        cursor: pointer;
+        position: relative;
+      }
+      .check input {
+        position: absolute;
+        opacity: 0;
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        cursor: pointer;
+      }
+      .check__box {
+        width: 22px;
+        height: 22px;
+        border: 1px solid var(--line);
+        border-radius: var(--r-xs);
+        display: grid;
+        place-items: center;
+        transition: background var(--t-fast) var(--e-out),
+          border-color var(--t-fast) var(--e-out),
+          transform var(--t-fast) var(--e-out);
+      }
+      .check:hover .check__box {
+        border-color: var(--ink);
+      }
+      .check input:focus-visible + .check__box {
+        outline: 1px solid var(--ink);
+        outline-offset: 2px;
+      }
+      .check__box svg {
+        width: 13px;
+        height: 13px;
+        stroke: var(--sand);
+        stroke-width: 1.8;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        fill: none;
+      }
+      .check__box svg path {
+        stroke-dasharray: 22;
+        stroke-dashoffset: 22;
+        transition: stroke-dashoffset 0.42s var(--e-out) 0.06s;
+      }
+      .check input:checked + .check__box {
+        background: var(--ink);
+        border-color: var(--ink);
+      }
+      .check input:checked + .check__box svg path {
+        stroke-dashoffset: 0;
+      }
+      .check input:active + .check__box {
+        transform: scale(0.9);
+      }
+
+      /* ══════════════════════════════════════════════════════════
+         MOCK CHROME
+         ══════════════════════════════════════════════════════════ */
+      .progressbar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 2px;
+        background: var(--ink);
+        z-index: 1000;
+        width: 0;
+      }
+      .mocknav {
+        position: sticky;
+        top: 0;
+        z-index: 900;
+        display: flex;
+        gap: var(--s3);
+        align-items: center;
+        padding: 13px var(--gut);
+        background: var(--ink);
+        color: var(--reverse);
+        font-size: 10px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        overflow-x: auto;
+        scrollbar-width: none;
+      }
+      .mocknav::-webkit-scrollbar {
+        display: none;
+      }
+      .mocknav b {
+        font-weight: 500;
+        opacity: 0.45;
+        white-space: nowrap;
+      }
+      .mocknav a {
+        position: relative;
+        white-space: nowrap;
+        opacity: 0.55;
+        padding-bottom: 2px;
+        transition: opacity var(--t-fast) var(--e-out);
+      }
+      .mocknav a::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: -2px;
+        height: 1px;
+        background: currentColor;
+        transform: scaleX(0);
+        transform-origin: left;
+        transition: transform var(--t-fast) var(--e-out);
+      }
+      .mocknav a:hover {
+        opacity: 1;
+      }
+      .mocknav a:hover::after {
+        transform: scaleX(1);
+      }
+
+      .screen__tag {
+        display: flex;
+        align-items: baseline;
+        gap: var(--s2);
+        padding: var(--s2) var(--gut);
+        background: var(--ink-3);
+        color: var(--reverse);
+      }
+      .screen__tag span:first-child {
+        font-size: 10px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        opacity: 0.5;
+      }
+      .screen__tag span:last-child {
+        font-family: var(--serif);
+        font-size: 16px;
+        letter-spacing: 0.5px;
+      }
+      .wrap {
+        max-width: var(--maxw);
+        margin: 0 auto;
+        padding: 0 var(--gut);
+      }
+
+      /* セクション見出しの共通レイアウト（左にラベル、右に本体） */
+      .shead {
+        display: grid;
+        grid-template-columns: 190px 1fr;
+        gap: var(--s5);
+        padding-bottom: var(--s5);
+      }
+      .shead__idx {
+        font-size: 10px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: var(--ink-2);
+        padding-top: 12px;
+      }
+      .shead__idx .n {
+        font-family: var(--serif);
+        display: block;
+        font-size: 34px;
+        letter-spacing: 0;
+        color: var(--ink);
+        line-height: 1;
+        margin-bottom: 10px;
+        font-weight: 200;
+      }
+      .hairline {
+        height: 1px;
+        background: var(--line-soft);
+        margin: var(--s5) 0;
+      }
+
+      /* ══════════════════════════════════════════════════════════
+         01 TOKENS
+         ══════════════════════════════════════════════════════════ */
+      .sec {
+        padding: var(--s8) 0;
+      }
+      .tok__grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(158px, 1fr));
+        gap: 1px;
+        background: var(--line-faint);
+        border: 1px solid var(--line-faint);
+        border-radius: var(--r-md);
+        overflow: hidden;
+      }
+      .swatch {
+        background: var(--sand-lt);
+        padding: var(--s2);
+        transition: background var(--t-fast) var(--e-out);
+      }
+      .swatch:hover {
+        background: var(--paper);
+      }
+      .swatch__chip {
+        height: 84px;
+        border-radius: var(--r-sm);
+        transition: transform var(--t-mid) var(--e-out);
+      }
+      .swatch:hover .swatch__chip {
+        transform: scale(1.03);
+      }
+      .swatch__name {
+        margin-top: var(--s2);
+        font-size: 10px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+      }
+      .swatch__hex {
+        font-size: 12px;
+        letter-spacing: 0.3px;
+        color: var(--ink-2);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .scale__row {
+        display: grid;
+        grid-template-columns: 230px 1fr;
+        gap: var(--s4);
+        padding: var(--s4) 0;
+        border-bottom: 1px solid var(--line-faint);
+        align-items: baseline;
+      }
+      .scale__row:first-child {
+        border-top: 1px solid var(--line-faint);
+      }
+      .scale__spec {
+        font-size: 11px;
+        letter-spacing: 0.3px;
+        color: var(--ink-2);
+        font-variant-numeric: tabular-nums;
+        line-height: 1.7;
+      }
+
+      .icogrid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+        gap: 1px;
+        background: var(--line-faint);
+        border: 1px solid var(--line-faint);
+        border-radius: var(--r-md);
+        overflow: hidden;
+      }
+      .icocell {
+        background: var(--sand-lt);
+        padding: var(--s3) var(--s2);
+        display: grid;
+        place-items: center;
+        gap: 12px;
+        transition: background var(--t-fast) var(--e-out),
+          color var(--t-fast) var(--e-out);
+      }
+      .icocell:hover {
+        background: var(--ink);
+        color: var(--sand);
+      }
+      .icocell .ico {
+        width: 26px;
+        height: 26px;
+        stroke-width: 1;
+      }
+      .icocell span {
+        font-size: 9.5px;
+        letter-spacing: 1.4px;
+        text-transform: uppercase;
+        color: inherit;
+        opacity: 0.7;
+      }
+
+      .comps {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--s2);
+        align-items: center;
+      }
+
+      /* ══════════════════════════════════════════════════════════
+         02 LOGIN
+         ══════════════════════════════════════════════════════════ */
+      .login {
+        min-height: min(88vh, 800px);
+        display: grid;
+        grid-template-columns: 1.2fr 1fr;
+      }
+      .login__art {
+        position: relative;
+        overflow: hidden;
+      }
+      .login__art img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: center 45%;
+        animation: slowZoom 2.6s var(--e-out) forwards;
+      }
+      .login__art::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          to bottom,
+          rgba(49, 49, 49, 0.15),
+          rgba(49, 49, 49, 0.55)
+        );
+      }
+      .login__artcap {
+        position: absolute;
+        left: var(--s5);
+        bottom: var(--s5);
+        z-index: 1;
+        color: var(--reverse);
+      }
+      .login__artcap .eyebrow {
+        color: rgba(243, 238, 231, 0.7);
+        margin-bottom: var(--s2);
+      }
+      .login__form {
+        background: var(--sand-lt);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: var(--s7) clamp(28px, 4.5vw, 70px);
+      }
+      .rule {
+        width: 56px;
+        height: 1px;
+        background: var(--ink);
+        margin: var(--s4) 0;
+      }
+      .field {
+        margin-top: var(--s5);
+        position: relative;
+      }
+      .field label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 10px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: var(--ink-2);
+        margin-bottom: var(--s2);
+      }
+      .field input {
+        width: 100%;
+        padding: 14px 0;
+        background: transparent;
+        border: 0;
+        font-family: var(--sans);
+        font-size: 17px;
+        letter-spacing: 3px;
+        color: var(--ink);
+        outline: none;
+      }
+      .field__line {
+        height: 1px;
+        background: var(--line);
+        position: relative;
+      }
+      .field__line::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: var(--ink);
+        transform: scaleX(0);
+        transform-origin: left;
+        transition: transform var(--t-mid) var(--e-out);
+      }
+      .field input:focus ~ .field__line::after {
+        transform: scaleX(1);
+      }
+      .login__note {
+        margin-top: var(--s4);
+        font-size: 11.5px;
+        letter-spacing: 0.3px;
+        color: var(--ink-2);
+        line-height: 1.75;
+        display: flex;
+        gap: 10px;
+      }
+      .login__note .ico {
+        margin-top: 2px;
+        opacity: 0.6;
+      }
+
+      /* ══════════════════════════════════════════════════════════
+         03 MENU
+         ══════════════════════════════════════════════════════════ */
+      .menu__head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: var(--s5);
+        flex-wrap: wrap;
+        padding-bottom: var(--s6);
+      }
+      .menu__grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1px;
+        background: var(--line-faint);
+        border: 1px solid var(--line-faint);
+        border-radius: var(--r-lg);
+        overflow: hidden;
+      }
+      .card {
+        position: relative;
+        background: var(--sand-lt);
+        display: block;
+        overflow: hidden;
+        transition: background var(--t-mid) var(--e-out);
+      }
+      .card:hover {
+        background: var(--paper);
+      }
+      .card__img {
+        aspect-ratio: 4 / 3;
+        overflow: hidden;
+        position: relative;
+      }
+      .card__img img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: transform 1.1s var(--e-out), filter 1.1s var(--e-out);
+        filter: saturate(0.82);
+      }
+      .card:hover .card__img img {
+        transform: scale(1.06);
+        filter: saturate(1);
+      }
+      .card__num {
+        position: absolute;
+        top: var(--s3);
+        left: var(--s3);
+        z-index: 2;
+        color: var(--sand);
+        font-family: var(--serif);
+        font-size: 15px;
+        letter-spacing: 2px;
+        mix-blend-mode: difference;
+      }
+      .card__body {
+        padding: var(--s4) var(--s3) var(--s5);
+      }
+      .card__body .h3 {
+        margin: var(--s2) 0 10px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .card__arrow {
+        margin-top: var(--s4);
+      }
+
+      /* ══════════════════════════════════════════════════════════
+         04 SCHEDULE
+         ══════════════════════════════════════════════════════════ */
+      .toolbar {
+        display: flex;
+        align-items: center;
+        gap: var(--s4);
+        flex-wrap: wrap;
+        padding: var(--s3) 0;
+        border-top: 1px solid var(--line-soft);
+        border-bottom: 1px solid var(--line-soft);
+      }
+      .toolbar__group {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .toolbar select {
+        font-family: var(--sans);
+        font-size: 13px;
+        letter-spacing: 0.7px;
+        padding: 8px 12px;
+        background: transparent;
+        border: 1px solid var(--line-soft);
+        border-radius: var(--r-pill);
+        color: var(--ink);
+        outline: none;
+        transition: border-color var(--t-fast) var(--e-out);
+      }
+      .toolbar select:hover,
+      .toolbar select:focus {
+        border-color: var(--ink);
+      }
+
+      .cal {
+        margin-top: var(--s5);
+        border: 1px solid var(--line-faint);
+        border-radius: var(--r-lg);
+        overflow: hidden;
+        background: var(--sand-lt);
+      }
+      .cal__row {
+        display: grid;
+        grid-template-columns: 72px 1fr;
+      }
+      .cal__gutter {
+        border-right: 1px solid var(--line-faint);
+        background: var(--sand-lt);
+      }
+      .cal__days {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+      }
+      .cal__dayhdr {
+        padding: var(--s3) var(--s2) var(--s2);
+        border-left: 1px solid var(--line-faint);
+        border-bottom: 1px solid var(--line-faint);
+        transition: background var(--t-fast) var(--e-out);
+      }
+      .cal__dayhdr:first-child {
+        border-left: 0;
+      }
+      .cal__dayhdr:hover {
+        background: var(--paper);
+      }
+      .cal__dow {
+        font-size: 10px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: var(--ink-2);
+      }
+      .cal__date {
+        font-family: var(--serif);
+        font-size: 26px;
+        font-weight: 300;
+        letter-spacing: 0;
+        line-height: 1.15;
+        margin-top: 4px;
+      }
+      .cal__dow--sat {
+        color: var(--c-hotel);
+      }
+      .cal__dow--sun {
+        color: var(--c-food);
+      }
+
+      .cal__allday-label,
+      .cal__hdr-gutter {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        padding: 0 12px;
+        font-size: 9.5px;
+        letter-spacing: 1.6px;
+        text-transform: uppercase;
+        color: var(--ink-2);
+        border-bottom: 1px solid var(--line-faint);
+      }
+      .cal__hdr-gutter {
+        min-height: 88px;
+      }
+      .cal__allday-label {
+        min-height: 50px;
+      }
+      .cal__allday-cell {
+        border-left: 1px solid var(--line-faint);
+        border-bottom: 1px solid var(--line-faint);
+        padding: 7px;
+        min-height: 50px;
+      }
+      .cal__allday-cell:first-child {
+        border-left: 0;
+      }
+      .allday-pill {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 6px 10px;
+        font-size: 11px;
+        letter-spacing: 0.3px;
+        color: var(--tx);
+        background: var(--bg);
+        border-left: 3px solid var(--bar);
+        border-radius: var(--r-xs);
+        white-space: nowrap;
+        overflow: hidden;
+        transition: transform var(--t-fast) var(--e-out);
+      }
+      .allday-pill .ico {
+        color: var(--bar);
+      }
+      .allday-pill:hover {
+        transform: translateX(3px);
+      }
+      .allday-pill span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .cal__slot {
+        height: 44px;
+        text-align: right;
+        padding: 0 12px;
+        font-size: 10.5px;
+        letter-spacing: 0.6px;
+        color: var(--ink-2);
+        font-variant-numeric: tabular-nums;
+        transform: translateY(-7px);
+      }
+      .cal__col {
+        position: relative;
+        border-left: 1px solid var(--line-faint);
+        background-image: repeating-linear-gradient(
+          to bottom,
+          transparent 0px,
+          transparent 43px,
+          var(--line-faint) 43px,
+          var(--line-faint) 44px
+        );
+      }
+      .cal__col:first-child {
+        border-left: 0;
+      }
+      .ev {
+        position: absolute;
+        overflow: hidden;
+        padding: 5px 8px;
+        background: var(--bg);
+        color: var(--tx);
+        border-left: 3px solid var(--bar);
+        border-radius: var(--r-xs);
+        cursor: pointer;
+        opacity: 0;
+        animation: riseIn 0.6s var(--e-out) forwards;
+        animation-delay: var(--d, 0s);
+        transition: box-shadow var(--t-fast) var(--e-out),
+          transform var(--t-fast) var(--e-out);
+      }
+      .ev:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 14px rgba(49, 49, 49, 0.14);
+        z-index: 5;
+      }
+      .ev__hd {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        color: var(--bar);
+      }
+      .ev__hd .ico {
+        width: 11px;
+        height: 11px;
+        stroke-width: 1.6;
+      }
+      .ev__t {
+        font-size: 9.5px;
+        letter-spacing: 0.5px;
+        font-variant-numeric: tabular-nums;
+      }
+      .ev__n {
+        font-size: 11.5px;
+        letter-spacing: 0.2px;
+        line-height: 1.3;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        margin-top: 1px;
+      }
+
+      /* カテゴリはカスタムプロパティのみを供給し、面の塗り方は各コンポーネントに委ねる */
+      .cat-move {
+        --bar: var(--c-move);
+        --bg: var(--c-move-bg);
+        --tx: var(--c-move-tx);
+      }
+      .cat-sight {
+        --bar: var(--c-sight);
+        --bg: var(--c-sight-bg);
+        --tx: var(--c-sight-tx);
+      }
+      .cat-food {
+        --bar: var(--c-food);
+        --bg: var(--c-food-bg);
+        --tx: var(--c-food-tx);
+      }
+      .cat-hotel {
+        --bar: var(--c-hotel);
+        --bg: var(--c-hotel-bg);
+        --tx: var(--c-hotel-tx);
+      }
+      .cat-shop {
+        --bar: var(--c-shop);
+        --bg: var(--c-shop-bg);
+        --tx: var(--c-shop-tx);
+      }
+
+      .mapsec {
+        margin-top: var(--s7);
+        display: grid;
+        grid-template-columns: 1fr 400px;
+        gap: 1px;
+        background: var(--line-faint);
+        border: 1px solid var(--line-faint);
+        border-radius: var(--r-lg);
+        overflow: hidden;
+      }
+      #leaflet-map {
+        height: 560px;
+        background: var(--sand-lt);
+      }
+      .loclist {
+        background: var(--sand-lt);
+        max-height: 560px;
+        overflow-y: auto;
+      }
+      .loc {
+        position: relative;
+        display: grid;
+        grid-template-columns: 84px 1fr 20px;
+        gap: var(--s2);
+        align-items: center;
+        padding: var(--s2);
+        border-bottom: 1px solid var(--line-faint);
+        cursor: pointer;
+        transition: background var(--t-fast) var(--e-out),
+          padding-left var(--t-fast) var(--e-out);
+      }
+      .loc:hover {
+        background: var(--paper);
+        padding-left: 20px;
+      }
+      .loc__thumbwrap {
+        width: 84px;
+        height: 66px;
+        overflow: hidden;
+        border-radius: var(--r-sm);
+        background: var(--line-faint);
+      }
+      .loc__thumb {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        filter: saturate(0.82);
+        transition: transform var(--t-slow) var(--e-out),
+          filter var(--t-slow) var(--e-out);
+      }
+      .loc:hover .loc__thumb {
+        transform: scale(1.08);
+        filter: saturate(1);
+      }
+      .loc__cat {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 9.5px;
+        letter-spacing: 1.6px;
+        text-transform: uppercase;
+      }
+      .loc__name {
+        font-family: var(--serif);
+        font-size: 16px;
+        letter-spacing: 0.4px;
+        line-height: 1.35;
+        margin: 3px 0;
+      }
+      .loc__meta {
+        font-size: 11px;
+        letter-spacing: 0.3px;
+        color: var(--ink-2);
+        font-variant-numeric: tabular-nums;
+      }
+      .loc__go {
+        opacity: 0;
+        transform: translateX(-6px);
+        transition: all var(--t-fast) var(--e-out);
+        color: var(--ink-2);
+      }
+      .loc:hover .loc__go {
+        opacity: 1;
+        transform: none;
+      }
+      .pin {
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        border-radius: var(--r-pill);
+        border: 1.5px solid rgba(253, 249, 245, 0.9);
+        box-shadow: 0 2px 8px rgba(49, 49, 49, 0.22);
+        transition: transform 0.25s var(--e-out);
+      }
+      .pin:hover {
+        transform: scale(1.18);
+      }
+      .pin svg {
+        width: 15px;
+        height: 15px;
+        stroke: currentColor;
+        stroke-width: 1.4;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        fill: none;
+      }
+
+      /* ══════════════════════════════════════════════════════════
+         EVENT SHEET — 右から出る詳細／編集シート
+         ══════════════════════════════════════════════════════════ */
+      .sheet-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(49, 49, 49, 0.4);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity var(--t-mid) var(--e-out);
+        z-index: 940;
+      }
+      .sheet-overlay.is-open {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .sheet {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: min(460px, 100vw);
+        background: var(--sand-lt);
+        border-left: 1px solid var(--line-soft);
+        transform: translateX(101%);
+        transition: transform var(--t-mid) var(--e-out);
+        z-index: 950;
+        display: flex;
+        flex-direction: column;
+        overscroll-behavior: contain;
+      }
+      .sheet.is-open {
+        transform: none;
+      }
+      .sheet__head {
+        display: flex;
+        align-items: center;
+        gap: var(--s2);
+        padding: var(--s3);
+        border-bottom: 1px solid var(--line-soft);
+      }
+      .sheet__head .eyebrow {
+        flex: 1;
+      }
+      .sheet__body {
+        flex: 1;
+        overflow-y: auto;
+        padding: var(--s3);
+      }
+      .sheet__foot {
+        display: flex;
+        gap: 10px;
+        padding: var(--s3);
+        border-top: 1px solid var(--line-soft);
+        background: var(--sand);
+      }
+      .sheet__foot .grow {
+        flex: 1;
+      }
+      .sheet__img {
+        width: 100%;
+        aspect-ratio: 16 / 10;
+        object-fit: cover;
+        border-radius: var(--r-md);
+        margin-bottom: var(--s3);
+      }
+
+      .fgrid {
+        display: grid;
+        gap: var(--s3);
+      }
+      .fgrid--2 {
+        grid-template-columns: 1fr 1fr;
+      }
+      .field2 label {
+        display: block;
+        font-size: 10px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: var(--ink-2);
+        margin-bottom: 7px;
+      }
+      .field2 .inp,
+      .field2 select,
+      .field2 textarea {
+        width: 100%;
+        padding: 10px 12px;
+        font-family: var(--sans);
+        font-size: 14px;
+        letter-spacing: 0.4px;
+        color: var(--ink);
+        background: var(--paper);
+        border: 1px solid var(--line-soft);
+        border-radius: var(--r-sm);
+        outline: none;
+        transition: border-color var(--t-fast) var(--e-out);
+      }
+      .field2 textarea {
+        min-height: 84px;
+        resize: vertical;
+        line-height: 1.6;
+      }
+      .field2 .inp:focus,
+      .field2 select:focus,
+      .field2 textarea:focus {
+        border-color: var(--ink);
+      }
+      .field2 .inp[aria-invalid="true"] {
+        border-color: var(--c-food);
+      }
+      .fhint {
+        font-size: 11.5px;
+        letter-spacing: 0.3px;
+        color: var(--ink-2);
+        margin-top: 6px;
+      }
+      .ferror {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 12px;
+        letter-spacing: 0.3px;
+        color: var(--c-food);
+        background: var(--c-food-bg);
+        border-radius: var(--r-sm);
+        padding: 10px 12px;
+      }
+      .switch {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        cursor: pointer;
+      }
+      .switch span {
+        font-size: 13px;
+        letter-spacing: 0.4px;
+      }
+      .catpick {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .catpick button {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 9px 14px;
+        font-size: 12px;
+        letter-spacing: 0.6px;
+        border: 1px solid var(--line-soft);
+        border-radius: var(--r-pill);
+        background: transparent;
+        color: var(--ink-2);
+        transition: all var(--t-fast) var(--e-out);
+      }
+      .catpick button:hover {
+        border-color: var(--ink);
+        color: var(--ink);
+      }
+      .catpick button[aria-pressed="true"] {
+        background: var(--bg);
+        border-color: var(--bar);
+        color: var(--tx);
+      }
+      .catpick button[aria-pressed="true"] .ico {
+        color: var(--bar);
+      }
+
+      .ev.is-editable {
+        cursor: pointer;
+      }
+      .ev.is-editable::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border: 1px dashed transparent;
+        border-radius: inherit;
+        transition: border-color var(--t-fast) var(--e-out);
+      }
+      .ev.is-editable:hover::after {
+        border-color: currentColor;
+      }
+
+      /* ══════════════════════════════════════════════════════════
+         05 DETAIL + COMMENTS
+         ══════════════════════════════════════════════════════════ */
+      .paneldemo {
+        display: grid;
+        grid-template-columns: 1fr 440px;
+        gap: var(--s7);
+        align-items: start;
+      }
+      .panel {
+        border: 1px solid var(--line-faint);
+        border-radius: var(--r-lg);
+        overflow: hidden;
+        background: var(--sand-lt);
+        position: sticky;
+        top: var(--s6);
+      }
+      .panel__imgwrap {
+        aspect-ratio: 16 / 10;
+        overflow: hidden;
+      }
+      .panel__img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        animation: slowZoom 2.4s var(--e-out) forwards;
+      }
+      .panel__body {
+        padding: var(--s4) var(--s3) var(--s5);
+      }
+      .panel__cat {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 7px 14px;
+        background: var(--bar);
+        color: var(--sand-lt);
+        border-radius: var(--r-pill);
+        font-size: 9.5px;
+        letter-spacing: 1.8px;
+        text-transform: uppercase;
+      }
+      .panel__title {
+        font-family: var(--serif);
+        font-size: 30px;
+        font-weight: 300;
+        letter-spacing: 0.2px;
+        line-height: 1.3;
+        margin: var(--s3) 0 0;
+      }
+      .panel__meta {
+        border-top: 1px solid var(--line-faint);
+        margin-top: var(--s4);
+      }
+      .panel__mrow {
+        display: grid;
+        grid-template-columns: 26px 96px 1fr;
+        gap: var(--s2);
+        padding: 13px 0;
+        border-bottom: 1px solid var(--line-faint);
+        font-size: 13px;
+        letter-spacing: 0.4px;
+        align-items: start;
+      }
+      .panel__mrow .ico {
+        width: 16px;
+        height: 16px;
+        color: var(--ink-2);
+        margin-top: 2px;
+      }
+      .panel__mrow dt {
+        font-size: 10px;
+        letter-spacing: 1.8px;
+        text-transform: uppercase;
+        color: var(--ink-2);
+        padding-top: 3px;
+      }
+      .panel__mrow dd {
+        margin: 0;
+      }
+      .panel__mrow a {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 2px;
+        transition: border-color var(--t-fast) var(--e-out);
+      }
+      .panel__mrow a:hover {
+        border-color: var(--ink);
+      }
+
+      .cmt {
+        border-top: 1px solid var(--line-soft);
+        margin-top: var(--s4);
+        padding-top: var(--s3);
+      }
+      .cmt__head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: var(--s2);
+      }
+      .cmt__head .eyebrow {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .cmt__list {
+        margin: var(--s3) 0 0;
+        padding: 0;
+        list-style: none;
+      }
+      .cmt__item {
+        position: relative;
+        padding: 2px 0 2px var(--s3);
+        margin-bottom: var(--s3);
+      }
+      .cmt__item::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 4px;
+        bottom: 4px;
+        width: 1px;
+        background: var(--line);
+        transition: background var(--t-fast) var(--e-out);
+      }
+      .cmt__item:hover::before {
+        background: var(--ink);
+      }
+      .cmt__who {
+        font-size: 9.5px;
+        letter-spacing: 1.8px;
+        text-transform: uppercase;
+        color: var(--ink-2);
+      }
+      .cmt__txt {
+        font-size: 13.5px;
+        letter-spacing: 0.4px;
+        line-height: 1.7;
+        margin: 5px 0 0;
+      }
+      .cmt__form {
+        display: flex;
+        margin-top: var(--s3);
+        border: 1px solid var(--line-soft);
+        border-radius: var(--r-pill);
+        overflow: hidden;
+        transition: border-color var(--t-fast) var(--e-out);
+      }
+      .cmt__form:focus-within {
+        border-color: var(--ink);
+      }
+      .cmt__form input {
+        flex: 1;
+        padding: 14px var(--s2);
+        border: 0;
+        background: transparent;
+        font-family: var(--sans);
+        font-size: 13px;
+        letter-spacing: 0.4px;
+        outline: none;
+        color: var(--ink);
+      }
+      .cmt__form button {
+        position: relative;
+        border: 0;
+        border-left: 1px solid var(--line-soft);
+        background: transparent;
+        padding: 0 var(--s3);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 10px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: var(--ink);
+        overflow: hidden;
+        isolation: isolate;
+        transition: color var(--t-fast) var(--e-out);
+      }
+      .cmt__form button::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: var(--ink);
+        transform: scaleX(0);
+        transform-origin: left;
+        transition: transform var(--t-fast) var(--e-out);
+        z-index: -1;
+      }
+      .cmt__form button:hover {
+        color: var(--reverse);
+      }
+      .cmt__form button:hover::before {
+        transform: scaleX(1);
+      }
+
+      /* ══════════════════════════════════════════════════════════
+         06 PACKING
+         ══════════════════════════════════════════════════════════ */
+      .pack__progress {
+        display: flex;
+        gap: var(--s7);
+        flex-wrap: wrap;
+        padding-bottom: var(--s6);
+      }
+      .prog__label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 10px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: var(--ink-2);
+      }
+      .prog__n {
+        font-family: var(--serif);
+        font-size: 40px;
+        font-weight: 200;
+        letter-spacing: 0;
+        margin: 12px 0 var(--s2);
+        line-height: 1;
+      }
+      .prog__n small {
+        font-size: 16px;
+        color: var(--ink-2);
+      }
+      .prog__bar {
+        width: 220px;
+        height: 4px;
+        background: var(--line-soft);
+        border-radius: var(--r-pill);
+        position: relative;
+        overflow: hidden;
+      }
+      .prog__bar span {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        background: var(--ink);
+        border-radius: var(--r-pill);
+        transition: width var(--t-slow) var(--e-out);
+      }
+
+      /* ── ツールバー ── */
+      .pack__toolbar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        padding: var(--s3) 0;
+        border-top: 1px solid var(--line-soft);
+        border-bottom: 1px solid var(--line-soft);
+        margin-bottom: var(--s4);
+      }
+      .pack__toolbar .spacer {
+        margin-left: auto;
+      }
+      .tbtn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 16px;
+        font-size: 11px;
+        letter-spacing: 1.2px;
+        text-transform: uppercase;
+        border: 1px solid var(--line-soft);
+        border-radius: var(--r-pill);
+        background: transparent;
+        color: var(--ink-2);
+        transition: color var(--t-fast) var(--e-out),
+          border-color var(--t-fast) var(--e-out),
+          background var(--t-fast) var(--e-out);
+      }
+      .tbtn:hover {
+        color: var(--ink);
+        border-color: var(--ink);
+      }
+      .tbtn[aria-pressed="true"] {
+        background: var(--ink);
+        border-color: var(--ink);
+        color: var(--sand);
+      }
+      .tbtn--danger:hover {
+        color: var(--c-food);
+        border-color: var(--c-food);
+      }
+
+      /* ── テーブル ── */
+      .pack__table {
+        border: 1px solid var(--line-faint);
+        border-radius: var(--r-lg);
+        overflow: hidden;
+        background: var(--sand-lt);
+      }
+      .pack__thead,
+      .pack__row {
+        display: grid;
+        grid-template-columns: var(--pack-cols);
+        align-items: center;
+      }
+      :root {
+        --pack-cols: 1fr 110px 110px 56px;
+      }
+      .is-edit {
+        --pack-cols: 34px 1fr 110px 110px 112px;
+      }
+      .pack__thead {
+        border-bottom: 1px solid var(--line);
+        background: var(--sand);
+      }
+      .pack__thead > div {
+        padding: var(--s2);
+        font-size: 10px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: var(--ink-2);
+        text-align: center;
+      }
+      .pack__thead > div.left {
+        text-align: left;
+      }
+
+      .pgroup {
+        border-bottom: 1px solid var(--line-faint);
+      }
+      .pgroup:last-of-type {
+        border-bottom: 0;
+      }
+      .pgroup__head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: var(--s4) var(--s2) 12px;
+        border-bottom: 1px solid var(--line-faint);
+      }
+      .pgroup__head .ico--cat {
+        color: var(--ink-2);
+      }
+      .pgroup__name {
+        font-family: var(--serif);
+        font-size: 19px;
+        font-weight: 300;
+        letter-spacing: 0.6px;
+      }
+      .pgroup__count {
+        margin-left: auto;
+        font-size: 10px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: var(--ink-2);
+        white-space: nowrap;
+      }
+      .pgroup__items:empty::after {
+        content: "この区分にはまだ項目がありません";
+        display: block;
+        padding: var(--s3) var(--s2);
+        font-size: 12px;
+        letter-spacing: 0.3px;
+        color: var(--line);
+      }
+      .pgroup__items.is-dropzone {
+        background: var(--c-hotel-bg);
+      }
+
+      .pack__row {
+        border-bottom: 1px solid var(--line-faint);
+        transition: background var(--t-fast) var(--e-out);
+      }
+      .pack__row:last-child {
+        border-bottom: 0;
+      }
+      .pack__row:hover {
+        background: var(--paper);
+      }
+      .pack__name {
+        padding: var(--s2);
+        font-size: 14.5px;
+        letter-spacing: 0.5px;
+        min-width: 0;
+      }
+      .pack__name em {
+        display: block;
+        font-style: normal;
+        font-size: 11.5px;
+        letter-spacing: 0.3px;
+        color: var(--ink-2);
+        margin-top: 3px;
+      }
+      .pack__cell {
+        display: flex;
+        justify-content: center;
+        padding: var(--s2) 0;
+      }
+      .pack__note {
+        border: 0;
+        background: transparent;
+        color: var(--line);
+        display: flex;
+        justify-content: center;
+        transition: color var(--t-fast) var(--e-out),
+          transform var(--t-fast) var(--e-out);
+      }
+      .pack__row:hover .pack__note {
+        color: var(--ink-2);
+      }
+      .pack__note:hover {
+        color: var(--ink);
+        transform: scale(1.12);
+      }
+
+      /* ── 編集モード ── */
+      .handle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: var(--s2) 0;
+        color: var(--line);
+        cursor: grab;
+        touch-action: none; /* タッチでドラッグ中にページがスクロールしないように */
+        transition: color var(--t-fast) var(--e-out);
+      }
+      .handle:hover {
+        color: var(--ink);
+      }
+      .handle:active {
+        cursor: grabbing;
+      }
+      .rowacts {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 2px;
+        padding-right: 10px;
+      }
+      .rowbtn {
+        display: grid;
+        place-items: center;
+        width: 28px;
+        height: 28px;
+        border: 0;
+        border-radius: var(--r-pill);
+        background: transparent;
+        color: var(--ink-2);
+        transition: background var(--t-fast) var(--e-out),
+          color var(--t-fast) var(--e-out);
+      }
+      .rowbtn:hover {
+        background: var(--sand);
+        color: var(--ink);
+      }
+      .rowbtn:disabled {
+        opacity: 0.25;
+        pointer-events: none;
+      }
+      .rowbtn--del:hover {
+        background: var(--c-food-bg);
+        color: var(--c-food);
+      }
+      .rowbtn--confirm {
+        width: auto;
+        padding: 0 12px;
+        font-size: 10px;
+        letter-spacing: 1.4px;
+        text-transform: uppercase;
+        background: var(--c-food);
+        color: var(--sand-lt);
+      }
+      .rowbtn--confirm:hover {
+        background: var(--c-food-tx);
+        color: var(--sand-lt);
+      }
+
+      .inp {
+        width: 100%;
+        padding: 7px 10px;
+        font-family: inherit;
+        font-size: 14px;
+        letter-spacing: 0.5px;
+        color: var(--ink);
+        background: var(--paper);
+        border: 1px solid var(--line-soft);
+        border-radius: var(--r-xs);
+        outline: none;
+        transition: border-color var(--t-fast) var(--e-out);
+      }
+      .inp:focus {
+        border-color: var(--ink);
+      }
+      .inp--note {
+        margin-top: 5px;
+        font-size: 12px;
+        color: var(--ink-2);
+      }
+      .inp--group {
+        font-family: var(--serif);
+        font-size: 18px;
+        font-weight: 300;
+        max-width: 320px;
+      }
+
+      .pack__row.is-dragging,
+      .pgroup.is-dragging {
+        opacity: 0.45;
+        background: var(--paper);
+      }
+      .pgroup.is-dragging {
+        outline: 1px dashed var(--line);
+      }
+
+      .pack__add {
+        display: flex;
+        gap: 10px;
+        padding: 12px var(--s2);
+        flex-wrap: wrap;
+      }
+      .addbtn {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 8px 14px;
+        font-size: 11px;
+        letter-spacing: 1.2px;
+        text-transform: uppercase;
+        border: 1px dashed var(--line);
+        border-radius: var(--r-pill);
+        background: transparent;
+        color: var(--ink-2);
+        transition: all var(--t-fast) var(--e-out);
+      }
+      .addbtn:hover {
+        border-style: solid;
+        border-color: var(--ink);
+        color: var(--ink);
+      }
+      .pack__footer {
+        padding: var(--s3) var(--s2);
+        border-top: 1px solid var(--line-faint);
+        background: var(--sand);
+      }
+
+      /* ══════════════════════════════════════════════════════════
+         07 ARCHIVE
+         ══════════════════════════════════════════════════════════ */
+      .search {
+        display: flex;
+        align-items: center;
+        border-bottom: 1px solid var(--ink);
+        gap: var(--s2);
+        padding-bottom: var(--s2);
+      }
+      .search > .ico {
+        color: var(--ink-2);
+      }
+      .search input {
+        flex: 1;
+        padding: var(--s2) 0;
+        border: 0;
+        background: transparent;
+        font-family: var(--serif);
+        font-size: clamp(22px, 2.6vw, 32px);
+        font-weight: 300;
+        letter-spacing: 0.3px;
+        outline: none;
+        color: var(--ink);
+      }
+      .search input::placeholder {
+        color: var(--line);
+      }
+      .filters {
+        display: flex;
+        gap: 10px;
+        margin-top: var(--s3);
+        flex-wrap: wrap;
+      }
+      .hits {
+        margin-top: var(--s6);
+      }
+      .hits__count {
+        display: flex;
+        align-items: baseline;
+        gap: var(--s2);
+        padding-bottom: var(--s2);
+        border-bottom: 1px solid var(--line);
+      }
+      .hit {
+        display: grid;
+        grid-template-columns: 130px 1fr 170px;
+        gap: var(--s4);
+        padding: var(--s4) 0;
+        border-bottom: 1px solid var(--line-faint);
+        cursor: pointer;
+        transition: background var(--t-mid) var(--e-out),
+          padding var(--t-mid) var(--e-out);
+      }
+      .hit:hover {
+        background: var(--sand-lt);
+        border-radius: var(--r-md);
+        padding-left: var(--s3);
+        padding-right: var(--s3);
+      }
+      .hit__src b {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 7px 13px;
+        border-radius: var(--r-pill);
+        color: var(--sand-lt);
+        font-size: 9.5px;
+        font-weight: 500;
+        letter-spacing: 1.8px;
+        text-transform: uppercase;
+      }
+      .src-gmail {
+        background: var(--c-hotel);
+      }
+      .src-line {
+        background: var(--c-move);
+      }
+      .hit__title {
+        font-family: var(--serif);
+        font-size: 21px;
+        font-weight: 400;
+        letter-spacing: 0.3px;
+        line-height: 1.4;
+        margin: 0;
+        transition: transform var(--t-mid) var(--e-out);
+      }
+      .hit:hover .hit__title {
+        transform: translateX(4px);
+      }
+      .hit__snip {
+        font-size: 13.5px;
+        letter-spacing: 0.4px;
+        line-height: 1.75;
+        color: var(--ink-2);
+        margin: var(--s2) 0 0;
+      }
+      .hit__snip mark {
+        background: transparent;
+        color: var(--ink);
+        box-shadow: inset 0 -7px 0 rgba(154, 91, 67, 0.22);
+      }
+      .hit__date {
+        font-size: 11.5px;
+        letter-spacing: 0.3px;
+        color: var(--ink-2);
+        font-variant-numeric: tabular-nums;
+        text-align: right;
+        line-height: 1.8;
+      }
+
+      footer.mockfoot {
+        background: var(--ink);
+        color: var(--reverse);
+        padding: var(--s8) var(--gut);
+        text-align: center;
+      }
+      footer.mockfoot .eyebrow {
+        color: rgba(243, 238, 231, 0.5);
+      }
+
+      /* ══════════════════════════════════════════════════════════
+         RESPONSIVE
+         ══════════════════════════════════════════════════════════ */
+      @media (max-width: 1180px) {
+        .mapsec,
+        .paneldemo,
+        .menu__grid,
+        .login {
+          grid-template-columns: 1fr;
+        }
+        .panel {
+          position: static;
+        }
+        .login__art {
+          min-height: 340px;
+        }
+        .shead {
+          grid-template-columns: 1fr;
+          gap: var(--s3);
+        }
+        .shead__idx {
+          padding-top: 0;
+        }
+        .shead__idx .n {
+          display: inline-block;
+          margin-right: var(--s2);
+          margin-bottom: 0;
+          font-size: 26px;
+          vertical-align: -3px;
+        }
+      }
+      @media (max-width: 760px) {
+        :root {
+          --s8: 96px;
+        }
+        .scale__row {
+          grid-template-columns: 1fr;
+          gap: var(--s2);
+        }
+        .hit {
+          grid-template-columns: 1fr;
+          gap: var(--s2);
+        }
+        .hit__date {
+          text-align: left;
+        }
+        :root {
+          --pack-cols: 1fr 58px 58px 40px;
+        }
+        .is-edit {
+          --pack-cols: 28px 1fr 52px 52px 96px;
+        }
+        .pack__progress {
+          gap: var(--s5);
+        }
+        .rowacts {
+          padding-right: 4px;
+        }
+        .rowbtn {
+          width: 26px;
+          height: 26px;
+        }
+
+        /* カレンダーは横スクロール。時間列は左に貼り付けたまま残す */
+        .cal {
+          overflow-x: auto;
+          overscroll-behavior-x: contain;
+        }
+        .cal__row {
+          grid-template-columns: 54px 1fr;
+          min-width: 640px;
+        }
+        .cal__gutter,
+        .cal__hdr-gutter,
+        .cal__allday-label {
+          position: sticky;
+          left: 0;
+          z-index: 4;
+          background: var(--sand-lt);
+        }
+        .cal__date {
+          font-size: 21px;
+        }
+        .cal__slot {
+          padding: 0 8px;
+          font-size: 10px;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- ══════════════ INLINE SVG SPRITE ══════════════ -->
+    <svg class="sprite" aria-hidden="true" focusable="false">
+      <symbol id="i-flight" viewBox="0 0 24 24">
+        <path d="M21.5 2.5 2.6 10.1l7.3 2.9m11.6-10.5L14 21.4l-2.8-8.4m10.3-10.5-10.3 10.5" />
+      </symbol>
+      <symbol id="i-camera" viewBox="0 0 24 24">
+        <path d="M3 8.6h3.5L8 6h8l1.5 2.6H21v10.4H3z" />
+        <circle cx="12" cy="13.4" r="3.2" />
+      </symbol>
+      <symbol id="i-food" viewBox="0 0 24 24">
+        <path d="M7.4 3v5.6a2.2 2.2 0 0 0 4.4 0V3M9.6 8.6V21M16.6 3c-1.5 1.5-2.2 3.4-2.2 5.4 0 1.7.9 2.8 2.2 3.1V21" />
+      </symbol>
+      <symbol id="i-hotel" viewBox="0 0 24 24">
+        <path d="M3 6.5v12" />
+        <path d="M3 13.2h18V18.5" />
+        <path d="M6.4 10.4h4.2" />
+        <path d="M13.4 13.2v-2.8h5.1A2.5 2.5 0 0 1 21 12.9" />
+      </symbol>
+      <symbol id="i-shop" viewBox="0 0 24 24">
+        <path d="M5.2 8h13.6l1 12H4.2z" />
+        <path d="M9 8V6.2a3 3 0 0 1 6 0V8" />
+      </symbol>
+      <symbol id="i-car" viewBox="0 0 24 24">
+        <path d="M4.6 17.2v2.2h3v-2.2M16.4 17.2v2.2h3v-2.2" />
+        <path d="M3 17.2v-4.6L5.1 7h13.8l2.1 5.6v4.6z" />
+        <path d="M3 12.6h18" />
+        <path d="M6.9 14.9h.01M17.1 14.9h.01" />
+      </symbol>
+      <symbol id="i-boat" viewBox="0 0 24 24">
+        <path d="M2.8 18.2c1.6 0 1.6 1.6 3.2 1.6s1.6-1.6 3.2-1.6 1.6 1.6 3.2 1.6 1.6-1.6 3.2-1.6 1.6 1.6 3.2 1.6" />
+        <path d="M4.6 15.6 6.2 9.5h11.6l1.6 6.1z" />
+        <path d="M12 9.5V4.6H7.8" />
+      </symbol>
+      <symbol id="i-arrow-right" viewBox="0 0 24 24">
+        <path d="M3.5 12h17m-6.5-6.5L20.5 12 14 18.5" />
+      </symbol>
+      <symbol id="i-chat" viewBox="0 0 24 24">
+        <path d="M4 4.8h16v11.4H9.4L4 20.4z" />
+      </symbol>
+      <symbol id="i-search" viewBox="0 0 24 24">
+        <circle cx="10.8" cy="10.8" r="6.6" />
+        <path d="m15.7 15.7 4.6 4.6" />
+      </symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24">
+        <path d="M4.8 10.8h14.4v9.4H4.8z" />
+        <path d="M8.4 10.8V7.4a3.6 3.6 0 0 1 7.2 0v3.4" />
+      </symbol>
+      <symbol id="i-calendar" viewBox="0 0 24 24">
+        <path d="M3.8 5.8h16.4v14.4H3.8z" />
+        <path d="M3.8 10.2h16.4M8.4 3.4v4.4M15.6 3.4v4.4" />
+      </symbol>
+      <symbol id="i-pin" viewBox="0 0 24 24">
+        <path d="M12 21.2s6.6-6.4 6.6-10.8a6.6 6.6 0 1 0-13.2 0C5.4 14.8 12 21.2 12 21.2Z" />
+        <circle cx="12" cy="10.4" r="2.5" />
+      </symbol>
+      <symbol id="i-clock" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="8.6" />
+        <path d="M12 6.6v5.7l3.6 2.1" />
+      </symbol>
+      <symbol id="i-external" viewBox="0 0 24 24">
+        <path d="M13.6 3.8h6.6v6.6M20.2 3.8 10.6 13.4" />
+        <path d="M17.6 14v6.2H3.8V6.4H10" />
+      </symbol>
+      <symbol id="i-luggage" viewBox="0 0 24 24">
+        <path d="M5.8 7.6h12.4v12.6H5.8z" />
+        <path d="M9.4 7.6V4.4h5.2v3.2M9.6 11.2v5.4M14.4 11.2v5.4" />
+      </symbol>
+      <symbol id="i-mail" viewBox="0 0 24 24">
+        <path d="M3 5.8h18v12.4H3z" />
+        <path d="m3 6.6 9 6.4 9-6.4" />
+      </symbol>
+      <symbol id="i-plug" viewBox="0 0 24 24">
+        <path d="M8.6 3.4v5.2M15.4 3.4v5.2" />
+        <path d="M5.6 8.6h12.8v3.2a6.4 6.4 0 0 1-12.8 0z" />
+        <path d="M12 18.2v3.4" />
+      </symbol>
+      <symbol id="i-key" viewBox="0 0 24 24">
+        <circle cx="8" cy="8" r="4.4" />
+        <path d="m11.2 11.2 8.4 8.4M17 17l2-2M14.4 14.4l1.8-1.8" />
+      </symbol>
+      <symbol id="i-note" viewBox="0 0 24 24">
+        <path d="M4.6 3.8h14.8v16.4H4.6z" />
+        <path d="M8 8.4h8M8 12h8M8 15.6h4.6" />
+      </symbol>
+      <symbol id="i-check" viewBox="0 0 24 24">
+        <path d="m4.5 12.6 5.2 5.2L19.5 6.6" />
+      </symbol>
+      <symbol id="i-scroll" viewBox="0 0 24 24">
+        <path d="M12 3.6v16.8M6.2 14.6 12 20.4l5.8-5.8" />
+      </symbol>
+      <symbol id="i-grip" viewBox="0 0 24 24">
+        <path d="M9 5.5h.01M15 5.5h.01M9 12h.01M15 12h.01M9 18.5h.01M15 18.5h.01" />
+      </symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24">
+        <path d="M12 4.8v14.4M4.8 12h14.4" />
+      </symbol>
+      <symbol id="i-x" viewBox="0 0 24 24">
+        <path d="M6 6l12 12M18 6 6 18" />
+      </symbol>
+      <symbol id="i-up" viewBox="0 0 24 24">
+        <path d="M12 19V5.4M5.8 11.6 12 5.4l6.2 6.2" />
+      </symbol>
+      <symbol id="i-down" viewBox="0 0 24 24">
+        <path d="M12 5v13.6M5.8 12.4 12 18.6l6.2-6.2" />
+      </symbol>
+      <symbol id="i-edit" viewBox="0 0 24 24">
+        <path d="M16.4 3.9 20.1 7.6 8.3 19.4l-4.6.9.9-4.6z" />
+        <path d="M14.2 6.1 17.9 9.8" />
+      </symbol>
+      <symbol id="i-export" viewBox="0 0 24 24">
+        <path d="M12 15.6V3.6M7.4 8.2 12 3.6l4.6 4.6" />
+        <path d="M4.2 15.2v5.2h15.6v-5.2" />
+      </symbol>
+      <symbol id="i-import" viewBox="0 0 24 24">
+        <path d="M12 3.6v12M7.4 11l4.6 4.6L16.6 11" />
+        <path d="M4.2 15.2v5.2h15.6v-5.2" />
+      </symbol>
+      <symbol id="i-reset" viewBox="0 0 24 24">
+        <path d="M4.2 12a7.8 7.8 0 1 0 2.5-5.7" />
+        <path d="M3.6 4.8v4.4H8" />
+      </symbol>
+    </svg>
+
+    <div class="progressbar" id="pbar"></div>
+
+    <nav class="mocknav">
+      <b>Aman mock v2</b>
+      <a href="#tokens">01 tokens</a>
+      <a href="#login">02 login</a>
+      <a href="#menu">03 menu</a>
+      <a href="#schedule">04 schedule</a>
+      <a href="#panel">05 detail + comment</a>
+      <a href="#packing">06 packing</a>
+      <a href="#archive">07 search</a>
+    </nav>
+
+    <!-- ══════════════ 01 TOKENS ══════════════ -->
+    <section id="tokens">
+      <div class="screen__tag">
+        <span>01</span><span>Design tokens — aman.com 実測値ベース</span>
+      </div>
+      <div class="wrap sec">
+        <div class="shead reveal">
+          <div class="shead__idx"><span class="n">01</span>Foundations</div>
+          <div>
+            <h2 class="h2 lines">
+              <span class="ln"><i>無彩色を基調に、</i></span>
+              <span class="ln"><i>カテゴリのみ低彩度の土系</i></span>
+            </h2>
+            <p class="body" style="margin-top: var(--s3)">
+              Aman は彩色を一切持たないため、カレンダーの識別に必要な 5
+              色だけをタイの素材（チーク・土・水）から低彩度で派生させました。
+            </p>
+          </div>
+        </div>
+
+        <div class="tok__grid reveal">
+          <div class="swatch">
+            <div class="swatch__chip" style="background: #f3eee7"></div>
+            <div class="swatch__name">sand</div>
+            <div class="swatch__hex">#F3EEE7</div>
+          </div>
+          <div class="swatch">
+            <div class="swatch__chip" style="background: #fdf9f5"></div>
+            <div class="swatch__name">sand light</div>
+            <div class="swatch__hex">#FDF9F5</div>
+          </div>
+          <div class="swatch">
+            <div class="swatch__chip" style="background: #313131"></div>
+            <div class="swatch__name">ink</div>
+            <div class="swatch__hex">#313131</div>
+          </div>
+          <div class="swatch">
+            <div class="swatch__chip" style="background: #585858"></div>
+            <div class="swatch__name">ink 2</div>
+            <div class="swatch__hex">#585858</div>
+          </div>
+          <div class="swatch">
+            <div class="swatch__chip" style="background: #aaa6a3"></div>
+            <div class="swatch__name">line</div>
+            <div class="swatch__hex">#AAA6A3</div>
+          </div>
+          <div class="swatch">
+            <div
+              class="swatch__chip"
+              style="background: linear-gradient(#3f5c50 0 46%, #d6e8db 46%)"
+            ></div>
+            <div class="swatch__name">移動</div>
+            <div class="swatch__hex">#3F5C50 / #D6E8DB</div>
+          </div>
+          <div class="swatch">
+            <div
+              class="swatch__chip"
+              style="background: linear-gradient(#7e5318 0 46%, #f6e7c0 46%)"
+            ></div>
+            <div class="swatch__name">観光</div>
+            <div class="swatch__hex">#7E5318 / #F6E7C0</div>
+          </div>
+          <div class="swatch">
+            <div
+              class="swatch__chip"
+              style="background: linear-gradient(#a54a2c 0 46%, #f9e2d7 46%)"
+            ></div>
+            <div class="swatch__name">食事</div>
+            <div class="swatch__hex">#A54A2C / #F9E2D7</div>
+          </div>
+          <div class="swatch">
+            <div
+              class="swatch__chip"
+              style="background: linear-gradient(#2f566f 0 46%, #d8e6f4 46%)"
+            ></div>
+            <div class="swatch__name">宿泊</div>
+            <div class="swatch__hex">#2F566F / #D8E6F4</div>
+          </div>
+          <div class="swatch">
+            <div
+              class="swatch__chip"
+              style="background: linear-gradient(#6a4c78 0 46%, #ede2f2 46%)"
+            ></div>
+            <div class="swatch__name">買物</div>
+            <div class="swatch__hex">#6A4C78 / #EDE2F2</div>
+          </div>
+        </div>
+        <p class="micro" style="margin-top: var(--s2)">
+          カテゴリ色は「アクセント（上）／ティント地（下）」の対で持ちます。カレンダーの面はティントで塗り、識別は縦バーとアイコンの濃色に任せる構成です。低彩度の濃色を大面積で並べると混色して濁るため。
+        </p>
+
+        <div class="hairline"></div>
+
+        <div class="shead reveal">
+          <div class="shead__idx"><span class="n">02</span>Type scale</div>
+          <div>
+            <div class="scale__row">
+              <div class="scale__spec">
+                Newsreader 200 / 96px<br />ls −.5px / lh 1.04
+              </div>
+              <div class="display">Thailand</div>
+            </div>
+            <div class="scale__row">
+              <div class="scale__spec">
+                Newsreader 300 / 42px<br />ls .2px / lh 1.28
+              </div>
+              <div class="h2">バンコクとパタヤ、六日間</div>
+            </div>
+            <div class="scale__row">
+              <div class="scale__spec">
+                Newsreader 400 / 19.6px<br />ls .98px / lh 1.45
+              </div>
+              <div class="h3">スパンニガ・イーティング・ルーム</div>
+            </div>
+            <div class="scale__row">
+              <div class="scale__spec">
+                Inter 300 / 14px<br />ls .8px / lh 1.7
+              </div>
+              <div class="body">
+                タイ東北料理の人気レストラン。ワット
+                アルンから徒歩圏で、昼どきは混雑するため予約推奨。
+              </div>
+            </div>
+            <div class="scale__row">
+              <div class="scale__spec">
+                Inter 500 / 10px<br />ls 2px / UPPERCASE
+              </div>
+              <div class="eyebrow">
+                Hotels &amp; Resorts — 大文字化はこのサイズのみ
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="hairline"></div>
+
+        <div class="shead reveal">
+          <div class="shead__idx"><span class="n">03</span>Icons</div>
+          <div>
+            <h2 class="h2">インライン SVG、線幅 1.0–1.25</h2>
+            <p class="body" style="margin-top: var(--s2)">
+              アイコンフォントは使いません。1
+              つのスプライトに収めて <code>&lt;use&gt;</code> で参照するので、追加リクエストはゼロ。線幅はヘアライン（1px
+              罫線）と揃えています。色は <code>currentColor</code> 追従。
+            </p>
+          </div>
+        </div>
+
+        <div class="icogrid reveal">
+          <div class="icocell"><svg class="ico"><use href="#i-flight" /></svg><span>flight</span></div>
+          <div class="icocell"><svg class="ico"><use href="#i-camera" /></svg><span>sight</span></div>
+          <div class="icocell"><svg class="ico"><use href="#i-food" /></svg><span>food</span></div>
+          <div class="icocell"><svg class="ico"><use href="#i-hotel" /></svg><span>hotel</span></div>
+          <div class="icocell"><svg class="ico"><use href="#i-shop" /></svg><span>shop</span></div>
+          <div class="icocell"><svg class="ico"><use href="#i-car" /></svg><span>car</span></div>
+          <div class="icocell"><svg class="ico"><use href="#i-boat" /></svg><span>ferry</span></div>
+          <div class="icocell"><svg class="ico"><use href="#i-pin" /></svg><span>pin</span></div>
+          <div class="icocell"><svg class="ico"><use href="#i-clock" /></svg><span>clock</span></div>
+          <div class="icocell"><svg class="ico"><use href="#i-calendar" /></svg><span>date</span></div>
+          <div class="icocell"><svg class="ico"><use href="#i-chat" /></svg><span>comment</span></div>
+          <div class="icocell"><svg class="ico"><use href="#i-search" /></svg><span>search</span></div>
+          <div class="icocell"><svg class="ico"><use href="#i-lock" /></svg><span>lock</span></div>
+          <div class="icocell"><svg class="ico"><use href="#i-key" /></svg><span>key</span></div>
+          <div class="icocell"><svg class="ico"><use href="#i-mail" /></svg><span>gmail</span></div>
+          <div class="icocell"><svg class="ico"><use href="#i-luggage" /></svg><span>packing</span></div>
+          <div class="icocell"><svg class="ico"><use href="#i-plug" /></svg><span>adapter</span></div>
+          <div class="icocell"><svg class="ico"><use href="#i-external" /></svg><span>external</span></div>
+        </div>
+
+        <div class="hairline"></div>
+
+        <div class="shead reveal">
+          <div class="shead__idx"><span class="n">04</span>Controls</div>
+          <div>
+            <div class="comps">
+              <button class="btn">
+                予約を確認 <svg class="ico ico--sm"><use href="#i-arrow-right" /></svg>
+              </button>
+              <button class="btn btn--ghost">
+                <svg class="ico ico--sm"><use href="#i-pin" /></svg> 地図で見る
+              </button>
+              <button class="chip" aria-pressed="true">すべて</button>
+              <button class="chip">食事</button>
+              <button class="chip">観光</button>
+              <label class="check">
+                <input type="checkbox" checked aria-label="サンプル1" />
+                <span class="check__box"
+                  ><svg viewBox="0 0 24 24"><path d="m4.5 12.6 5.2 5.2L19.5 6.6" /></svg
+                ></span>
+              </label>
+              <label class="check">
+                <input type="checkbox" aria-label="サンプル2" />
+                <span class="check__box"
+                  ><svg viewBox="0 0 24 24"><path d="m4.5 12.6 5.2 5.2L19.5 6.6" /></svg
+                ></span>
+              </label>
+            </div>
+            <p class="micro" style="margin-top: var(--s3)">
+              ホバーは 0.32〜0.55s の
+              <code>cubic-bezier(.22,1,.36,1)</code>。ボタンは地色が右へ抜け、チェックはパスを
+              0.42s で描画します。<code>prefers-reduced-motion</code>
+              では全アニメーションを無効化。
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════ 02 LOGIN ══════════════ -->
+    <section id="login">
+      <div class="screen__tag">
+        <span>02</span><span>index.html — パスワード入力</span>
+      </div>
+      <div class="login">
+        <div class="login__art">
+          <img
+            src="https://www.thailandtravel.or.jp/wp-content/uploads/2017/03/e80e52ddc3c9cafa754f4bcd981f509a-808x539.jpg"
+            alt=""
+          />
+          <div class="login__artcap">
+            <p class="eyebrow">Bangkok · Pattaya</p>
+            <p
+              class="display"
+              style="font-size: clamp(28px, 3.6vw, 46px); font-weight: 300"
+            >
+              12–17 August 2026
+            </p>
+          </div>
+        </div>
+        <div class="login__form">
+          <p class="eyebrow reveal">Private</p>
+          <h1 class="display lines reveal" style="--d: 0.1s; font-size: clamp(40px, 5vw, 68px)">
+            <span class="ln"><i>Thailand</i></span>
+            <span class="ln"><i>2026</i></span>
+          </h1>
+          <div class="rule drawline" style="--d: 0.35s"></div>
+          <p class="body reveal" style="--d: 0.4s">
+            旅程・持ち物・予約データをまとめています。合言葉を入力してください。
+          </p>
+
+          <div class="field reveal" style="--d: 0.5s">
+            <label for="pw">
+              <svg class="ico ico--sm"><use href="#i-key" /></svg> Passphrase
+            </label>
+            <input id="pw" type="password" value="passphrase" />
+            <div class="field__line"></div>
+          </div>
+
+          <div class="reveal" style="--d: 0.6s; margin-top: var(--s5)">
+            <button class="btn" style="width: 100%">
+              入る <svg class="ico ico--sm"><use href="#i-arrow-right" /></svg>
+            </button>
+          </div>
+
+          <p class="login__note reveal" style="--d: 0.7s">
+            <svg class="ico ico--sm"><use href="#i-lock" /></svg>
+            <span>
+              合言葉は検索データの復号キーを兼ねています。誤った合言葉では検索データを開けません。セッション中は再入力不要です。
+            </span>
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════ 03 MENU ══════════════ -->
+    <section id="menu">
+      <div class="screen__tag">
+        <span>03</span><span>index.html — 認証後のメニュー</span>
+      </div>
+      <div class="wrap sec">
+        <div class="menu__head reveal">
+          <div>
+            <p class="eyebrow">12–17 August 2026</p>
+            <h2 class="display lines" style="margin-top: var(--s2)">
+              <span class="ln"><i>Thailand</i></span>
+            </h2>
+          </div>
+          <p class="micro" style="text-align: right">
+            出発まで あと 3 日<br />依田家・篠崎家 合同
+          </p>
+        </div>
+
+        <div class="menu__grid">
+          <a class="card reveal" href="#schedule">
+            <div class="card__img">
+              <span class="card__num">01</span>
+              <img
+                src="https://www.thailandtravel.or.jp/wp-content/uploads/2017/07/241531199_1074098326727081_2405869266411881148_nSNSre.jpg"
+                alt=""
+              />
+            </div>
+            <div class="card__body">
+              <p class="eyebrow">Itinerary</p>
+              <h3 class="h3">
+                <svg class="ico"><use href="#i-calendar" /></svg> 旅程
+              </h3>
+              <p class="micro">
+                6日間のタイムライン、地図、各スポットの詳細とメモ。
+              </p>
+              <span class="swipe card__arrow"
+                >開く <svg class="ico ico--sm"><use href="#i-arrow-right" /></svg
+              ></span>
+            </div>
+          </a>
+
+          <a class="card reveal" href="#archive" style="--d: 0.12s">
+            <div class="card__img">
+              <span class="card__num">02</span>
+              <img
+                src="https://enjoy-bkk.com/wp-content/uploads/2016/10/EmQuartier-1200-628.jpg"
+                alt=""
+              />
+            </div>
+            <div class="card__body">
+              <p class="eyebrow">Archive</p>
+              <h3 class="h3">
+                <svg class="ico"><use href="#i-search" /></svg> データ検索
+              </h3>
+              <p class="micro">
+                Gmail と LINE から集めた予約・やりとりを横断検索。
+              </p>
+              <span class="swipe card__arrow"
+                >開く <svg class="ico ico--sm"><use href="#i-arrow-right" /></svg
+              ></span>
+            </div>
+          </a>
+
+          <a class="card reveal" href="#packing" style="--d: 0.24s">
+            <div class="card__img">
+              <span class="card__num">03</span>
+              <img
+                src="https://www.thailandtravel.or.jp/wp-content/uploads/2017/03/01871-808x538.jpg"
+                alt=""
+              />
+            </div>
+            <div class="card__body">
+              <p class="eyebrow">Packing</p>
+              <h3 class="h3">
+                <svg class="ico"><use href="#i-luggage" /></svg> 持ち物リスト
+              </h3>
+              <p class="micro">
+                二人分のチェックリスト。アイテムごとにメモを残せます。
+              </p>
+              <span class="swipe card__arrow"
+                >開く <svg class="ico ico--sm"><use href="#i-arrow-right" /></svg
+              ></span>
+            </div>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════ 04 SCHEDULE ══════════════ -->
+    <section id="schedule">
+      <div class="screen__tag">
+        <span>04</span><span>schedule.html — 旅程（実データ）</span>
+      </div>
+      <div class="wrap sec">
+        <div class="shead reveal">
+          <div class="shead__idx"><span class="n">01</span>Itinerary</div>
+          <div>
+            <h2 class="display lines" style="font-size: clamp(38px, 5vw, 72px)">
+              <span class="ln"><i>六日間の道のり</i></span>
+            </h2>
+          </div>
+        </div>
+
+        <div class="toolbar reveal">
+          <div class="toolbar__group">
+            <span class="eyebrow">Hours</span>
+            <select id="vs"></select>
+            <span class="micro">—</span>
+            <select id="ve"></select>
+          </div>
+          <div class="toolbar__group" id="catchips">
+            <span class="eyebrow">Category</span>
+          </div>
+          <div class="toolbar__group" style="margin-left: auto">
+            <button class="tbtn" id="evEditToggle" aria-pressed="false">
+              <svg class="ico ico--sm"><use href="#i-edit" /></svg>
+              <span id="evEditLabel">予定を編集</span>
+            </button>
+            <button class="tbtn" id="evAdd">
+              <svg class="ico ico--sm"><use href="#i-plus" /></svg> 予定を追加
+            </button>
+          </div>
+        </div>
+
+        <div class="cal" id="cal"></div>
+
+        <div class="mapsec reveal">
+          <div id="leaflet-map"></div>
+          <div class="loclist" id="loclist"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════ 05 DETAIL + COMMENTS ══════════════ -->
+    <section id="panel">
+      <div class="screen__tag">
+        <span>05</span
+        ><span>詳細パネル＋コメント（全ページ共通モジュール）</span>
+      </div>
+      <div class="wrap sec paneldemo">
+        <div>
+          <div class="reveal">
+            <p class="eyebrow">Comment module</p>
+            <h2 class="h2 lines" style="margin-top: var(--s2)">
+              <span class="ln"><i>同じ仕組みを 4 か所で</i></span>
+              <span class="ln"><i>使い回す</i></span>
+            </h2>
+            <p class="body" style="margin-top: var(--s3)">
+              コメントは「対象キー・本文・書いた人」だけを持つ単純な構造です。対象キーを
+              <code>event:wat-arun</code> / <code>day:1</code> /
+              <code>packing:adapter</code> / <code>global</code>
+              と切り替えるだけで、イベント・日付・持ち物・全体メモの 4
+              要件すべてを 1 つのモジュールで賄えます。
+            </p>
+          </div>
+
+          <div class="cmt reveal" style="--d: 0.1s">
+            <div class="cmt__head">
+              <p class="eyebrow">
+                <svg class="ico ico--sm"><use href="#i-calendar" /></svg>
+                Day 2 — 8/13(木) のメモ
+              </p>
+              <span class="micro num">2</span>
+            </div>
+            <ul class="cmt__list">
+              <li class="cmt__item">
+                <div class="cmt__who">Yuichi · 8/2 21:14</div>
+                <p class="cmt__txt">
+                  ワット
+                  アルンは階段が急なので、この日はスニーカーで。サンダルだと登れない。
+                </p>
+              </li>
+              <li class="cmt__item">
+                <div class="cmt__who">Partner · 8/3 09:02</div>
+                <p class="cmt__txt">
+                  午前は寺院2つで肩が出る服NG。羽織るもの1枚ずつ持つ。
+                </p>
+              </li>
+            </ul>
+            <form class="cmt__form" onsubmit="return false">
+              <input placeholder="この日についてメモを書く…" />
+              <button type="submit">
+                追加 <svg class="ico ico--sm"><use href="#i-arrow-right" /></svg>
+              </button>
+            </form>
+          </div>
+
+          <div class="cmt reveal" style="--d: 0.2s">
+            <div class="cmt__head">
+              <p class="eyebrow">
+                <svg class="ico ico--sm"><use href="#i-note" /></svg>
+                Global — 旅行全体のフリーメモ
+              </p>
+              <span class="micro num">1</span>
+            </div>
+            <ul class="cmt__list">
+              <li class="cmt__item">
+                <div class="cmt__who">Yuichi · 7/28 12:40</div>
+                <p class="cmt__txt">
+                  Grab は事前にアプリ入れてクレカ登録。空港の SIM は AIS
+                  のカウンターが一番早い。
+                </p>
+              </li>
+            </ul>
+            <form class="cmt__form" onsubmit="return false">
+              <input placeholder="思いついたことを書く…" />
+              <button type="submit">
+                追加 <svg class="ico ico--sm"><use href="#i-arrow-right" /></svg>
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <aside class="panel reveal" style="--d: 0.15s">
+          <div class="panel__imgwrap">
+            <img
+              class="panel__img"
+              src="https://www.thailandtravel.or.jp/wp-content/uploads/2017/03/e80e52ddc3c9cafa754f4bcd981f509a-808x539.jpg"
+              alt=""
+            />
+          </div>
+          <div class="panel__body">
+            <span class="panel__cat cat-sight">
+              <svg class="ico ico--sm"><use href="#i-camera" /></svg> 観光
+            </span>
+            <h3 class="panel__title">ワット アルン</h3>
+
+            <dl class="panel__meta">
+              <div class="panel__mrow">
+                <svg class="ico"><use href="#i-calendar" /></svg>
+                <dt>Date</dt>
+                <dd>8/13（木）</dd>
+              </div>
+              <div class="panel__mrow">
+                <svg class="ico"><use href="#i-clock" /></svg>
+                <dt>Time</dt>
+                <dd class="num">11:30 → 13:00</dd>
+              </div>
+              <div class="panel__mrow">
+                <svg class="ico"><use href="#i-pin" /></svg>
+                <dt>Location</dt>
+                <dd>Wat Arun Ratchawararam</dd>
+              </div>
+              <div class="panel__mrow">
+                <svg class="ico"><use href="#i-external" /></svg>
+                <dt>Link</dt>
+                <dd>
+                  <a href="#panel"
+                    >Google Maps
+                    <svg class="ico ico--sm"><use href="#i-external" /></svg
+                  ></a>
+                </dd>
+              </div>
+            </dl>
+
+            <div class="cmt">
+              <div class="cmt__head">
+                <p class="eyebrow">
+                  <svg class="ico ico--sm"><use href="#i-chat" /></svg> Notes
+                </p>
+                <span class="micro num">1</span>
+              </div>
+              <ul class="cmt__list">
+                <li class="cmt__item">
+                  <div class="cmt__who">Yuichi · 8/4 07:55</div>
+                  <p class="cmt__txt">
+                    渡し船は 5B。対岸のター・ティアン側から乗る。
+                  </p>
+                </li>
+              </ul>
+              <form class="cmt__form" onsubmit="return false">
+                <input placeholder="このスポットにメモ…" />
+                <button type="submit">
+                  追加 <svg class="ico ico--sm"><use href="#i-arrow-right" /></svg>
+                </button>
+              </form>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ══════════════ 06 PACKING ══════════════ -->
+    <section id="packing">
+      <div class="screen__tag">
+        <span>06</span><span>packing.html — 持ち物リスト（2名分）</span>
+      </div>
+      <div class="wrap sec">
+        <div class="shead reveal">
+          <div class="shead__idx"><span class="n">01</span>Packing</div>
+          <div>
+            <h2 class="display lines" style="font-size: clamp(38px, 5vw, 72px)">
+              <span class="ln"><i>持ち物</i></span>
+            </h2>
+          </div>
+        </div>
+
+        <div class="pack__progress reveal">
+          <div>
+            <div class="prog__label">
+              <svg class="ico ico--sm"><use href="#i-luggage" /></svg> Yuichi
+            </div>
+            <div class="prog__n num" id="p1n">0<small> / 0</small></div>
+            <div class="prog__bar"><span id="p1b" style="width: 0%"></span></div>
+          </div>
+          <div>
+            <div class="prog__label">
+              <svg class="ico ico--sm"><use href="#i-luggage" /></svg> Partner
+            </div>
+            <div class="prog__n num" id="p2n">0<small> / 0</small></div>
+            <div class="prog__bar"><span id="p2b" style="width: 0%"></span></div>
+          </div>
+        </div>
+
+        <div class="pack__toolbar">
+          <button class="tbtn" id="editToggle" aria-pressed="false">
+            <svg class="ico ico--sm"><use href="#i-edit" /></svg>
+            <span id="editLabel">リストを編集</span>
+          </button>
+          <span class="spacer"></span>
+          <button class="tbtn" id="btnExport">
+            <svg class="ico ico--sm"><use href="#i-export" /></svg> 書き出し
+          </button>
+          <button class="tbtn" id="btnImport">
+            <svg class="ico ico--sm"><use href="#i-import" /></svg> 読み込み
+          </button>
+          <input
+            type="file"
+            id="fileImport"
+            accept="application/json"
+            hidden
+          />
+          <button class="tbtn tbtn--danger" id="btnReset">
+            <svg class="ico ico--sm"><use href="#i-reset" /></svg> 既定に戻す
+          </button>
+        </div>
+
+        <div class="pack__table reveal" id="packtable"></div>
+        <p class="micro" style="margin-top: var(--s3)">
+          リストもチェック状態も localStorage
+          に保存されます。初回だけ既定リストを取り込み、以降は完全に自分たちのデータです。二人の端末は同期しないので、揃えたいときは「書き出し」の
+          JSON を渡して「読み込み」してください。
+        </p>
+      </div>
+    </section>
+
+    <!-- ══════════════ 07 ARCHIVE ══════════════ -->
+    <section id="archive">
+      <div class="screen__tag">
+        <span>07</span><span>archive.html — Gmail / LINE 横断検索</span>
+      </div>
+      <div class="wrap sec">
+        <div class="shead reveal">
+          <div class="shead__idx"><span class="n">01</span>Archive · 復号済み</div>
+          <div>
+            <h2 class="display lines" style="font-size: clamp(38px, 5vw, 72px)">
+              <span class="ln"><i>予約とやりとり</i></span>
+            </h2>
+          </div>
+        </div>
+
+        <div class="search reveal">
+          <svg class="ico ico--lg"><use href="#i-search" /></svg>
+          <input value="137 ピラーズ" aria-label="検索" />
+        </div>
+        <div class="filters reveal" style="--d: 0.1s">
+          <button class="chip" aria-pressed="true">すべて</button>
+          <button class="chip">Gmail</button>
+          <button class="chip">LINE</button>
+          <button class="chip">予約番号あり</button>
+        </div>
+
+        <div class="hits">
+          <div class="hits__count reveal">
+            <span class="eyebrow">Results</span>
+            <span class="num" style="font-family: var(--serif); font-size: 22px"
+              >3</span
+            >
+          </div>
+
+          <article class="hit reveal">
+            <div class="hit__src">
+              <b class="src-gmail">
+                <svg class="ico ico--sm"><use href="#i-mail" /></svg> Gmail
+              </b>
+            </div>
+            <div>
+              <h3 class="hit__title">
+                【予約確定】137 Pillars Residences Bangkok
+              </h3>
+              <p class="hit__snip">
+                ご予約ありがとうございます。<mark>137 ピラーズ</mark>
+                レジデンス
+                バンコク、8月12日チェックイン／8月14日チェックアウト、確認番号
+                HTL-4471-2026。チェックインは 15:00 から…
+              </p>
+            </div>
+            <div class="hit__date">2026/06/21<br />booking@137pillars</div>
+          </article>
+
+          <article class="hit reveal" style="--d: 0.08s">
+            <div class="hit__src">
+              <b class="src-line">
+                <svg class="ico ico--sm"><use href="#i-chat" /></svg> LINE
+              </b>
+            </div>
+            <div>
+              <h3 class="hit__title">タイ旅行 2026（グループ）</h3>
+              <p class="hit__snip">
+                依田: <mark>137 ピラーズ</mark>
+                のプールって何時まで開いてる？／ Yuichi:
+                22時まで。朝は6時から。
+              </p>
+            </div>
+            <div class="hit__date">2026/07/03 22:41<br />5件のメッセージ</div>
+          </article>
+
+          <article class="hit reveal" style="--d: 0.16s">
+            <div class="hit__src">
+              <b class="src-gmail">
+                <svg class="ico ico--sm"><use href="#i-mail" /></svg> Gmail
+              </b>
+            </div>
+            <div>
+              <h3 class="hit__title">
+                TG683 HND–BKK 搭乗券／eチケットお客様控え
+              </h3>
+              <p class="hit__snip">
+                タイ国際航空 TG683、8月12日 10:35 羽田発 15:05
+                スワンナプーム着。予約番号 8FKQ2R。座席 34A / 34B…
+              </p>
+            </div>
+            <div class="hit__date">2026/05/14<br />noreply@thaiairways</div>
+          </article>
+        </div>
+
+        <p class="micro" style="margin-top: var(--s4)">
+          データは AES-GCM
+          で暗号化して配置し、合言葉から導出した鍵でブラウザ上のみ復号します。
+        </p>
+      </div>
+    </section>
+
+    <footer class="mockfoot">
+      <p class="eyebrow">Design mock v2 — reference: aman.com</p>
+      <p
+        style="
+          font-family: var(--serif);
+          font-size: clamp(28px, 4vw, 48px);
+          font-weight: 200;
+          letter-spacing: 0.5px;
+          margin: var(--s3) 0 0;
+        "
+      >
+        Thailand 2026
+      </p>
+    </footer>
+
+    <!-- ══════════════ 予定シート（詳細／編集） ══════════════ -->
+    <div class="sheet-overlay" id="sheetOverlay"></div>
+    <aside
+      class="sheet"
+      id="evSheet"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="sheetTitle"
+      aria-hidden="true"
+    >
+      <div class="sheet__head">
+        <p class="eyebrow" id="sheetTitle">予定</p>
+        <button class="rowbtn" id="sheetClose" aria-label="閉じる">
+          <svg class="ico ico--sm"><use href="#i-x" /></svg>
+        </button>
+      </div>
+      <div class="sheet__body" id="sheetBody"></div>
+      <div class="sheet__foot" id="sheetFoot"></div>
+    </aside>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+      /* ══════════════ データ ══════════════ */
+      const HOUR_H = 44;
+      const days = [
+        { dow: "水", date: "8/12" },
+        { dow: "木", date: "8/13" },
+        { dow: "金", date: "8/14" },
+        { dow: "土", date: "8/15" },
+        { dow: "日", date: "8/16" },
+        { dow: "月", date: "8/17" },
+      ];
+      const catMeta = {
+        "cat-move": { icon: "i-flight", label: "移動", color: "#3F5C50" },
+        "cat-sight": { icon: "i-camera", label: "観光", color: "#7E5318" },
+        "cat-food": { icon: "i-food", label: "食事", color: "#A54A2C" },
+        "cat-hotel": { icon: "i-hotel", label: "宿泊", color: "#2F566F" },
+        "cat-shop": { icon: "i-shop", label: "買物", color: "#6A4C78" },
+      };
+
+      const IMG = {
+        hotelBkk:
+          "https://res.cloudinary.com/pillarshotels/image/upload/f_auto,q_auto/web/cms/resources/outlet/nimitr-terrace.jpeg",
+        hotelPty:
+          "https://dynamic-media-cdn.tripadvisor.com/media/photo-o/14/fb/da/18/grande-centre-point-pattaya.jpg?w=900&h=500&s=1",
+        plane:
+          "https://www.thailandtravel.or.jp/wp-content/uploads/2017/03/01871-808x538.jpg",
+        paknam:
+          "https://www.thailandtravel.or.jp/wp-content/uploads/2017/07/241531199_1074098326727081_2405869266411881148_nSNSre.jpg",
+        arun: "https://www.thailandtravel.or.jp/wp-content/uploads/2017/03/e80e52ddc3c9cafa754f4bcd981f509a-808x539.jpg",
+        supanniga:
+          "https://www.bangkok-pukuko.com/wp-content/uploads/2021/06/supanniga-eating-room12.jpg",
+        emq: "https://enjoy-bkk.com/wp-content/uploads/2016/10/EmQuartier-1200-628.jpg",
+      };
+
+      const events = [
+        { d: 0, cat: "cat-hotel", title: "バンコク1泊目", allDay: true },
+        { d: 1, cat: "cat-hotel", title: "バンコク2泊目", allDay: true },
+        { d: 2, cat: "cat-hotel", title: "パタヤ1泊目", allDay: true },
+        { d: 3, cat: "cat-hotel", title: "パタヤ2泊目", allDay: true },
+        { d: 4, cat: "cat-move", title: "機内泊", allDay: true },
+
+        { d: 0, cat: "cat-move", title: "出国フライト（依田家）", start: 10.58, end: 15.08, time: "10:35 → 15:05", location: "スワンナプーム国際空港", lat: 13.69, lng: 100.7501 },
+        { d: 0, cat: "cat-move", title: "出国フライト（篠崎家）", start: 11.0, end: 15.0, time: "11:00 → 15:00", location: "スワンナプーム国際空港", lat: 13.6901, lng: 100.7502 },
+        { d: 0, cat: "cat-move", title: "移動", start: 15.08, end: 17.0, time: "15:05 → 17:00", icon: "i-car" },
+        { d: 0, cat: "cat-hotel", title: "バンコクホテル", start: 17.0, end: 22.0, time: "17:00 チェックイン", location: "137 ピラーズ レジデンス バンコク", lat: 13.7278, lng: 100.5601, image: IMG.hotelBkk },
+
+        { d: 1, cat: "cat-food", title: "Tiengna Viennoiserie", start: 7.5, end: 9.0, time: "7:30 → 9:00", location: "スクンビット39", lat: 13.7364, lng: 100.5729 },
+        { d: 1, cat: "cat-move", title: "移動", start: 9.0, end: 10.0, time: "9:00 → 10:00", icon: "i-car" },
+        { d: 1, cat: "cat-sight", title: "ワット パークナム", start: 10.0, end: 11.0, time: "10:00 → 11:00", location: "Wat Paknam Phasi Charoen", lat: 13.721776, lng: 100.470358, image: IMG.paknam },
+        { d: 1, cat: "cat-move", title: "移動", start: 11.0, end: 11.5, time: "11:00 → 11:30", icon: "i-car" },
+        { d: 1, cat: "cat-sight", title: "ワット アルン", start: 11.5, end: 13.0, time: "11:30 → 13:00", location: "Wat Arun Ratchawararam", lat: 13.743865, lng: 100.488444, image: IMG.arun },
+        { d: 1, cat: "cat-food", title: "スパンニガ", start: 13.0, end: 14.5, time: "13:00 → 14:30", location: "Supanniga Eating Room", lat: 13.744135, lng: 100.491735, image: IMG.supanniga },
+        { d: 1, cat: "cat-move", title: "移動", start: 14.5, end: 15.5, time: "14:30 → 15:30", icon: "i-car" },
+        { d: 1, cat: "cat-shop", title: "エムクオーティエ", start: 15.5, end: 17.0, time: "15:30 → 17:00", location: "EmQuartier", lat: 13.731225, lng: 100.569476, image: IMG.emq },
+
+        { d: 2, cat: "cat-food", title: "Horme Cafe Bangna", start: 7.75, end: 9.0, time: "7:45 → 9:00", location: "Bangna", lat: 13.6683, lng: 100.6423 },
+        { d: 2, cat: "cat-food", title: "Tuang Dim Sum", start: 11.5, end: 13.0, time: "11:30 → 13:00", location: "Chachoengsao", lat: 13.6904, lng: 101.0705 },
+        { d: 2, cat: "cat-move", title: "移動（Grab）", start: 13.0, end: 14.25, time: "13:00 → 14:15", icon: "i-car" },
+        { d: 2, cat: "cat-sight", title: "ワット サマーン", start: 14.25, end: 15.25, time: "14:15 → 15:15", location: "Wat Saman Rattanaram", lat: 13.6486, lng: 101.1284 },
+        { d: 2, cat: "cat-move", title: "移動（Grab）", start: 15.25, end: 16.5, time: "15:15 → 16:30", icon: "i-car" },
+        { d: 2, cat: "cat-food", title: "Marina Night Market", start: 19.0, end: 21.0, time: "19:00 → 21:00", location: "Pattaya", lat: 12.9276, lng: 100.8776 },
+
+        { d: 3, cat: "cat-food", title: "朝ごはん（ホテル）", start: 7.0, end: 8.0, time: "7:00 → 8:00", location: "グランデ センター ポイント パタヤ", lat: 12.9411, lng: 100.8865, image: IMG.hotelPty },
+        { d: 3, cat: "cat-move", title: "移動（Grab）", start: 8.0, end: 8.5, time: "8:00 → 8:30", icon: "i-car" },
+        { d: 3, cat: "cat-move", title: "フェリー", start: 9.0, end: 9.75, time: "9:00 → 9:45", icon: "i-boat" },
+        { d: 3, cat: "cat-sight", title: "マリンアクティビティ", start: 10.0, end: 15.0, time: "10:00 → 15:00", location: "ラン島", lat: 12.9186, lng: 100.7856 },
+        { d: 3, cat: "cat-move", title: "フェリー", start: 15.5, end: 16.25, time: "15:30 → 16:15", icon: "i-boat" },
+        { d: 3, cat: "cat-move", title: "移動（Grab）", start: 16.25, end: 16.75, time: "16:15 → 16:45", icon: "i-car" },
+        { d: 3, cat: "cat-food", title: "The Sky Gallery", start: 19.0, end: 21.0, time: "19:00 → 21:00", location: "Pattaya", lat: 12.8619, lng: 100.8703 },
+
+        { d: 4, cat: "cat-food", title: "朝ごはん（ホテル）", start: 7.0, end: 8.0, time: "7:00 → 8:00" },
+        { d: 4, cat: "cat-sight", title: "プール", start: 8.0, end: 10.0, time: "8:00 → 10:00" },
+        { d: 4, cat: "cat-move", title: "チェックアウト", start: 10.0, end: 11.0, time: "10:00 → 11:00", icon: "i-car" },
+        { d: 4, cat: "cat-shop", title: "Terminal 21", start: 11.0, end: 12.5, time: "11:00 → 12:30", location: "Terminal 21 Pattaya", lat: 12.9497, lng: 100.8896 },
+        { d: 4, cat: "cat-food", title: "Robin Hood Tavern", start: 12.5, end: 13.5, time: "12:30 → 13:30" },
+        { d: 4, cat: "cat-move", title: "移動（Grab）", start: 14.0, end: 16.0, time: "14:00 → 16:00", icon: "i-car" },
+        { d: 4, cat: "cat-food", title: "夜ごはん（空港）", start: 18.0, end: 20.0, time: "18:00 → 20:00", location: "スワンナプーム国際空港", lat: 13.6899, lng: 100.7503 },
+
+        { d: 5, cat: "cat-move", title: "帰国フライト（依田家）", start: 0.1, end: 8.0, time: "00:05 → 08:00" },
+        { d: 5, cat: "cat-move", title: "帰国フライト（篠崎家）", start: 1.0, end: 9.0, time: "01:00 → 09:00" },
+      ];
+
+      const svgIcon = (id, cls) =>
+        `<svg class="ico ${cls || ""}"><use href="#${id}"/></svg>`;
+      const iconOf = (e) => e.icon || catMeta[e.cat].icon;
+
+      function el(tag, cls, txt) {
+        const e = document.createElement(tag);
+        if (cls) e.className = cls;
+        if (txt != null) e.textContent = txt;
+        return e;
+      }
+
+      /* ══════════════════════════════════════════════════════════
+         イベントの正規化
+         保存形式は startDay / endDay を常に持つ。d は入力の省略記法。
+         ══════════════════════════════════════════════════════════ */
+      let evSeed = 0;
+      const evUid = () => "ev-" + (++evSeed).toString(36);
+
+      events.forEach((e) => {
+        e.id ??= evUid();
+        e.startDay ??= e.d ?? 0;
+        e.endDay ??= e.d ?? e.startDay;
+        delete e.d;
+        if (e.allDay) {
+          delete e.start;
+          delete e.end;
+        }
+      });
+
+      const dec2hhmm = (dec) => {
+        let h = Math.floor(dec);
+        let m = Math.round((dec - h) * 60);
+        if (m === 60) {
+          h += 1;
+          m = 0;
+        }
+        return String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0");
+      };
+      const hhmm2dec = (s) => {
+        const [h, m] = s.split(":").map(Number);
+        return h + m / 60;
+      };
+      const timeLabel = (e) =>
+        e.allDay ? "終日" : `${dec2hhmm(e.start)} → ${dec2hhmm(e.end)}`;
+
+      // 日をまたぐイベントを日ごとのセグメントに割る
+      function expandEvents(list) {
+        const out = [];
+        list.forEach((e) => {
+          const sd = e.startDay,
+            ed = Math.max(e.endDay, e.startDay);
+          for (let d = sd; d <= ed && d < days.length; d++) {
+            out.push({
+              ref: e,
+              d,
+              allDay: !!e.allDay,
+              start: d === sd ? e.start : 0,
+              end: d === ed ? e.end : 24,
+            });
+          }
+        });
+        return out;
+      }
+
+      /* ══════════════ カレンダー ══════════════ */
+      let viewStart = 6,
+        viewEnd = 22;
+      let catFilter = null;
+      let evEditMode = false;
+
+      function renderCalendar() {
+        const cal = document.getElementById("cal");
+        cal.innerHTML = "";
+        const segments = expandEvents(events);
+
+        const hdr = el("div", "cal__row");
+        hdr.appendChild(el("div", "cal__hdr-gutter"));
+        const hdrDays = el("div", "cal__days");
+        days.forEach((d) => {
+          const c = el("div", "cal__dayhdr");
+          c.appendChild(
+            el(
+              "div",
+              "cal__dow" +
+                (d.dow === "土"
+                  ? " cal__dow--sat"
+                  : d.dow === "日"
+                    ? " cal__dow--sun"
+                    : ""),
+              d.dow
+            )
+          );
+          c.appendChild(el("div", "cal__date", d.date));
+          hdrDays.appendChild(c);
+        });
+        hdr.appendChild(hdrDays);
+        cal.appendChild(hdr);
+
+        const al = el("div", "cal__row");
+        al.appendChild(el("div", "cal__allday-label", "All day"));
+        const alCells = el("div", "cal__days");
+        days.forEach((_, i) => {
+          const cell = el("div", "cal__allday-cell");
+          segments
+            .filter((s) => s.allDay && s.d === i)
+            .forEach((s) => {
+              const e = s.ref;
+              const p = el("div", "allday-pill " + e.cat);
+              p.innerHTML =
+                svgIcon(iconOf(e), "ico--sm") + `<span>${e.title}</span>`;
+              p.style.cursor = "pointer";
+              p.onclick = () => openSheet(e, evEditMode ? "edit" : "view");
+              cell.appendChild(p);
+            });
+          alCells.appendChild(cell);
+        });
+        al.appendChild(alCells);
+        cal.appendChild(al);
+
+        const body = el("div", "cal__row");
+        const timeCol = el("div", "cal__gutter");
+        for (let h = viewStart; h < viewEnd; h++) {
+          timeCol.appendChild(
+            el("div", "cal__slot", String(h).padStart(2, "0") + ":00")
+          );
+        }
+        body.appendChild(timeCol);
+
+        const cols = el("div", "cal__days");
+        const totalH = (viewEnd - viewStart) * HOUR_H;
+        let seq = 0;
+        days.forEach((_, i) => {
+          const col = el("div", "cal__col");
+          col.style.height = totalH + "px";
+
+          const timed = segments
+            .filter(
+              (s) =>
+                !s.allDay &&
+                s.d === i &&
+                s.end > viewStart &&
+                s.start < viewEnd &&
+                (!catFilter || s.ref.cat === catFilter)
+            )
+            .sort((a, b) => a.start - b.start);
+
+          const lanes = [];
+          timed.forEach((s) => {
+            let lane = lanes.findIndex((endT) => endT <= s.start);
+            if (lane === -1) {
+              lane = lanes.length;
+              lanes.push(s.end);
+            } else lanes[lane] = s.end;
+            s._lane = lane;
+          });
+          timed.forEach((s) => (s._lanes = lanes.length));
+
+          timed.forEach((s) => {
+            const e = s.ref;
+            const vs = Math.max(s.start, viewStart);
+            const ve = Math.min(s.end, viewEnd);
+            const top = (vs - viewStart) * HOUR_H;
+            const h = Math.max((ve - vs) * HOUR_H - 2, 22);
+            const w = 100 / (s._lanes || 1);
+            const box = el(
+              "div",
+              "ev " + e.cat + (evEditMode ? " is-editable" : "")
+            );
+            box.style.cssText =
+              `top:${top}px;height:${h}px;left:${s._lane * w}%;` +
+              `width:calc(${w}% - 2px);--d:${(seq++ * 0.012).toFixed(3)}s`;
+            const label = timeLabel(e);
+            const hd = el("div", "ev__hd");
+            hd.innerHTML =
+              svgIcon(iconOf(e)) +
+              (h >= 36 ? `<span class="ev__t">${label}</span>` : "");
+            box.appendChild(hd);
+            box.appendChild(el("div", "ev__n", e.title));
+            box.title = e.title + " / " + label;
+            box.onclick = () => openSheet(e, evEditMode ? "edit" : "view");
+            col.appendChild(box);
+          });
+          cols.appendChild(col);
+        });
+        body.appendChild(cols);
+        cal.appendChild(body);
+      }
+
+      function buildOptions(id, min, max, sel) {
+        const s = document.getElementById(id);
+        for (let i = min; i <= max; i++) {
+          const o = document.createElement("option");
+          o.value = i;
+          o.textContent = String(i).padStart(2, "0") + ":00";
+          if (i === sel) o.selected = true;
+          s.appendChild(o);
+        }
+      }
+      buildOptions("vs", 0, 12, viewStart);
+      buildOptions("ve", 13, 24, viewEnd);
+      document.getElementById("vs").onchange = (e) => {
+        viewStart = +e.target.value;
+        renderCalendar();
+      };
+      document.getElementById("ve").onchange = (e) => {
+        viewEnd = +e.target.value;
+        renderCalendar();
+      };
+
+      const chipWrap = document.getElementById("catchips");
+      const allChip = el("button", "chip", "すべて");
+      allChip.setAttribute("aria-pressed", "true");
+      chipWrap.appendChild(allChip);
+      const chips = [allChip];
+      Object.entries(catMeta).forEach(([k, m]) => {
+        const b = el("button", "chip", m.label);
+        b.setAttribute("aria-pressed", "false");
+        b.onclick = () => {
+          catFilter = catFilter === k ? null : k;
+          chips.forEach((c) => c.setAttribute("aria-pressed", "false"));
+          (catFilter ? b : allChip).setAttribute("aria-pressed", "true");
+          renderCalendar();
+          buildLocationList();
+        };
+        chipWrap.appendChild(b);
+        chips.push(b);
+      });
+      allChip.onclick = () => {
+        catFilter = null;
+        chips.forEach((c) => c.setAttribute("aria-pressed", "false"));
+        allChip.setAttribute("aria-pressed", "true");
+        renderCalendar();
+        buildLocationList();
+      };
+
+      renderCalendar();
+
+      /* ══════════════ 地図 ══════════════ */
+      let map,
+        markers = {};
+
+      function locations() {
+        const seen = new Map();
+        events.forEach((e) => {
+          if (e.lat == null || e.lng == null) return;
+          if (catFilter && e.cat !== catFilter) return;
+          const k = e.lat + "," + e.lng;
+          if (!seen.has(k)) seen.set(k, e);
+        });
+        return [...seen.values()];
+      }
+
+      function initMap() {
+        map = L.map("leaflet-map", { scrollWheelZoom: false }).setView(
+          [13.4, 100.7],
+          8
+        );
+        L.tileLayer(
+          "https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png",
+          {
+            attribution:
+              '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            subdomains: "abcd",
+            maxZoom: 19,
+          }
+        ).addTo(map);
+        drawMarkers();
+      }
+
+      function drawMarkers() {
+        Object.values(markers).forEach((m) => map.removeLayer(m));
+        markers = {};
+        const locs = locations();
+        locs.forEach((e) => {
+          const icon = L.divIcon({
+            className: "",
+            html: `<div class="pin" style="background:${catMeta[e.cat].color}"><svg viewBox="0 0 24 24"><use href="#${iconOf(e)}"/></svg></div>`,
+            iconSize: [30, 30],
+            iconAnchor: [15, 15],
+          });
+          markers[e.lat + "," + e.lng] = L.marker([e.lat, e.lng], { icon })
+            .addTo(map)
+            .bindPopup(
+              `<div style="font-family:Newsreader,serif;font-size:16px;font-weight:300;letter-spacing:.3px">${e.title}</div>` +
+                `<div style="font-family:Inter,sans-serif;font-size:11px;letter-spacing:.3px;color:#585858;margin-top:5px">${e.location || ""}</div>`
+            );
+        });
+        if (locs.length)
+          map.fitBounds(
+            L.latLngBounds(locs.map((l) => [l.lat, l.lng])).pad(0.18)
+          );
+      }
+
+      function buildLocationList() {
+        const wrap = document.getElementById("loclist");
+        wrap.innerHTML = "";
+        locations().forEach((e) => {
+          const row = el("div", "loc");
+          const m = catMeta[e.cat];
+          row.innerHTML =
+            `<div class="loc__thumbwrap"><img class="loc__thumb" src="${e.image || IMG.plane}" alt="" loading="lazy"></div>` +
+            `<div>` +
+            `<div class="loc__cat" style="color:${m.color}">${svgIcon(iconOf(e), "ico--sm")}${m.label}</div>` +
+            `<div class="loc__name">${e.title}</div>` +
+            `<div class="loc__meta">${days[e.startDay].date}（${days[e.startDay].dow}） · ${timeLabel(e)}</div>` +
+            `</div>` +
+            `<span class="loc__go">${svgIcon("i-arrow-right", "ico--sm")}</span>`;
+          row.onclick = () => {
+            map.flyTo([e.lat, e.lng], 14, { duration: 0.8 });
+            markers[e.lat + "," + e.lng]?.openPopup();
+          };
+          wrap.appendChild(row);
+        });
+        if (map) drawMarkers();
+      }
+
+      initMap();
+      buildLocationList();
+
+      /* ══════════════════════════════════════════════════════════
+         予定シート — 詳細表示と編集フォーム
+         ══════════════════════════════════════════════════════════ */
+      const sheet = document.getElementById("evSheet");
+      const sheetOverlay = document.getElementById("sheetOverlay");
+      const sheetBody = document.getElementById("sheetBody");
+      const sheetFoot = document.getElementById("sheetFoot");
+      const sheetTitle = document.getElementById("sheetTitle");
+      let sheetEvent = null;
+      let sheetIsNew = false;
+      let lastFocus = null;
+
+      function openSheet(ev, mode) {
+        sheetEvent = ev;
+        sheetIsNew = !events.includes(ev);
+        lastFocus = document.activeElement;
+        mode === "edit" ? renderSheetEdit() : renderSheetView();
+        sheet.classList.add("is-open");
+        sheetOverlay.classList.add("is-open");
+        sheet.setAttribute("aria-hidden", "false");
+        document.body.style.overflow = "hidden";
+        sheet.querySelector("input, select, textarea, button")?.focus();
+      }
+
+      function closeSheet() {
+        sheet.classList.remove("is-open");
+        sheetOverlay.classList.remove("is-open");
+        sheet.setAttribute("aria-hidden", "true");
+        document.body.style.overflow = "";
+        sheetEvent = null;
+        lastFocus?.focus();
+      }
+
+      document.getElementById("sheetClose").onclick = closeSheet;
+      sheetOverlay.onclick = closeSheet;
+      addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && sheet.classList.contains("is-open")) closeSheet();
+      });
+
+      /* ── 詳細表示 ── */
+      function renderSheetView() {
+        const e = sheetEvent;
+        const m = catMeta[e.cat];
+        sheetTitle.textContent = "予定の詳細";
+        sheetBody.innerHTML =
+          (e.image ? `<img class="sheet__img" src="${e.image}" alt="">` : "") +
+          `<span class="panel__cat ${e.cat}">${svgIcon(iconOf(e), "ico--sm")} ${m.label}</span>` +
+          `<h3 class="panel__title">${e.title || "（無題）"}</h3>` +
+          `<dl class="panel__meta">` +
+          row("i-calendar", "Date", dayRangeLabel(e)) +
+          row("i-clock", "Time", timeLabel(e)) +
+          (e.location ? row("i-pin", "Location", e.location) : "") +
+          (e.lat != null && e.lng != null
+            ? row("i-pin", "Coords", `${e.lat}, ${e.lng}`)
+            : "") +
+          (e.url
+            ? row(
+                "i-external",
+                "Link",
+                `<a href="${e.url}" target="_blank" rel="noopener">開く ${svgIcon("i-external", "ico--sm")}</a>`
+              )
+            : "") +
+          `</dl>` +
+          (e.notes
+            ? `<p class="body" style="margin-top:var(--s3);white-space:pre-wrap">${e.notes}</p>`
+            : "");
+
+        sheetFoot.innerHTML = "";
+        const edit = el("button", "btn grow");
+        edit.innerHTML = svgIcon("i-edit", "ico--sm") + " この予定を編集";
+        edit.onclick = renderSheetEdit;
+        sheetFoot.appendChild(edit);
+      }
+
+      const row = (icon, dt, dd) =>
+        `<div class="panel__mrow">${svgIcon(icon)}<dt>${dt}</dt><dd>${dd}</dd></div>`;
+
+      const dayRangeLabel = (e) => {
+        const s = days[e.startDay];
+        const t = days[Math.max(e.endDay, e.startDay)];
+        return e.endDay > e.startDay
+          ? `${s.date}（${s.dow}） → ${t.date}（${t.dow}）`
+          : `${s.date}（${s.dow}）`;
+      };
+
+      /* ── 編集フォーム ── */
+      function renderSheetEdit() {
+        const e = sheetEvent;
+        sheetTitle.textContent = sheetIsNew ? "予定を追加" : "予定を編集";
+
+        const dayOpts = (sel) =>
+          days
+            .map(
+              (d, i) =>
+                `<option value="${i}"${i === sel ? " selected" : ""}>${d.date}（${d.dow}）</option>`
+            )
+            .join("");
+
+        sheetBody.innerHTML = `
+          <div class="fgrid">
+            <div class="field2">
+              <label for="f-title">タイトル</label>
+              <input class="inp" id="f-title" value="${escapeAttr(e.title || "")}" placeholder="例: ワット アルン">
+            </div>
+
+            <div class="field2">
+              <label>カテゴリ</label>
+              <div class="catpick" id="f-cat"></div>
+            </div>
+
+            <label class="switch">
+              <input type="checkbox" id="f-allday" ${e.allDay ? "checked" : ""} hidden>
+              <span class="check__box" id="f-allday-box"><svg viewBox="0 0 24 24"><path d="m4.5 12.6 5.2 5.2L19.5 6.6"/></svg></span>
+              <span>終日の予定にする</span>
+            </label>
+
+            <div class="fgrid fgrid--2">
+              <div class="field2">
+                <label for="f-sday">開始日</label>
+                <select id="f-sday">${dayOpts(e.startDay)}</select>
+              </div>
+              <div class="field2">
+                <label for="f-eday">終了日</label>
+                <select id="f-eday">${dayOpts(Math.max(e.endDay, e.startDay))}</select>
+              </div>
+            </div>
+
+            <div class="fgrid fgrid--2" id="f-times">
+              <div class="field2">
+                <label for="f-start">開始時刻</label>
+                <input class="inp" type="time" id="f-start" step="300" value="${dec2hhmm(e.start ?? 9)}">
+              </div>
+              <div class="field2">
+                <label for="f-end">終了時刻</label>
+                <input class="inp" type="time" id="f-end" step="300" value="${dec2hhmm(e.end ?? 10)}">
+              </div>
+            </div>
+
+            <div class="field2">
+              <label for="f-loc">場所</label>
+              <input class="inp" id="f-loc" value="${escapeAttr(e.location || "")}" placeholder="例: Wat Arun Ratchawararam">
+            </div>
+
+            <div class="fgrid fgrid--2">
+              <div class="field2">
+                <label for="f-lat">緯度</label>
+                <input class="inp" id="f-lat" inputmode="decimal" value="${e.lat ?? ""}" placeholder="13.7438">
+              </div>
+              <div class="field2">
+                <label for="f-lng">経度</label>
+                <input class="inp" id="f-lng" inputmode="decimal" value="${e.lng ?? ""}" placeholder="100.4884">
+              </div>
+            </div>
+            <p class="fhint">緯度と経度を両方入れると地図にピンが立ちます。片方だけでは立ちません。</p>
+
+            <div class="field2">
+              <label for="f-url">リンク</label>
+              <input class="inp" id="f-url" value="${escapeAttr(e.url || "")}" placeholder="https://">
+            </div>
+
+            <div class="field2">
+              <label for="f-notes">メモ</label>
+              <textarea id="f-notes" placeholder="補足があれば">${escapeHtml(e.notes || "")}</textarea>
+            </div>
+
+            <div id="f-error"></div>
+          </div>`;
+
+        // カテゴリ選択
+        const catBox = sheetBody.querySelector("#f-cat");
+        let pickedCat = e.cat || "cat-sight";
+        Object.entries(catMeta).forEach(([k, m]) => {
+          const b = el("button", k);
+          b.type = "button";
+          b.innerHTML = svgIcon(m.icon, "ico--sm") + `<span>${m.label}</span>`;
+          b.setAttribute("aria-pressed", String(k === pickedCat));
+          b.onclick = () => {
+            pickedCat = k;
+            [...catBox.children].forEach((c) =>
+              c.setAttribute("aria-pressed", String(c.classList.contains(k)))
+            );
+          };
+          catBox.appendChild(b);
+        });
+
+        // 終日トグル（時刻欄の出し入れ）
+        const allday = sheetBody.querySelector("#f-allday");
+        const box = sheetBody.querySelector("#f-allday-box");
+        const times = sheetBody.querySelector("#f-times");
+        const syncAllday = () => {
+          box.parentElement
+            .querySelector(".check__box")
+            .classList.toggle("is-on", allday.checked);
+          box.style.background = allday.checked ? "var(--ink)" : "transparent";
+          box.style.borderColor = allday.checked ? "var(--ink)" : "var(--line)";
+          box.querySelector("path").style.strokeDashoffset = allday.checked ? 0 : 22;
+          times.style.display = allday.checked ? "none" : "grid";
+        };
+        box.parentElement.onclick = (ev) => {
+          if (ev.target.tagName === "INPUT") return;
+          ev.preventDefault();
+          allday.checked = !allday.checked;
+          syncAllday();
+        };
+        syncAllday();
+
+        // フッター
+        sheetFoot.innerHTML = "";
+        const save = el("button", "btn grow");
+        save.innerHTML = svgIcon("i-check", "ico--sm") + " 保存";
+        save.onclick = () => saveSheet(pickedCat);
+        sheetFoot.appendChild(save);
+
+        if (!sheetIsNew) {
+          const del = el("button", "btn btn--ghost");
+          del.innerHTML = svgIcon("i-x", "ico--sm") + " 削除";
+          let armed = false;
+          del.onclick = () => {
+            if (!armed) {
+              armed = true;
+              del.innerHTML = svgIcon("i-x", "ico--sm") + " もう一度で削除";
+              return;
+            }
+            events.splice(events.indexOf(sheetEvent), 1);
+            refreshSchedule();
+            closeSheet();
+          };
+          sheetFoot.appendChild(del);
+        }
+      }
+
+      const escapeHtml = (s) =>
+        String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+      const escapeAttr = (s) => escapeHtml(s).replace(/"/g, "&quot;");
+
+      function saveSheet(pickedCat) {
+        const q = (id) => sheetBody.querySelector("#" + id);
+        const errBox = q("f-error");
+        const errs = [];
+
+        const title = q("f-title").value.trim();
+        if (!title) errs.push("タイトルを入力してください。");
+
+        const allDay = q("f-allday").checked;
+        const startDay = +q("f-sday").value;
+        const endDay = +q("f-eday").value;
+        if (endDay < startDay) errs.push("終了日が開始日より前になっています。");
+
+        let start, end;
+        if (!allDay) {
+          start = hhmm2dec(q("f-start").value || "00:00");
+          end = hhmm2dec(q("f-end").value || "00:00");
+          // 同日内でのみ「終了が開始より後」を要求する。日をまたぐ場合は
+          // 15:00 → 11:00 のような指定が正しいため
+          if (endDay === startDay && end <= start)
+            errs.push("同じ日の中では、終了時刻を開始時刻より後にしてください。");
+        }
+
+        const latRaw = q("f-lat").value.trim();
+        const lngRaw = q("f-lng").value.trim();
+        const lat = latRaw === "" ? null : Number(latRaw);
+        const lng = lngRaw === "" ? null : Number(lngRaw);
+        if (latRaw !== "" && (!Number.isFinite(lat) || lat < -90 || lat > 90))
+          errs.push("緯度は −90〜90 の数値で入力してください。");
+        if (lngRaw !== "" && (!Number.isFinite(lng) || lng < -180 || lng > 180))
+          errs.push("経度は −180〜180 の数値で入力してください。");
+
+        q("f-title").setAttribute("aria-invalid", String(!title));
+
+        if (errs.length) {
+          errBox.innerHTML = errs
+            .map(
+              (m) =>
+                `<p class="ferror">${svgIcon("i-x", "ico--sm")}<span>${m}</span></p>`
+            )
+            .join("");
+          return;
+        }
+
+        const e = sheetEvent;
+        Object.assign(e, {
+          title,
+          cat: pickedCat,
+          allDay,
+          startDay,
+          endDay,
+          location: q("f-loc").value.trim(),
+          url: q("f-url").value.trim(),
+          notes: q("f-notes").value,
+          lat: lat != null && lng != null ? lat : null,
+          lng: lat != null && lng != null ? lng : null,
+        });
+        if (allDay) {
+          delete e.start;
+          delete e.end;
+        } else {
+          e.start = start;
+          e.end = end;
+        }
+
+        if (sheetIsNew) {
+          events.push(e);
+          sheetIsNew = false;
+        }
+        refreshSchedule();
+        closeSheet();
+      }
+
+      function refreshSchedule() {
+        renderCalendar();
+        buildLocationList();
+      }
+
+      /* ── ツールバー ── */
+      const evEditToggle = document.getElementById("evEditToggle");
+      evEditToggle.onclick = () => {
+        evEditMode = !evEditMode;
+        evEditToggle.setAttribute("aria-pressed", String(evEditMode));
+        document.getElementById("evEditLabel").textContent = evEditMode
+          ? "編集を終える"
+          : "予定を編集";
+        renderCalendar();
+      };
+
+      document.getElementById("evAdd").onclick = () => {
+        openSheet(
+          {
+            id: evUid(),
+            cat: "cat-sight",
+            title: "",
+            allDay: false,
+            startDay: 0,
+            endDay: 0,
+            start: 9,
+            end: 10,
+            location: "",
+            notes: "",
+          },
+          "edit"
+        );
+      };
+
+      /* ══════════════════════════════════════════════════════════
+         持ち物リスト — グループ／項目とも追加・編集・削除・並べ替え可能
+         保存は localStorage。初回のみ既定リストを取り込む。
+         ══════════════════════════════════════════════════════════ */
+      const PACK_KEY = "tp:packing";
+
+      // 既定リスト（リポジトリ側に持つデータ。ユーザーの編集対象ではない）
+      const PACK_DEFAULT = [
+        {
+          id: "g-valuables",
+          name: "貴重品・書類",
+          icon: "i-key",
+          items: [
+            { id: "passport", name: "パスポート", note: "残存6か月以上", a: true, b: true },
+            { id: "cash", name: "現金（THB / JPY）", note: "", a: true, b: false },
+            { id: "card", name: "クレジットカード", note: "海外利用の上限を確認", a: false, b: false },
+            { id: "insurance", name: "海外旅行保険の控え", note: "", a: false, b: false },
+          ],
+        },
+        {
+          id: "g-devices",
+          name: "電子機器",
+          icon: "i-plug",
+          items: [
+            { id: "adapter", name: "変換プラグ", note: "タイは A / B3 / C", a: true, b: false },
+            { id: "battery", name: "モバイルバッテリー", note: "受託手荷物に入れない", a: false, b: false },
+            { id: "cable", name: "充電ケーブル一式", note: "", a: false, b: false },
+            { id: "camera", name: "カメラ", note: "", a: false, b: false },
+          ],
+        },
+        {
+          id: "g-clothes",
+          name: "衣類・その他",
+          icon: "i-luggage",
+          items: [
+            { id: "shoes", name: "スニーカー", note: "ワット アルンの階段用", a: true, b: true },
+            { id: "cover", name: "羽織るもの", note: "寺院は肩・膝を隠す", a: false, b: false },
+            { id: "swim", name: "水着", note: "ラン島マリンアクティビティ", a: false, b: false },
+            { id: "sunscreen", name: "日焼け止め", note: "", a: false, b: false },
+            { id: "meds", name: "常備薬・胃薬", note: "", a: false, b: false },
+          ],
+        },
+      ];
+
+      const clone = (v) => JSON.parse(JSON.stringify(v));
+      let uidSeed = 0;
+      const uid = (p) => p + "-" + (++uidSeed).toString(36) + "x";
+
+      // モックはメモリ保持。本番はここが localStorage の読み書きになる
+      let packing = clone(PACK_DEFAULT);
+      let editMode = false;
+      let pendingDelete = null; // 「もう一度押すと削除」の対象 id
+
+      const packTable = document.getElementById("packtable");
+
+      /* ── 描画 ── */
+      function renderPacking() {
+        packTable.classList.toggle("is-edit", editMode);
+        packTable.innerHTML = "";
+
+        const head = el("div", "pack__thead");
+        if (editMode) head.appendChild(el("div", null, ""));
+        head.appendChild(el("div", "left", "Item"));
+        head.appendChild(el("div", null, "Yuichi"));
+        head.appendChild(el("div", null, "Partner"));
+        head.appendChild(el("div", null, editMode ? "" : "Memo"));
+        packTable.appendChild(head);
+
+        packing.forEach((g, gi) => {
+          const block = el("div", "pgroup");
+          block.dataset.gid = g.id;
+
+          // グループ見出し
+          const gh = el("div", "pgroup__head");
+          if (editMode) {
+            const handle = el("div", "handle");
+            handle.innerHTML = svgIcon("i-grip");
+            handle.title = "ドラッグして区分を並べ替え";
+            handle.dataset.dragGroup = g.id;
+            gh.appendChild(handle);
+          }
+          const gicon = document.createElement("span");
+          gicon.innerHTML = svgIcon(g.icon, "ico--cat");
+          gh.appendChild(gicon.firstElementChild);
+
+          if (editMode) {
+            const inp = el("input", "inp inp--group");
+            inp.value = g.name;
+            inp.setAttribute("aria-label", "区分名");
+            inp.oninput = () => {
+              g.name = inp.value;
+            };
+            gh.appendChild(inp);
+          } else {
+            gh.appendChild(el("span", "pgroup__name", g.name));
+          }
+
+          gh.appendChild(el("span", "pgroup__count", g.items.length + " items"));
+
+          if (editMode) {
+            const acts = el("div", "rowacts");
+            acts.appendChild(
+              mkBtn("i-up", "区分を上へ", gi === 0, () => moveGroup(gi, -1))
+            );
+            acts.appendChild(
+              mkBtn("i-down", "区分を下へ", gi === packing.length - 1, () =>
+                moveGroup(gi, 1)
+              )
+            );
+            acts.appendChild(mkDelete(g.id, () => deleteGroup(gi), g.items.length));
+            gh.appendChild(acts);
+          }
+          block.appendChild(gh);
+
+          // 項目
+          const list = el("div", "pgroup__items");
+          list.dataset.gid = g.id;
+          g.items.forEach((it, ii) => list.appendChild(renderRow(g, gi, it, ii)));
+          block.appendChild(list);
+
+          if (editMode) {
+            const add = el("div", "pack__add");
+            const b = el("button", "addbtn");
+            b.innerHTML = svgIcon("i-plus", "ico--sm") + "<span>項目を追加</span>";
+            b.onclick = () => {
+              g.items.push({ id: uid("i"), name: "", note: "", a: false, b: false });
+              renderPacking();
+              focusLast(g.id);
+            };
+            add.appendChild(b);
+            block.appendChild(add);
+          }
+
+          packTable.appendChild(block);
+        });
+
+        if (editMode) {
+          const foot = el("div", "pack__footer");
+          const b = el("button", "addbtn");
+          b.innerHTML = svgIcon("i-plus", "ico--sm") + "<span>区分を追加</span>";
+          b.onclick = () => {
+            packing.push({
+              id: uid("g"),
+              name: "新しい区分",
+              icon: "i-luggage",
+              items: [],
+            });
+            renderPacking();
+          };
+          foot.appendChild(b);
+          packTable.appendChild(foot);
+        }
+
+        bindDrag();
+        updateProgress();
+      }
+
+      function renderRow(g, gi, it, ii) {
+        const row = el("div", "pack__row");
+        row.dataset.iid = it.id;
+
+        if (editMode) {
+          const handle = el("div", "handle");
+          handle.innerHTML = svgIcon("i-grip");
+          handle.title = "ドラッグして並べ替え・区分間の移動";
+          handle.dataset.dragItem = it.id;
+          row.appendChild(handle);
+        }
+
+        const nm = el("div", "pack__name");
+        if (editMode) {
+          const n = el("input", "inp");
+          n.value = it.name;
+          n.placeholder = "品目名";
+          n.setAttribute("aria-label", "品目名");
+          n.oninput = () => {
+            it.name = n.value;
+          };
+          const note = el("input", "inp inp--note");
+          note.value = it.note || "";
+          note.placeholder = "補足メモ（任意）";
+          note.setAttribute("aria-label", "補足メモ");
+          note.oninput = () => {
+            it.note = note.value;
+          };
+          nm.appendChild(n);
+          nm.appendChild(note);
+        } else {
+          nm.appendChild(document.createTextNode(it.name || "（名称未設定）"));
+          if (it.note) nm.appendChild(el("em", null, it.note));
+        }
+        row.appendChild(nm);
+
+        ["a", "b"].forEach((who) => {
+          const cell = el("div", "pack__cell");
+          const lab = el("label", "check");
+          const cb = document.createElement("input");
+          cb.type = "checkbox";
+          cb.setAttribute(
+            "aria-label",
+            (it.name || "項目") + " / " + (who === "a" ? "Yuichi" : "Partner")
+          );
+          cb.checked = !!it[who];
+          cb.onchange = () => {
+            it[who] = cb.checked;
+            updateProgress();
+          };
+          const box = el("span", "check__box");
+          box.innerHTML =
+            '<svg viewBox="0 0 24 24"><path d="m4.5 12.6 5.2 5.2L19.5 6.6"/></svg>';
+          lab.appendChild(cb);
+          lab.appendChild(box);
+          cell.appendChild(lab);
+          row.appendChild(cell);
+        });
+
+        if (editMode) {
+          const acts = el("div", "rowacts");
+          acts.appendChild(mkBtn("i-up", "上へ", gi === 0 && ii === 0, () => moveItem(gi, ii, -1)));
+          acts.appendChild(
+            mkBtn(
+              "i-down",
+              "下へ",
+              gi === packing.length - 1 && ii === g.items.length - 1,
+              () => moveItem(gi, ii, 1)
+            )
+          );
+          acts.appendChild(mkDelete(it.id, () => deleteItem(gi, ii), 0));
+          row.appendChild(acts);
+        } else {
+          const noteBtn = el("button", "pack__note");
+          noteBtn.innerHTML = svgIcon("i-chat", "ico--sm");
+          noteBtn.title = "この品目にコメントを追加";
+          row.appendChild(noteBtn);
+        }
+        return row;
+      }
+
+      function mkBtn(icon, title, disabled, fn) {
+        const b = el("button", "rowbtn");
+        b.innerHTML = svgIcon(icon, "ico--sm");
+        b.title = title;
+        b.setAttribute("aria-label", title);
+        b.disabled = !!disabled;
+        b.onclick = fn;
+        return b;
+      }
+
+      // ダイアログを出さず、2 度押しで確定させる削除ボタン
+      function mkDelete(id, fn, childCount) {
+        const armed = pendingDelete === id;
+        const b = el("button", "rowbtn rowbtn--del" + (armed ? " rowbtn--confirm" : ""));
+        if (armed) {
+          b.textContent = childCount ? `${childCount}件ごと削除` : "削除";
+        } else {
+          b.innerHTML = svgIcon("i-x", "ico--sm");
+        }
+        b.title = armed ? "もう一度押すと削除します" : "削除";
+        b.setAttribute("aria-label", b.title);
+        b.onclick = () => {
+          if (armed) {
+            pendingDelete = null;
+            fn();
+          } else {
+            pendingDelete = id;
+            renderPacking();
+          }
+        };
+        return b;
+      }
+
+      function focusLast(gid) {
+        const list = packTable.querySelector(`.pgroup__items[data-gid="${gid}"]`);
+        list?.lastElementChild?.querySelector("input.inp")?.focus();
+      }
+
+      /* ── 並べ替え（ボタン） ── */
+      // 端に達したら隣の区分へ送る。区分をまたいだ移動をボタンだけでも完結させる
+      function moveItem(gi, ii, dir) {
+        const g = packing[gi];
+        const to = ii + dir;
+        if (to >= 0 && to < g.items.length) {
+          [g.items[ii], g.items[to]] = [g.items[to], g.items[ii]];
+        } else {
+          const ngi = gi + dir;
+          if (ngi < 0 || ngi >= packing.length) return;
+          const [it] = g.items.splice(ii, 1);
+          if (dir < 0) packing[ngi].items.push(it);
+          else packing[ngi].items.unshift(it);
+        }
+        renderPacking();
+      }
+
+      function moveGroup(gi, dir) {
+        const to = gi + dir;
+        if (to < 0 || to >= packing.length) return;
+        [packing[gi], packing[to]] = [packing[to], packing[gi]];
+        renderPacking();
+      }
+
+      function deleteItem(gi, ii) {
+        packing[gi].items.splice(ii, 1);
+        renderPacking();
+      }
+      function deleteGroup(gi) {
+        packing.splice(gi, 1);
+        renderPacking();
+      }
+
+      /* ── 並べ替え（ドラッグ） ──
+         Pointer Events で実装。DOM を直接動かし、離した時点の DOM 順から
+         配列を組み直す。HTML5 Drag&Drop はタッチ端末で動かないため使わない。 */
+      function bindDrag() {
+        packTable.querySelectorAll("[data-drag-item]").forEach((h) =>
+          h.addEventListener("pointerdown", (e) => startDrag(e, h, "item"))
+        );
+        packTable.querySelectorAll("[data-drag-group]").forEach((h) =>
+          h.addEventListener("pointerdown", (e) => startDrag(e, h, "group"))
+        );
+      }
+
+      function startDrag(e, handle, kind) {
+        if (e.button != null && e.button !== 0) return;
+        e.preventDefault();
+        const el0 =
+          kind === "item" ? handle.closest(".pack__row") : handle.closest(".pgroup");
+        if (!el0) return;
+        el0.classList.add("is-dragging");
+        // capture は「あれば嬉しい」程度に扱う。失敗しても window 側の
+        // リスナーで拾えるようにしておく
+        try {
+          handle.setPointerCapture(e.pointerId);
+        } catch {}
+
+        const move = (ev) => {
+          const y = ev.clientY;
+          if (kind === "item") {
+            // 空の区分に落とせるよう、項目コンテナ自体も判定対象に含める
+            const lists = [...packTable.querySelectorAll(".pgroup__items")];
+            let host = null;
+            for (const l of lists) {
+              const r = l.getBoundingClientRect();
+              const head = l.previousElementSibling.getBoundingClientRect();
+              if (y >= head.top && y <= r.bottom + 8) host = l;
+            }
+            if (!host) return;
+            const siblings = [...host.querySelectorAll(".pack__row")].filter(
+              (n) => n !== el0
+            );
+            const after = siblings.find((n) => {
+              const r = n.getBoundingClientRect();
+              return y < r.top + r.height / 2;
+            });
+            host.insertBefore(el0, after || null);
+          } else {
+            const groups = [...packTable.querySelectorAll(".pgroup")].filter(
+              (n) => n !== el0
+            );
+            const after = groups.find((n) => {
+              const r = n.getBoundingClientRect();
+              return y < r.top + r.height / 2;
+            });
+            packTable.insertBefore(el0, after || packTable.querySelector(".pack__footer"));
+          }
+        };
+
+        const end = () => {
+          window.removeEventListener("pointermove", move);
+          window.removeEventListener("pointerup", end);
+          window.removeEventListener("pointercancel", end);
+          el0.classList.remove("is-dragging");
+          syncFromDom();
+          renderPacking();
+        };
+
+        // ハンドルではなく window に付ける。ポインタがハンドルから外れても
+        // 追従し続ける必要があるため
+        window.addEventListener("pointermove", move);
+        window.addEventListener("pointerup", end);
+        window.addEventListener("pointercancel", end);
+      }
+
+      // DOM の並びを正として配列を組み直す
+      function syncFromDom() {
+        const byItem = new Map();
+        packing.forEach((g) => g.items.forEach((it) => byItem.set(it.id, it)));
+        const byGroup = new Map(packing.map((g) => [g.id, g]));
+
+        packing = [...packTable.querySelectorAll(".pgroup")].map((block) => {
+          const g = byGroup.get(block.dataset.gid);
+          const items = [...block.querySelectorAll(".pack__row")]
+            .map((r) => byItem.get(r.dataset.iid))
+            .filter(Boolean);
+          return { ...g, items };
+        });
+      }
+
+      /* ── 進捗 ── */
+      function updateProgress() {
+        const total = packing.reduce((n, g) => n + g.items.length, 0);
+        ["a", "b"].forEach((who, i) => {
+          const done = packing.reduce(
+            (n, g) => n + g.items.filter((it) => it[who]).length,
+            0
+          );
+          document.getElementById(i === 0 ? "p1n" : "p2n").innerHTML =
+            done + `<small> / ${total}</small>`;
+          document.getElementById(i === 0 ? "p1b" : "p2b").style.width =
+            (total ? (done / total) * 100 : 0) + "%";
+        });
+      }
+
+      /* ── ツールバー ── */
+      const editToggle = document.getElementById("editToggle");
+      editToggle.onclick = () => {
+        editMode = !editMode;
+        pendingDelete = null;
+        editToggle.setAttribute("aria-pressed", String(editMode));
+        document.getElementById("editLabel").textContent = editMode
+          ? "編集を終える"
+          : "リストを編集";
+        renderPacking();
+      };
+
+      document.getElementById("btnExport").onclick = () => {
+        const blob = new Blob([JSON.stringify(packing, null, 2)], {
+          type: "application/json",
+        });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "packing.json";
+        a.click();
+        URL.revokeObjectURL(a.href);
+      };
+
+      const fileImport = document.getElementById("fileImport");
+      document.getElementById("btnImport").onclick = () => fileImport.click();
+      fileImport.onchange = async () => {
+        const f = fileImport.files?.[0];
+        if (!f) return;
+        try {
+          const data = JSON.parse(await f.text());
+          if (!Array.isArray(data)) throw new Error("配列ではありません");
+          packing = data;
+          renderPacking();
+        } catch (err) {
+          // 本番はインラインのエラー表示にする（dialog は使わない）
+          document.getElementById("packtable").insertAdjacentHTML(
+            "beforebegin",
+            `<p class="micro" style="color:var(--c-food)">読み込めませんでした: ${err.message}</p>`
+          );
+        }
+        fileImport.value = "";
+      };
+
+      let resetArmed = false;
+      const btnReset = document.getElementById("btnReset");
+      btnReset.onclick = () => {
+        if (!resetArmed) {
+          resetArmed = true;
+          btnReset.innerHTML =
+            svgIcon("i-reset", "ico--sm") + " もう一度押すと戻します";
+          setTimeout(() => {
+            resetArmed = false;
+            btnReset.innerHTML = svgIcon("i-reset", "ico--sm") + " 既定に戻す";
+          }, 4000);
+          return;
+        }
+        resetArmed = false;
+        btnReset.innerHTML = svgIcon("i-reset", "ico--sm") + " 既定に戻す";
+        packing = clone(PACK_DEFAULT);
+        renderPacking();
+      };
+
+      renderPacking();
+
+      /* ══════════════ スクロール演出 ══════════════ */
+      // threshold 0 + スクロール掃引の二段構え。
+      // IntersectionObserver 単体だと、アンカージャンプやスクロール位置復元で
+      // 要素をひとまたぎしたとき is-in が付かず、コンテンツが不可視のまま残る。
+      const animated = new Set(
+        document.querySelectorAll(".reveal, .lines, .drawline")
+      );
+
+      function show(node) {
+        if (!animated.has(node)) return;
+        node.classList.add("is-in");
+        animated.delete(node);
+        io.unobserve(node);
+      }
+
+      const io = new IntersectionObserver(
+        (entries) => entries.forEach((en) => en.isIntersecting && show(en.target)),
+        { threshold: 0, rootMargin: "0px 0px -40px 0px" }
+      );
+      animated.forEach((n) => io.observe(n));
+
+      // 取りこぼしの掃引: ビューポート下端より上に来た要素は無条件で表示
+      function sweep() {
+        if (!animated.size) return;
+        [...animated].forEach((n) => {
+          if (n.getBoundingClientRect().top < innerHeight - 40) show(n);
+        });
+      }
+
+      const pbar = document.getElementById("pbar");
+      let ticking = false;
+      addEventListener(
+        "scroll",
+        () => {
+          if (ticking) return;
+          ticking = true;
+          requestAnimationFrame(() => {
+            const h = document.documentElement.scrollHeight - innerHeight;
+            pbar.style.width = (h > 0 ? (scrollY / h) * 100 : 0) + "%";
+            sweep();
+            ticking = false;
+          });
+        },
+        { passive: true }
+      );
+      addEventListener("resize", sweep, { passive: true });
+      addEventListener("load", sweep);
+      sweep();
+    </script>
+  </body>
+</html>

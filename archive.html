@@ -16,21 +16,17 @@
   </head>
   <body>
     <nav class="nav" id="nav"></nav>
-
     <main class="wrap sec">
-      <div class="menu__head reveal">
-        <div>
-          <p class="eyebrow">12–17 August 2026</p>
-          <h1 class="display lines" style="margin-top: var(--s2)">
-            <span class="ln"><i>Thailand</i></span>
-          </h1>
-        </div>
-        <p class="micro" id="countdown"></p>
-      </div>
-
-      <div class="menu__grid" id="menu"></div>
+      <p class="eyebrow">Archive</p>
+      <h1 class="display" style="font-size: clamp(32px, 4.2vw, 50px)">データ検索</h1>
+      <p class="body" style="margin-top: var(--s3)">Phase C で作ります。</p>
+      <a class="btn" href="index.html" style="margin-top: var(--s4)">メニューへ戻る</a>
     </main>
-
-    <script type="module" src="assets/js/menu.js"></script>
+    <script type="module">
+      import { injectSprite } from "./assets/js/icons.js";
+      import { renderNav } from "./assets/js/nav.js";
+      injectSprite();
+      renderNav(document.getElementById("nav"), "archive");
+    </script>
   </body>
 </html>
