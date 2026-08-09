@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createStore } from "../assets/js/store.js";
+import { createStore, StoreWriteError } from "../assets/js/store.js";
 
 function memoryBackend(initial = {}) {
   const map = new Map(Object.entries(initial));
@@ -39,8 +39,14 @@ test("未設定のキーは fallback を返す", () => {
 test("壊れた JSON は fallback を返し、例外を投げない", () => {
   // 手で localStorage をいじった、別バージョンが書いた、などで起きうる。
   // ここで throw するとページ全体が起動しなくなるので、握って既定値に戻す。
-  const store = createStore(memoryBackend({ "tp:events": "{ぐちゃぐちゃ" }));
-  assert.equal(store.read("events", "既定値"), "既定値");
+  const original = console.warn;
+  console.warn = () => {}; // 警告を捨てる
+  try {
+    const store = createStore(memoryBackend({ "tp:events": "{ぐちゃぐちゃ" }));
+    assert.equal(store.read("events", "既定値"), "既定値");
+  } finally {
+    console.warn = original;
+  }
 });
 
 test("壊れた JSON を読んだことは警告として残る", () => {
@@ -71,22 +77,47 @@ test("remove で消える", () => {
 test("容量超過は StoreWriteError として投げ直す", () => {
   // 黙って失敗すると「保存したつもり」で編集が消える。呼び出し側が気づける形にする。
   const backend = memoryBackend();
-  backend.setItem = () => {
-    const e = new Error("quota");
-    e.name = "QuotaExceededError";
-    throw e;
-  };
-  assert.throws(() => createStore(backend).write("events", { a: 1 }), /保存できませんでした/);
+  const original = new Error("quota");
+  original.name = "QuotaExceededError";
+  backend.setItem = () => { throw original; };
+
+  assert.throws(
+    () => createStore(backend).write("events", { a: 1 }),
+    (error) =>
+      error instanceof StoreWriteError &&
+      error.cause === original &&
+      /tp:events/.test(error.message)
+  );
 });
 
 test("localStorage が使えない環境でも生成自体は成功する", () => {
   // プライベートブラウジングなどで getItem が throw することがある
-  const hostile = {
-    getItem: () => { throw new Error("denied"); },
-    setItem: () => { throw new Error("denied"); },
-    removeItem: () => {},
-  };
-  const store = createStore(hostile);
-  assert.equal(store.read("a", "既定値"), "既定値");
-  assert.equal(store.has("a"), false);
+  const original = console.warn;
+  console.warn = () => {}; // 警告を捨てる
+  try {
+    const hostile = {
+      getItem: () => { throw new Error("denied"); },
+      setItem: () => { throw new Error("denied"); },
+      removeItem: () => {},
+    };
+    const store = createStore(hostile);
+    assert.equal(store.read("a", "既定値"), "既定値");
+    assert.equal(store.has("a"), false);
+  } finally {
+    console.warn = original;
+  }
+});
+
+test("remove が例外を投げても外に出さない", () => {
+  // removeItem が投げるバックエンドでも remove は静かに失敗する
+  const original = console.warn;
+  console.warn = () => {}; // 警告を捨てる
+  try {
+    const backend = memoryBackend();
+    backend.removeItem = () => { throw new Error("cannot remove"); };
+    // remove が例外を投げずに返ることを確認
+    assert.doesNotThrow(() => createStore(backend).remove("x"));
+  } finally {
+    console.warn = original;
+  }
 });
