@@ -59,6 +59,13 @@ test("connect-src が GitHub API を許可している", () => {
 
 test("地図タイルとフォントの取得元が許可されている", () => {
   const csp = cspOf(read("schedule.html"));
-  assert.ok(directive(csp, "img-src")?.some((s) => s.includes("cartocdn.com")));
+  // img-src は https: のワイルドカードで許可している（旅程データが複数の
+  // 外部ホストから画像を直リンクしているため。設計書 §13 の負債）。
+  // ホスト名を列挙する形に変えたなら、その並びに CartoDB が入っていること。
+  const img = directive(csp, "img-src");
+  assert.ok(
+    img?.includes("https:") || img?.some((s) => s.includes("cartocdn.com")),
+    `img-src が地図タイルを許可していません: ${img?.join(" ")}`
+  );
   assert.ok(directive(csp, "font-src")?.some((s) => s.includes("fonts.gstatic.com")));
 });
