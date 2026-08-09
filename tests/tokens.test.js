@@ -113,6 +113,54 @@ test("本文が主背景に対して十分な明暗差がある", () => {
   assert.ok(contrast(T.get("sand"), T.get("ink-2")) >= 4.5);
 });
 
+test("--hour-h と calendar.js の HOUR_H が一致する", () => {
+  // ずれると時間軸の目盛りとイベントブロックの高さが食い違う。
+  // 4 つのドキュメントが「両方直すこと」と書いているだけで、
+  // これまで機械的に確かめる手段が無かった。
+  const js = readFileSync(new URL("../assets/js/calendar.js", import.meta.url), "utf8");
+  const matched = /export const HOUR_H\s*=\s*(\d+(?:\.\d+)?)\s*;/.exec(js);
+  assert.ok(matched, "calendar.js から HOUR_H を読み取れません");
+  assert.equal(
+    L.get("hour-h"),
+    `${matched[1]}px`,
+    `--hour-h が ${L.get("hour-h")} なのに HOUR_H は ${matched[1]} です`
+  );
+});
+
+test("半透明用のチャンネルトークンが元の色と一致する", () => {
+  // rgb(var(--ink-rgb) / 0.14) の形で使うため、--ink を変えたときに
+  // 影だけ古い色のまま取り残されるのを防ぐ。
+  for (const [channelName, hexName] of [["ink-rgb", "ink"], ["sand-lt-rgb", "sand-lt"]]) {
+    const matched = new RegExp(`--${channelName}\\s*:\\s*(\\d+)\\s+(\\d+)\\s+(\\d+)\\s*;`).exec(css);
+    assert.ok(matched, `--${channelName} が定義されていません`);
+    const channels = matched.slice(1, 4).map(Number);
+    assert.deepEqual(
+      channels,
+      rgb(T.get(hexName)),
+      `--${channelName} が --${hexName}（${T.get(hexName)}）と一致しません`
+    );
+  }
+});
+
+test("tokens.css 以外の CSS に色リテラルを書かない", () => {
+  // 「色は tokens.css だけ」は 4 つのドキュメントが宣言している約束。
+  // スプライト側には icons.test.js の同種のガードがあるが、
+  // CSS 側には無かったので 4 箇所すり抜けていた。
+  const files = ["base.css", "controls.css", "calendar.css"];
+  for (const name of files) {
+    const src = readFileSync(new URL(`../assets/css/${name}`, import.meta.url), "utf8")
+      // コメント中の例示や出典メモは対象外
+      .replace(/\/\*[\s\S]*?\*\//g, "");
+    assert.doesNotMatch(src, /#[0-9a-fA-F]{3,8}\b/, `${name}: 16進の色リテラルがあります`);
+    // rgb(var(--ink-rgb) / 0.4) は許す。数値を直接書いた形だけを弾く
+    assert.doesNotMatch(
+      src,
+      /\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\(\s*[\d.]/,
+      `${name}: 数値を直接書いた色関数があります`
+    );
+  }
+});
+
 test("角丸トークンが5段階そろっている", () => {
   // css.includes() だとコメント内の文字列一致でも通ってしまうため、
   // 実際の宣言として値を持つかを readLengthTokens() のパース結果で検証する。

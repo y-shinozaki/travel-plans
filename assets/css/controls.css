@@ -188,7 +188,7 @@
 .sheet-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(49, 49, 49, 0.4);
+  background: rgb(var(--ink-rgb) / 0.4);
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--t-mid) var(--e-out);
@@ -259,7 +259,7 @@
   background: var(--bar);
   color: var(--sand-lt);
   border-radius: var(--r-pill);
-  font-size: 9.5px;
+  font-size: 10px;
   letter-spacing: 1.8px;
   text-transform: uppercase;
 }
