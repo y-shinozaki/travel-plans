@@ -92,9 +92,16 @@ export function createMap({ mapMount, listMount, days, onSelect }) {
       row.className = "loc";
       row.innerHTML = locationRowHtml(ev, day, accentColor(ev.cat));
 
+      // 地図の移動に失敗しても詳細シートは開く。行をクリックした人にとっての
+      // 主目的は詳細を見ることで、地図が動かないのは副作用の失敗にすぎない。
+      // ここで投げると onSelect まで届かず、画面が完全に無反応になる。
       const activate = () => {
-        map.flyTo([ev.lat, ev.lng], 14, { duration: 0.8 });
-        markers.get(keyOf(ev))?.openPopup();
+        try {
+          map.flyTo([ev.lat, ev.lng], 14, { duration: 0.8 });
+          markers.get(keyOf(ev))?.openPopup();
+        } catch (error) {
+          console.error(`map: 地点への移動に失敗しました（${ev.id} / ${ev.title}）`, error);
+        }
         onSelect?.(ev);
       };
       const label = `${catMeta(ev.cat).label}、${day.date}（${day.dow}） · ${timeLabel(ev)}`;

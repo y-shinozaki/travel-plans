@@ -373,6 +373,15 @@
   border-radius: var(--r-sm);
   padding: 10px 12px;
 }
+/* データ不備の一覧のように、改行を含む複数行のエラーを出すとき。
+   flex + 1行前提の .ferror では改行が潰れるため、ブロックに戻して
+   改行をそのまま見せる（長い行は通常どおり折り返す） */
+.ferror--block {
+  display: block;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
 .switch {
   display: flex;
   align-items: center;
