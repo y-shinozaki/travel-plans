@@ -15,6 +15,7 @@ import { icon } from "./icons.js";
 import { renderEventDetail } from "./sheet.js";
 import { emptyEvent, eventFormHtml, readEventForm, formProblems } from "./event-form.js";
 import { validateEvents, EventDataError } from "./validate.js";
+import { decToHHMM } from "./time.js";
 
 /* ── 純粋な部分（テストはここを突く） ───────────────────── */
 
@@ -35,6 +36,18 @@ export function nextEventId(events) {
 }
 
 /**
+ * 同じ時刻を指しているか。
+ *
+ * フォームの時刻は 10 進 → HH:MM → 10 進を往復する。分に丸められるので
+ * 10.58 は 10.583333333333334 になって戻ってくる（実データに 4 件ある）。
+ * 表示は decToHHMM が同じ文字列に戻すので変わらないが、触ってもいない値が
+ * 公開時の差分に載る。events.json の差分は人が読むものなので、
+ * 「同じ時刻なら元の数値を残す」で無関係なノイズを出さない。
+ */
+const sameClock = (a, b) =>
+  Number.isFinite(a) && Number.isFinite(b) && decToHHMM(a) === decToHHMM(b);
+
+/**
  * 既存イベントにフォームの入力を併合する。置き換えではない。
  *
  * フォームには image / imagePos / icon の入力欄が無い。readEventForm() の
@@ -47,6 +60,11 @@ export function nextEventId(events) {
  */
 export function mergeEvent(original, input) {
   const merged = { ...original, ...input, id: original.id };
+
+  // 時刻を触っていないなら、往復で丸まった値ではなく元の数値を残す（sameClock）
+  for (const key of ["start", "end"]) {
+    if (sameClock(original[key], merged[key])) merged[key] = original[key];
+  }
 
   // 終日に切り替えたときは時刻を落とす。readEventForm は終日のとき
   // start / end を返さないので、併合しただけでは元の時刻が残る。
@@ -108,6 +126,20 @@ export function createEventEditor({ sheet, bodyEl, getData, commit, fallbackFocu
   };
 
   /**
+   * シート本文から欄を引く。無ければどの id かを名指しして投げる。
+   *
+   * id の出どころは event-form.js のマークアップ 1 か所だけ。ずれたときに
+   * 「黙って効かない部品があるフォーム」を出さないよう、引く側は必ずここを通す。
+   */
+  function requireField(id) {
+    const node = bodyEl.querySelector(`#${id}`);
+    if (!node) {
+      throw new Error(`event-editor: 入力欄 #${id} が見つかりません`);
+    }
+    return node;
+  }
+
+  /**
    * 入力欄の値を文字列で返す。
    *
    * チェックボックスは checked から作る。DOM の input.value はチェックの
@@ -115,10 +147,7 @@ export function createEventEditor({ sheet, bodyEl, getData, commit, fallbackFocu
    * （event-form.js の readEventForm が要求している約束）。
    */
   function getValue(id) {
-    const node = bodyEl.querySelector(`#${id}`);
-    if (!node) {
-      throw new Error(`event-editor: 入力欄 #${id} が見つかりません`);
-    }
+    const node = requireField(id);
     return node.type === "checkbox" ? (node.checked ? "on" : "") : node.value;
   }
 
@@ -152,15 +181,16 @@ export function createEventEditor({ sheet, bodyEl, getData, commit, fallbackFocu
   }
 
   /**
-   * 例外（全体検査・保存の失敗）を伝える。
+   * 例外（全体検査・保存・組み立ての失敗）を伝える。
    * validateEvents のメッセージは複数行なので .ferror--block で改行を残す。
+   * lead は「何をしようとして失敗したのか」の 1 行目。
    */
-  function showFailure(error) {
+  function showFailure(error, lead = "保存に失敗しました。") {
     const box = errorBox();
     const text =
       error instanceof EventDataError
         ? `この内容では保存できません。\n${error.message}`
-        : `保存に失敗しました。\n${error?.name ?? "Error"}: ${error?.message ?? String(error)}`;
+        : `${lead}\n${error?.name ?? "Error"}: ${error?.message ?? String(error)}`;
     if (!box) {
       // フォームが出ていない（削除の失敗など）。シートごと文言に差し替える
       sheet.open("保存できません", failureBody(text));
@@ -304,7 +334,7 @@ export function createEventEditor({ sheet, bodyEl, getData, commit, fallbackFocu
         save(original);
       } catch (error) {
         console.error("event-editor: 入力を読み取れませんでした", error);
-        showFailure(error);
+        showFailure(error, "入力を読み取れませんでした。");
       }
     });
     foot.push(saveBtn);
@@ -328,12 +358,21 @@ export function createEventEditor({ sheet, bodyEl, getData, commit, fallbackFocu
 
     sheet.open(original ? "予定を編集" : "予定を追加", body, foot);
 
-    // 終日の予定は時刻を持たないので、切り替えに合わせて時刻欄を出し入れする
-    const allDay = bodyEl.querySelector("#f-allday");
-    const times = bodyEl.querySelector("#f-times");
-    const syncTimes = () => times.classList.toggle("is-hidden", allDay.checked);
-    allDay.addEventListener("change", syncTimes);
-    syncTimes();
+    // 終日の予定は時刻を持たないので、切り替えに合わせて時刻欄を出し入れする。
+    //
+    // ここで落ちても例外を外へ出さない。抜けると「トグルだけ黙って効かない
+    // フォーム」が開いたまま残り、画面には理由が何も出ない。他の DOM 参照
+    // （requireField / errorBox）と同じく、名指しして画面の中で伝える。
+    try {
+      const allDay = requireField("f-allday");
+      const times = requireField("f-times");
+      const syncTimes = () => times.classList.toggle("is-hidden", allDay.checked);
+      allDay.addEventListener("change", syncTimes);
+      syncTimes();
+    } catch (error) {
+      console.error("event-editor: 終日の切り替えを配線できませんでした", error);
+      showFailure(error, "このフォームを正しく組み立てられませんでした。");
+    }
   }
 
   return {
