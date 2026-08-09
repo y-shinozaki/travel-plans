@@ -283,12 +283,17 @@
   padding: var(--s2);
   border-bottom: 1px solid var(--line-faint);
   cursor: pointer;
+  outline: none;
   transition: background var(--t-fast) var(--e-out),
     padding-left var(--t-fast) var(--e-out);
 }
 .loc:hover {
   background: var(--paper);
   padding-left: 20px;
+}
+.loc:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
 }
 .loc__thumbwrap {
   width: 84px;

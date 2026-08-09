@@ -1,7 +1,7 @@
 import { collectLocations } from "./events.js";
 import { timeLabel } from "./time.js";
 import { icon, CATEGORY_ICON } from "./icons.js";
-import { CAT_META } from "./calendar.js";
+import { CAT_META, makeSelectable } from "./calendar.js";
 
 /**
  * タイルは CartoDB Positron（低彩度）を使う。
@@ -74,11 +74,13 @@ export function createMap({ mapMount, listMount, days, onSelect }) {
         </div>
         <span class="loc__go">${icon("i-arrow-right", "ico--sm")}</span>`;
 
-      row.addEventListener("click", () => {
+      const activate = () => {
         map.flyTo([ev.lat, ev.lng], 14, { duration: 0.8 });
         markers.get(keyOf(ev))?.openPopup();
         onSelect?.(ev);
-      });
+      };
+      const label = `${CAT_META[ev.cat].label}、${day.date}（${day.dow}） · ${timeLabel(ev)}`;
+      makeSelectable(row, ev, label, activate);
       listMount.appendChild(row);
     }
   }

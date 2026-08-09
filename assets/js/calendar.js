@@ -27,8 +27,10 @@ function el(tag, cls, text) {
  * キーボードでも到達・実行できるようにする。
  * カレンダーのブロック／ピルは見た目上カード状で <button> の既定スタイルと
  * 相性が悪いため、role="button" + tabindex + keydown で最小限に済ませる。
+ * map.js のロケーション一覧行でも同じパターンが必要になるため export する
+ * （同じロジックを 2 箇所に書き写さない）。
  */
-function makeSelectable(node, ev, label, onSelect) {
+export function makeSelectable(node, ev, label, onSelect) {
   node.tabIndex = 0;
   node.setAttribute("role", "button");
   node.setAttribute("aria-label", `${ev.title}、${label}`);
