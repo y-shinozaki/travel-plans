@@ -219,23 +219,26 @@ export function readEventForm(getValue) {
   const lngText = text("f-lng");
   const hasCoords = latText !== "" && lngText !== "";
 
-  // events.json 上のキーの並びに合わせて組み立てる（差分を読みやすく保つため）
+  // キーの並びは events.json の既存イベントに合わせる（start / end は末尾）。
+  // 新しい予定だけ並びが違うと、公開したときの差分が読みにくくなる
   const ev = {
     cat: text("f-cat"),
     title: text("f-title"),
     allDay,
     startDay: toIndex(text("f-sday")),
     endDay: toIndex(text("f-eday")),
+    location: text("f-loc"),
+    lat: hasCoords ? Number(latText) : null,
+    lng: hasCoords ? Number(lngText) : null,
+    url: text("f-url"),
+    notes: text("f-notes"),
   };
+  // 終日の予定は start / end を「持たない」。null を入れると
+  // 「終日でないのに時刻が無い」形と区別が付かなくなる
   if (!allDay) {
     ev.start = toDec(text("f-start"));
     ev.end = toDec(text("f-end"));
   }
-  ev.location = text("f-loc");
-  ev.lat = hasCoords ? Number(latText) : null;
-  ev.lng = hasCoords ? Number(lngText) : null;
-  ev.url = text("f-url");
-  ev.notes = text("f-notes");
   return ev;
 }
 
