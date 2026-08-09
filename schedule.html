@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>旅程 — Thailand 2026</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,200;6..72,300;6..72,400&family=Inter:wght@300;400;500&family=Noto+Sans+JP:wght@300;400;500&family=Noto+Serif+JP:wght@200;300;400&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="assets/css/tokens.css" />
+    <link rel="stylesheet" href="assets/css/base.css" />
+    <link rel="stylesheet" href="assets/css/controls.css" />
+    <link rel="stylesheet" href="assets/css/calendar.css" />
+  </head>
+  <body>
+    <nav class="nav" id="nav"></nav>
+
+    <main class="wrap sec">
+      <div class="shead reveal">
+        <div class="shead__idx"><span class="n">01</span>Itinerary</div>
+        <div>
+          <h1 class="display lines" style="font-size: clamp(38px, 5vw, 72px)">
+            <span class="ln"><i>六日間の道のり</i></span>
+          </h1>
+        </div>
+      </div>
+
+      <div class="toolbar reveal">
+        <div class="toolbar__group">
+          <span class="eyebrow">Hours</span>
+          <select id="view-start" aria-label="表示開始時刻"></select>
+          <span class="micro">—</span>
+          <select id="view-end" aria-label="表示終了時刻"></select>
+        </div>
+        <div class="toolbar__group" id="cat-filters">
+          <span class="eyebrow">Category</span>
+        </div>
+      </div>
+
+      <div class="cal" id="cal"></div>
+    </main>
+
+    <script type="module" src="assets/js/schedule.js"></script>
+  </body>
+</html>
