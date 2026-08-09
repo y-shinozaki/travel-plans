@@ -3,6 +3,22 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Phase B でリポジトリ書き込み権限を持つトークンをブラウザに保存するため、
+         スクリプトの実行元を自分自身だけに絞る。'unsafe-inline' を入れないので
+         インライン script と javascript: URL は実行されない。
+         style は Leaflet と自前コードが style 属性を多用するため許可が要る
+         （狙いはスクリプト実行の遮断であって、スタイルではない）。 -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self';
+               script-src 'self';
+               style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+               font-src https://fonts.gstatic.com;
+               img-src 'self' data: https:;
+               connect-src 'self' https://api.github.com;
+               base-uri 'self';
+               form-action 'none'"
+    />
     <title>Thailand 2026</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -14,7 +30,7 @@
     <link rel="stylesheet" href="assets/css/base.css" />
     <link rel="stylesheet" href="assets/css/controls.css" />
   </head>
-  <body>
+  <body data-page="archive">
     <nav class="nav" id="nav"></nav>
     <main class="wrap sec">
       <p class="eyebrow">Archive</p>
@@ -22,11 +38,6 @@
       <p class="body" style="margin-top: var(--s3)">Phase C で作ります。</p>
       <a class="btn" href="index.html" style="margin-top: var(--s4)">メニューへ戻る</a>
     </main>
-    <script type="module">
-      import { injectSprite } from "./assets/js/icons.js";
-      import { renderNav } from "./assets/js/nav.js";
-      injectSprite();
-      renderNav(document.getElementById("nav"), "archive");
-    </script>
+    <script type="module" src="assets/js/stub-page.js"></script>
   </body>
 </html>
