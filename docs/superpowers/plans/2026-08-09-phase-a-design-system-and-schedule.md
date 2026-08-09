@@ -23,7 +23,13 @@
 - **角丸は `--r-xs` / `--r-sm` / `--r-md` / `--r-lg` / `--r-pill` のトークンのみ使う。** 生の px を書かない
 - **`alert()` / `confirm()` / `prompt()` を使わない。** ページ全体をブロックするため。破壊的操作は2度押し、エラーはインライン表示
 - **行間は 1.45 倍を基本とし、本文のみ 1.7 倍**
-- **大文字化（`text-transform: uppercase`）は 10px・字間 2px のラベルにのみ適用する**
+- **大文字化（`text-transform: uppercase`）は、10〜12px・字間 1.2〜2px のミクロラベルと
+  コントロール類にのみ適用する。見出しと本文には使わない。**
+  該当するのは `.eyebrow` `.swipe` `.field2 label` `.shead__idx`（10px/2px）、
+  `.rowbtn--confirm`（10px/1.4px）、`.chip` `.nav__link`（11px/1.4px）、
+  `.tbtn`（11px/1.2px）、`.btn`（12px/1.6px）。
+  ※ 当初この制約を「10px・字間 2px のみ」と書いていたが、それは Aman の実測ラベル 1 種類だけを
+  指した記述で、承認済みモックのコントロール類を説明できていなかった。実態に合わせて訂正済み。
 - **`prefers-reduced-motion: reduce` で全アニメーションを無効化する**
 - UI の文言はすべて日本語
 - JS は `<script type="module">` で読み込む。`file://` では動かないため、動作確認は必ず `python3 -m http.server 8000` 経由で行う
