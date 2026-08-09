@@ -350,21 +350,6 @@
   color: var(--bar);
 }
 
-.ev.is-editable {
-  cursor: pointer;
-}
-.ev.is-editable::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border: 1px dashed transparent;
-  border-radius: inherit;
-  transition: border-color var(--t-fast) var(--e-out);
-}
-.ev.is-editable:hover::after {
-  border-color: currentColor;
-}
-
 /* ── ツールバーボタン ── */
 .tbtn {
   display: inline-flex;
