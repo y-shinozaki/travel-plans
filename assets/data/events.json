@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-08-09T15:08:48.028939Z",
+  "updatedAt": "2026-08-09T15:16:14.400383Z",
   "days": [
     {
       "dow": "水",
@@ -494,11 +494,11 @@
       "lat": 12.9215,
       "lng": 100.8594,
       "url": "https://www.google.com/maps/search/The+Sky+Gallery+Pattaya",
-      "notes": "仮設定。プラタムナックヒル、ホテルから車5分",
+      "notes": "仮設定。プラタムナックヒル、ホテルから車5分\n8月のパタヤの日没は 18:40 頃。夕日の時間に重なるようこの時間にしている",
       "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSK9gYvVdp5p8zfLd2iyaG7ldcf-2gtwg8N1w&s",
       "imagePos": "",
-      "start": 20.0,
-      "end": 21.5
+      "start": 17.0,
+      "end": 19.0
     },
     {
       "id": "ev-034",
@@ -709,56 +709,56 @@
       "imagePos": ""
     },
     {
-      "id": "ev-046",
-      "cat": "cat-move",
-      "title": "移動（Grab）",
-      "allDay": false,
-      "startDay": 1,
-      "endDay": 1,
-      "start": 17.0,
-      "end": 18.0,
-      "location": "",
-      "lat": null,
-      "lng": null,
-      "url": "",
-      "notes": "エムクオーティエ → ラジャダムナン・スタジアム 約9km。夕方は渋滞するので余裕を見る",
-      "image": "",
-      "imagePos": "",
-      "icon": "i-car"
-    },
-    {
-      "id": "ev-047",
-      "cat": "cat-sight",
-      "title": "ムエタイ観戦（ラジャダムナン）",
-      "allDay": false,
-      "startDay": 1,
-      "endDay": 1,
-      "start": 18.0,
-      "end": 20.5,
-      "location": "ラジャダムナン・スタジアム",
-      "lat": 13.757,
-      "lng": 100.5058,
-      "url": "https://www.lumpinee-rajadamnern.com/rajadamnern",
-      "notes": "木曜は 18:00 開始・8試合で 21 時頃まで。後半ほどメインの試合になる\n最後まで見なくても途中で出られる。夕食は屋台か観戦後に",
-      "image": "",
-      "imagePos": ""
-    },
-    {
       "id": "ev-048",
       "cat": "cat-sight",
       "title": "ティファニーズ・ショー",
       "allDay": false,
       "startDay": 3,
       "endDay": 3,
-      "start": 18.0,
-      "end": 19.33,
+      "start": 19.5,
+      "end": 20.83,
       "location": "464 Moo 9, パタヤ 2nd Rd（ノースパタヤ）",
       "lat": 12.953,
       "lng": 100.888,
       "url": "https://www.tiffany-show.co.th/booking",
-      "notes": "上演 70〜80分。回は 18:00 / 19:30 / 21:00（ほかに 16:30 と 22:30 の回もある）\nホテルから約2km・10分。要予約\nツアーが 15:20 に戻るので支度の時間はある",
+      "notes": "上演 70〜80分。回は 18:00 / 19:30 / 21:00（ほかに 16:30 と 22:30 の回もある）\n19:30 の回にしたのは、The Sky Gallery で夕日を見てから向かうため。\n21:00 の回だと終演 22:20 で、翌日のチェックアウトと機内泊にひびく\n要予約",
       "image": "",
       "imagePos": ""
+    },
+    {
+      "id": "ev-049",
+      "cat": "cat-food",
+      "title": "夕ごはん（お店は未定）",
+      "allDay": false,
+      "startDay": 1,
+      "endDay": 1,
+      "start": 18.0,
+      "end": 19.5,
+      "location": "",
+      "lat": null,
+      "lng": null,
+      "url": "",
+      "notes": "お店は未定",
+      "image": "",
+      "imagePos": ""
+    },
+    {
+      "id": "ev-050",
+      "cat": "cat-move",
+      "title": "移動（Grab）",
+      "allDay": false,
+      "startDay": 3,
+      "endDay": 3,
+      "start": 19.0,
+      "end": 19.5,
+      "location": "",
+      "lat": null,
+      "lng": null,
+      "url": "",
+      "notes": "The Sky Gallery → ティファニーズ・ショー 約5.5km・25分",
+      "image": "",
+      "imagePos": "",
+      "icon": "i-car"
     }
   ]
 }

@@ -67,8 +67,8 @@ test("日付をまたぐフライトは 2 日ぶんに割れる（start > end �
 
 test("座標を持つイベントは同一地点にまとめられる", () => {
   const withCoords = data.events.filter(hasCoords);
-  assert.equal(withCoords.length, 23, "座標を持つイベント数");
-  assert.equal(collectLocations(data.events, null).length, 19, "重複除去後の地点数");
+  assert.equal(withCoords.length, 22, "座標を持つイベント数");
+  assert.equal(collectLocations(data.events, null).length, 18, "重複除去後の地点数");
 });
 
 test("カテゴリで絞ると地点が実際に減る", () => {

@@ -481,7 +481,7 @@ test("配線: 新規追加は採番され、削除ボタンを出さない", () 
     fire(h.sheet.opens[0].foot[0]);
     assert.equal(h.commits.length, 1);
     const added = h.commits[0].events.at(-1);
-    assert.equal(added.id, "ev-049");
+    assert.equal(added.id, "ev-046");
     assert.ok(!DATA.events.some((ev) => ev.id === added.id));
     assert.equal(h.commits[0].events.length, DATA.events.length + 1);
     // 元が無いので、フォームに無いキーは付かない
