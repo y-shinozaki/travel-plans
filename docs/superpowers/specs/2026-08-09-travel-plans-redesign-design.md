@@ -631,12 +631,23 @@ assets/data/archive.enc
 Phase A の実装とレビューで見つかり、Phase A の範囲外として意図的に残した項目。
 着手前にこの節を読むこと。
 
+**Phase A で解消し、この節から削除した項目**（PR #5 のレビュー指摘による。
+3 人のレビュアーが独立に「Phase B まで待てない」と判断したため繰り越しを取り消した）:
+
+- `ev.url` のスキーム検証 → `dom.js` の `safeHttpUrl()`（http / https の許可リスト）。
+  弾いた URL はリンクにせず素のテキストで見せる
+- 読み込み時のデータ検査の不在 → `assets/js/validate.js` の `validateEvents()`。
+  `schedule.js` が描画前に一度だけ通す。これに伴い次も解消した:
+  範囲外の `startDay` によるイベントの黙殺 / `NaN`・片側だけの座標 /
+  `dayRangeLabel` の添字エラー / `days.length === 0` の不正な CSS
+- `schedule.js` の `catch` が失敗の種類を区別しない → HTTP・通信断 / JSON パース失敗 /
+  データ内容の不備 / それ以外、の 4 通りに文言を分けた。
+  初回描画のあとの再描画（セレクトとチップ）も `safeDraw()` で守っている
+- `menu.js` に例外処理が無く、失敗すると index.html が真っ白になる →
+  `schedule.js` と同じ `try` / `catch` / `finally` にした
+
 ### セキュリティ（Phase B の公開機能に直結する）
 
-- **`ev.url` のスキーム検証がない。** `renderEventDetail` は `<a href>` に
-  `escapeHtml` は掛けるが、`javascript:` スキームは素通りする。現状は `events.json` が
-  リポジトリ管理下なので到達しないが、**Phase B で url が編集可能になった時点で
-  実際の穴になる。** 同じページに書き込み権限のトークンが載る点に注意
 - **CSP を入れていない。** `<meta http-equiv="Content-Security-Policy">` で
   `script-src` から `unsafe-inline` を外せば、文字列組み立てによる注入をまとめて塞げる。
   今なら `packing.html` / `archive.html` のインライン module を外部ファイルへ移すだけで済む。
@@ -649,14 +660,13 @@ Phase A の実装とレビューで見つかり、Phase A の範囲外として�
 
 - **`map.js` の再描画判定が `id` と座標だけを見ている。** `title` や `image` を
   その場で編集しても一覧が更新されない。Phase B の編集機能で顕在化する
-- **`schedule.js` の `catch` が描画時の例外もデータ読込失敗として表示する。**
-  実際の原因は `console.error` には出る
-- **`dayRangeLabel` は `endDay` 未定義で落ちる。** `expandEvents` は `??` で
-  フォールバックしており不整合。正しい直し方は読み込み時に一度正規化すること。
-  2 つ目の `??` を足して糊塗しないこと
 - **`iconOf` は `ev.icon` があると `ev.cat` を検証しない。** 不正なカテゴリが
-  カレンダーだけ無言で通る（地図と詳細シートは throw する）
+  カレンダーだけ無言で通る（地図と詳細シートは throw する）。
+  読み込み時の `validateEvents()` が `cat` を検査するようになったため、
+  `events.json` 経由では到達しない。Phase B のフォーム入力を検査外で描画すると復活する
 - **`hhmmToDec` は `"24:30"` を受け入れる。** Phase B でフォーム入力を通す前に上限を決める
+  （`validateEvents()` は `start` / `end` を 0〜24 に制限しているが、
+  `hhmmToDec` 自体の上限はまだ `h > 24` のまま）
 - **シートに閉じる操作を拒否する手段がない。** Phase B の編集フォームは未保存の変更を
   黙って捨てることになる。`confirm()` は使えないので `canClose` 述語などが要る
 - **`sheet.open()` は本文を文字列で受け取る。** フォームを載せるなら Node も
@@ -667,7 +677,6 @@ Phase A の実装とレビューで見つかり、Phase A の範囲外として�
 - CSS の色リテラル検査（`tokens.test.js`）は対象ファイルをハードコードしている。
   `packing.css` を足すと無検査になる
 - 名前付き色（`red` など）とコメント内の色は検査対象外
-- `days.length === 0` で `repeat(0, 1fr)` という不正な CSS になる
 - `.ev` の padding が `box-sizing: border-box` 下で高さの下限になり、表示終端まで
   13.6 分未満のイベントで約 5.6px はみ出す（実データでは発生しない）
 - メニューカードが `ul` / `li` で包まれていない

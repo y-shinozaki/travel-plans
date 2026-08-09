@@ -34,8 +34,11 @@ travel-plans/
 │   │   ├── lanes.js        assignLanes()（重なるイベントのレーン配置）
 │   │   ├── icons.js        インライン SVG スプライトの注入と icon()（スプライトのみを扱う）
 │   │   ├── categories.js   CAT_META（ラベル・既定アイコン）、catMeta() / iconOf() /
-│   │   │                   accentToken() / accentColor()。カテゴリの知識はここだけ
-│   │   ├── dom.js          el() / makeSelectable() / escapeHtml()（描画の共通部品）
+│   │   │                   accentToken() / accentColor()。カテゴリの JS 側の定義
+│   │   │                   （色の実体は tokens.css と calendar.css。後述の3ファイル）
+│   │   ├── validate.js     validateEvents()。events.json を描画前に一度だけ検査する
+│   │   ├── countdown.js    index.html の「出発まで あと N 日」（DOM に触らない）
+│   │   ├── dom.js          el() / makeSelectable() / escapeHtml() / safeHttpUrl()
 │   │   ├── calendar.js     renderCalendar()、HOUR_H
 │   │   ├── map.js          Leaflet 初期化、位置情報リスト、popupHtml() / locationRowHtml()
 │   │   ├── sheet.js        詳細シート（読み取り専用）、renderEventDetail()
@@ -103,6 +106,8 @@ travel-plans/
 ```
 assets/data/events.json（fetch）
   ↓
+validateEvents() → 描画前に一度だけ形を検査（後述）。通らなければここで止める
+  ↓
 expandEvents() → 複数日イベントを日単位のセグメントに変換
 assignLanes()  → 同じ日・重なる時間帯のセグメントにレーンを割り当てる
   ↓
@@ -129,6 +134,43 @@ map.js の createMap() → 座標を持つイベントからマーカーと位�
 4. 複数日にまたがる場合は `endDay` を `startDay` より後ろにする
 5. 終日イベント（ホテルなど）は `allDay: true` にする。地図に出さない場合は `lat` / `lng` を `null` にする
 6. 保存後、ブラウザをリロードすれば反映される（ビルドステップなし）
+
+### 新しいカテゴリを追加
+
+**触るファイルは 3 つある。**「カテゴリの知識は `categories.js` だけ」ではない
+（色の実体は CSS 側にあり、JS は名前で参照しているだけ）。
+
+1. `assets/js/categories.js` の `CAT_META` に `cat-xxx`（ラベルと既定アイコン）を足す
+2. `assets/css/tokens.css` に `--c-xxx` / `--c-xxx-bg` / `--c-xxx-tx` の 3 値を足す
+3. `assets/css/calendar.css` に `.cat-xxx { --bar / --bg / --tx }` のブロックを足す
+
+1 だけで 2 を忘れると `accentColor()` が例外になり、3 を忘れるとイベントブロックも
+終日ピルも未定義のカスタムプロパティを参照して無色になる（JS 側は何も気付かない）。
+
+`node --test` がこの 3 点セットを機械的に検査する。`tests/tokens.test.js` は
+カテゴリ一覧を `CAT_META` から導いているので、**テストにカテゴリ名を書き写さないこと**
+（写すと 1 だけ足して CSS を忘れた状態が素通りする）。
+新しいカテゴリは `tests/categories.test.js` の `CATEGORIES`（Phase A の想定一覧）にも足す。
+
+### データの検査（`assets/js/validate.js`）
+
+`schedule.js` は `events.json` を fetch したあと、描画に入る前に `validateEvents(data)` を
+一度だけ通す。ここを通過したコードは「`days` の添字は有効」「座標は有限」を前提にしてよい。
+
+検査するのは、破ると**静かに壊れる**前提:
+
+- `days` / `events` が配列で、`days` が空でないこと
+- `startDay` / `endDay` が `[0, days.length)` の整数で、`endDay >= startDay` であること
+  （範囲外だと `expandEvents` が 0 セグメントを返し、イベントがカレンダーから黙って消える）
+- `cat` が `CAT_META` にあること
+- 終日でないイベントの `start` / `end` が有限で 0〜24 に収まること
+  （**`start > end` は日をまたぐイベントの正しい形。入れ替えて「直さない」こと**）
+- `lat` / `lng` が「両方 null」か「両方が有限の数値」であること
+  （片方だけだと「座標なし」と区別が付かず、`NaN` は `!= null` をすり抜けて Leaflet に届く）
+- `id` が空でない一意の文字列であること
+
+不備は 1 件目で止めず全部集め、どのイベントの何が悪いかを名指しして
+`EventDataError` で投げる。画面には「再読み込みでは直らない」旨とともに一覧が出る。
 
 ### カレンダーグリッドの高さを変更
 
@@ -191,15 +233,27 @@ Leaflet を更新する際は `assets/vendor/leaflet/` 配下のファイルを�
 node --test
 ```
 
-依存ゼロ、ビルド不要。`tests/` 配下は `time.js` / `events.js` / `lanes.js` / `icons.js` /
-`categories.js` / `tokens.css` の純粋関数・静的な検証と、`tests/renderers.test.js` の
-エスケープ検証を対象にしている（`package.json` は `"type": "module"` を宣言するためだけに存在する）。
+依存ゼロ、ビルド不要。`tests/` 配下は純粋関数・静的な検証を対象にしている
+（`package.json` は `"type": "module"` を宣言するためだけに存在する）。
 
-`tokens.test.js` は色そのものに加えて次の 2 つの約束も機械的に守らせている:
+- `time.test.js` / `events.test.js` / `lanes.test.js` / `icons.test.js` / `categories.test.js`
+- `calendar.test.js` — `blockLayout()` の配置計算（上端・下端の切り落とし、22px の下限、
+  列の高さによるクランプ、時刻ラベルを出す 36px の境界）
+- `validate.test.js` — `validateEvents()`。不備が例外になり、かつイベントを名指しすること
+- `countdown.test.js` — 出発カウントダウンの日付計算と境界
+- `data.test.js` — **実データ**（`assets/data/events.json`）を検査とパイプラインに通す。
+  件数・セグメント数・地点数の実測値を固定しているので、旅程を編集すると落ちる。
+  意図した変更なら期待値を更新すること
+- `renderers.test.js` — エスケープ、URL スキームの許可リスト、カテゴリ絞り込み、`renderNav`
+- `tokens.test.js` — 色のコントラストと、下記の CSS 側の約束
+
+`tokens.test.js` は色そのものに加えて次の約束も機械的に守らせている:
 
 - `--hour-h`（tokens.css）と `HOUR_H`（calendar.js）が同じ値であること
 - `base.css` / `controls.css` / `calendar.css` に色リテラルを書かないこと
   （半透明が必要なら `rgb(var(--ink-rgb) / 0.14)` のようにチャンネルトークンを使う）
+- `CAT_META` の各カテゴリに `tokens.css` の 3 値と `calendar.css` の `.cat-xxx` が揃っていること
+  （「新しいカテゴリを追加」参照。カテゴリ一覧は `CAT_META` から導いている）
 
 `renderers.test.js` の `renderCalendar` のテストは、`document.createElement` だけを備えた
 最小スタブを噛ませて「どの文字列が `innerHTML` に入り、どれが `textContent` に入ったか」を
@@ -254,6 +308,15 @@ Safari 15.5 で対応したため、これがサポート下限を決めてい�
   `tests/renderers.test.js` が 3 つの描画経路すべてについてこれを検証している。
   Phase B ではブラウザで入力した文字列を、リポジトリ書き込み権限を持つトークンを
   抱えたページ自身で描画することになるため、この規約は必須
+- **`href` に載せる URL は `escapeHtml()` では守れない。** `escapeHtml()` が変換するのは
+  `& < > " '` の 5 文字だけで、`javascript:…` にはそのどれも含まれない。
+  URL は必ず `dom.js` の `safeHttpUrl()`（http / https の許可リスト）を通し、
+  弾かれた値はリンクにしないこと
+- **エラーは必ず画面かコンソールに出す。** `alert()` / `confirm()` / `prompt()` は使わない。
+  各ページのエントリポイント（`menu.js` / `schedule.js`）は本体を `try` / `catch` / `finally`
+  で囲み、失敗しても `initReveal()` は必ず走らせる（`.reveal` は `opacity: 0` で待機しているため、
+  飛ばすとページが真っ白になる）。初回描画のあとの再描画（`schedule.js` の `safeDraw()`）も
+  同様に守ること
 - Leaflet MarkerCluster は未実装。イベント密度が大幅に増加した場合に追加検討
 - Dancing Script（旧デザインの筆記体タイトル）は Aman 由来のデザインへの刷新に伴い廃止した。
   現在の見出しフォントは `--serif`（Newsreader / Noto Serif JP）
