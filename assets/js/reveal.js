@@ -7,6 +7,16 @@
  */
 
 export function initReveal(root = document) {
+  /**
+   * 対象は initReveal() を呼んだ時点の一度きりのスナップショット。
+   * MutationObserver は使っていないので、あとから DOM に足した .reveal は
+   * 永久に opacity: 0 のまま残る（誰も is-in を付けない）。
+   *
+   * Phase A では各ページの描画がすべて initReveal() より前に終わるので
+   * 問題にならないが、Phase B の持ち物リストのように後から行が増える画面では
+   * ここに当たる。そのときは足した要素に is-in を直接付けるか、
+   * 描画のあとで initReveal() を呼び直すこと（返り値で前回を破棄してから）。
+   */
   const pending = new Set(root.querySelectorAll(".reveal, .lines, .drawline"));
   if (!pending.size) return () => {};
 
