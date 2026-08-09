@@ -229,7 +229,11 @@ node --test
 
 - Chrome/Edge（最新版）
 - Firefox（最新版）
-- Safari（iOS 14 以上）
+- Safari（iOS 15.5 以上）
+
+詳細シートは背景を `inert` で隔離している（`assets/js/sheet.js`）。`inert` は
+Safari 15.5 で対応したため、これがサポート下限を決めている。これより古い Safari では
+閉じたシートの閉じるボタンがタブ移動で到達でき、支援技術からも隠れない。
 
 ## デプロイメント
 
