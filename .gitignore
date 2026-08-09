@@ -40,6 +40,10 @@ npm-debug.log*
 # Temp
 .tmp/
 
+# 手元にだけ置く元データ（LINE のトーク履歴、メールの控えなど）。
+# 設計書 §2.2 は当初からここを対象外と書いていたが、実際には入っていなかった。
+private/
+
 # Local development (but keep .claude/settings.json for project config)
 
 # Superpowers subagent-driven-development の作業領域（コミット対象外）
