@@ -2377,6 +2377,22 @@ EOF
 
 Phase B で編集フォームを同じシートに載せるため、開閉とフォーカス管理は `sheet.js` に、中身の生成は呼び出し側に分ける。
 
+- [ ] **Step 0: スプライトに `i-x` を足す**
+
+閉じるボタンに使う × 記号が Phase A のスプライトに入っていない。Task 7 の 18 個を
+選んだときに数え落としたもの。矢印で代用すると意味が合わないので、ここで足す。
+
+`assets/js/icons.js` の `SPRITE` に追加:
+
+```html
+  <symbol id="i-x" viewBox="0 0 24 24">
+    <path d="M6 6l12 12M18 6 6 18"/>
+  </symbol>
+```
+
+`ICON_IDS` の配列にも `"i-x"` を足す。`tests/icons.test.js` の必須リスト（UI 部品の行）にも
+足して、`node --test tests/icons.test.js` が通ることを確認する。
+
 - [ ] **Step 1: `assets/js/sheet.js` を作る**
 
 ```js
@@ -2487,7 +2503,7 @@ export function renderEventDetail(ev, days) {
       <div class="sheet__head">
         <p class="eyebrow" id="sheet-title">予定</p>
         <button class="rowbtn" id="sheet-close" aria-label="閉じる">
-          <svg class="ico ico--sm"><use href="#i-arrow-right"/></svg>
+          <svg class="ico ico--sm"><use href="#i-x"/></svg>
         </button>
       </div>
       <div class="sheet__body" id="sheet-body"></div>
@@ -2520,7 +2536,16 @@ import { createSheet, renderEventDetail } from "./sheet.js";
     sheet.open("予定の詳細", renderEventDetail(ev, state.days));
 ```
 
-`draw()` と `createMap()` の `onSelect` を `console.log` から `openDetail` に差し替える。`openDetail` は `main()` のスコープにあるので、`draw()` をモジュール直下ではなく `main()` の中に移すか、`state` にぶら下げること。**`state.onSelect = openDetail;` を `main()` で設定し、`draw()` は `state.onSelect` を渡す形にするのが簡単。**
+`schedule.js` には現在 `onSelect: (ev) => console.log("選択:", ev.title)` が 2 か所ある
+（`draw()` 内の `renderCalendar` 呼び出しと、`main()` 内の `createMap` 呼び出し）。
+両方を `openDetail` に差し替える。
+
+`openDetail` は `main()` のスコープにあり `draw()` はモジュール直下にあるので、そのままでは
+参照できない。**`main()` で `state.onSelect = openDetail;` を設定し、`draw()` は
+`state.onSelect` を渡す形にするのが簡単。** `createMap` にも同じものを渡す。
+
+`console.log` が 1 つも残っていないことを、差し替え後に
+`grep -n "console.log" assets/js/schedule.js` で確認すること。
 
 - [ ] **Step 4: ブラウザで確認する**
 
