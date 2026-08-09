@@ -384,19 +384,28 @@ fetch が失敗した場合（オフライン、Pages 障害）はローカル�
 GitHub Contents API を使う。
 
 ```
-1. GET  /repos/{owner}/{repo}/contents/assets/data/events.json  → 現在の sha
-2. updatedAt を現在時刻に更新
-3. PUT  同 URL  { message, content: base64(JSON), sha }
-4. 成功 → baseUpdatedAt を更新、「公開しました」を表示
+1. 検証。validateEvents を通らなければここで止める（壊れたものを push しない）
+2. GET  /repos/{owner}/{repo}/contents/assets/data/events.json  → sha と本文
+3. 本文の updatedAt を baseUpdatedAt と比較する ← 競合検出はここ
+     進んでいれば「取り込んでから公開し直してください」で中断する
+4. updatedAt を現在時刻に更新
+5. PUT  同 URL  { message, content: base64(JSON), sha }
+6. 成功 → baseUpdatedAt を更新、「公開しました」を表示
 ```
 
 注意点:
 
 - **base64 化に `btoa()` を直接使わない**。日本語を含む UTF-8 は例外になる。
   `TextEncoder` でバイト列にしてから base64 化する
-- sha が古い場合 API は 409 を返す。別端末から公開した場合に起きる。
-  「リモートが更新されています。取り込んでから公開し直してください」と表示し、
-  勝手に上書きしない
+- **競合検出を sha に頼らないこと。** GET の直後に PUT するので sha はほぼ常に最新で、
+  409 が返るのは GET と PUT の間の数十ミリ秒に別の公開が挟まった場合だけ。
+  現実の競合は「B がページを開いて 30 分編集する間に A が公開する」という形で起きる。
+  この場合 sha は新しいままなので **PUT は成功し、A の作業が黙って消える**。
+  手順 3 の `updatedAt` 比較が本当の砦であり、GET が返す本文を捨ててはならない。
+  409 の処理は残すが、それは最後の保険であって主たる検出手段ではない
+  （2026-08-09、Task 7 のレビューで判明。当初この節は sha 競合を主たる検出手段と書いていた）
+- ページ起動時の `decideSync` はページを開いた瞬間しか見ないので、
+  開いたまま編集している間に起きた公開は検出できない。公開時にもう一度確かめる必要がある
 - Pages への反映には 1 分程度かかる。公開直後に「反映まで少し時間がかかります」と添える
 - 公開は 3 つの JSON をまとめてではなく、変更のあったファイルのみ
 
