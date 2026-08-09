@@ -221,7 +221,7 @@ test("削除は 1 件だけ取り除く", () => {
   const next = withoutEvent(DATA, DATA.events[3].id);
   assert.equal(next.events.length, DATA.events.length - 1);
   assert.ok(!next.events.some((ev) => ev.id === DATA.events[3].id));
-  assert.equal(DATA.events.length, 39, "元の配列が書き換えられています");
+  assert.equal(DATA.events.length, 43, "元の配列が書き換えられています");
   validateEvents(next);
 });
 
@@ -481,7 +481,7 @@ test("配線: 新規追加は採番され、削除ボタンを出さない", () 
     fire(h.sheet.opens[0].foot[0]);
     assert.equal(h.commits.length, 1);
     const added = h.commits[0].events.at(-1);
-    assert.equal(added.id, "ev-045");
+    assert.equal(added.id, "ev-049");
     assert.ok(!DATA.events.some((ev) => ev.id === added.id));
     assert.equal(h.commits[0].events.length, DATA.events.length + 1);
     // 元が無いので、フォームに無いキーは付かない
