@@ -221,7 +221,7 @@ test("削除は 1 件だけ取り除く", () => {
   const next = withoutEvent(DATA, DATA.events[3].id);
   assert.equal(next.events.length, DATA.events.length - 1);
   assert.ok(!next.events.some((ev) => ev.id === DATA.events[3].id));
-  assert.equal(DATA.events.length, 40, "元の配列が書き換えられています");
+  assert.equal(DATA.events.length, 39, "元の配列が書き換えられています");
   validateEvents(next);
 });
 

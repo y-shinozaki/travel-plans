@@ -60,7 +60,7 @@ test("events.json が参照する個別アイコンがすべて存在する", ()
     readFileSync(new URL("../assets/data/events.json", import.meta.url), "utf8")
   );
   // 空配列だとループが 0 回で素通りするので、件数そのものを先に確かめる
-  assert.equal(data.events.length, 40, "events.json の件数が想定と違います");
+  assert.equal(data.events.length, 39, "events.json の件数が想定と違います");
   for (const ev of data.events) {
     if (!ev.icon) continue;
     assert.ok(ICON_IDS.includes(ev.icon), `${ev.title}: ${ev.icon} がスプライトにありません`);

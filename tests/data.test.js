@@ -29,7 +29,7 @@ test("実データが読み込み時の検査を通る", () => {
 
 test("実データの件数が想定どおり", () => {
   assert.equal(data.days.length, 6, "日数");
-  assert.equal(data.events.length, 40, "イベント件数");
+  assert.equal(data.events.length, 39, "イベント件数");
   assert.equal(data.events.filter((e) => e.allDay).length, 5, "終日イベント");
   assert.equal(data.events.filter((e) => e.endDay > e.startDay).length, 3, "複数日イベント");
 });
@@ -40,8 +40,8 @@ test("実データの全イベントがカレンダーのセグメントにな�
   const missing = data.events.filter((e) => !covered.has(e.id)).map((e) => `${e.id}/${e.title}`);
   assert.deepEqual(missing, [], "セグメントが 1 つも作られないイベントがあります");
 
-  // 単日 37 件 + ev-008（3 日）+ ev-009（3 日）+ ev-010（2 日）＝ 45
-  assert.equal(segments.length, 45, "セグメント総数");
+  // 単日 36 件 + ev-008（3 日）+ ev-009（3 日）+ ev-010（2 日）＝ 44
+  assert.equal(segments.length, 44, "セグメント総数");
   for (const seg of segments) {
     assert.ok(seg.day >= 0 && seg.day < data.days.length, `${seg.ref.id}: day が範囲外`);
   }
@@ -67,8 +67,8 @@ test("日付をまたぐフライトは 2 日ぶんに割れる（start > end �
 
 test("座標を持つイベントは同一地点にまとめられる", () => {
   const withCoords = data.events.filter(hasCoords);
-  assert.equal(withCoords.length, 21, "座標を持つイベント数");
-  assert.equal(collectLocations(data.events, null).length, 17, "重複除去後の地点数");
+  assert.equal(withCoords.length, 20, "座標を持つイベント数");
+  assert.equal(collectLocations(data.events, null).length, 16, "重複除去後の地点数");
 });
 
 test("カテゴリで絞ると地点が実際に減る", () => {

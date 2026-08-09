@@ -60,7 +60,7 @@ test("events.json のカテゴリがすべて既知である", () => {
   const data = JSON.parse(
     readFileSync(new URL("../assets/data/events.json", import.meta.url), "utf8")
   );
-  assert.equal(data.events.length, 40, "events.json の件数が想定と違います");
+  assert.equal(data.events.length, 39, "events.json の件数が想定と違います");
   for (const ev of data.events) {
     assert.doesNotThrow(() => catMeta(ev.cat), `${ev.title}: ${ev.cat}`);
     assert.ok(ICON_IDS.includes(iconOf(ev)), `${ev.title}: ${iconOf(ev)} がスプライトにありません`);
