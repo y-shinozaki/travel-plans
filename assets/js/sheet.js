@@ -11,6 +11,18 @@ import { CAT_META } from "./calendar.js";
 export function createSheet({ root, overlay, titleEl, bodyEl, footEl, closeBtn }) {
   let lastFocused = null;
 
+  /**
+   * body 直下の子要素のうち、シート自身とオーバーレイを除いたもの。
+   * aria-modal="true" を名乗る以上、背景は本当にフォーカス・クリック・
+   * 支援技術から隔離しないと宣言と実装が食い違う。inert はそれを一括で
+   * 行うので、要素ごとに tabindex を操作するより確実。
+   * body の子要素を都度読み直すのは、nav/main 以外の要素が将来
+   * 増えても（Phase B でフッターが増える等）取りこぼさないため。
+   */
+  function inertTargets() {
+    return [...document.body.children].filter((el) => el !== root && el !== overlay);
+  }
+
   function open(title, bodyHtml, footNodes = []) {
     lastFocused = document.activeElement;
     titleEl.textContent = title;
@@ -22,6 +34,7 @@ export function createSheet({ root, overlay, titleEl, bodyEl, footEl, closeBtn }
     overlay.classList.add("is-open");
     root.setAttribute("aria-hidden", "false");
     document.body.style.overflow = "hidden";
+    for (const el of inertTargets()) el.inert = true;
     bodyEl.scrollTop = 0;
     (footEl.querySelector("button") ?? closeBtn).focus();
   }
@@ -31,6 +44,9 @@ export function createSheet({ root, overlay, titleEl, bodyEl, footEl, closeBtn }
     overlay.classList.remove("is-open");
     root.setAttribute("aria-hidden", "true");
     document.body.style.overflow = "";
+    // フォーカスを戻す前に inert を解かないと、対象要素が
+    // まだフォーカス不能なままで focus() が失敗する
+    for (const el of inertTargets()) el.inert = false;
     lastFocused?.focus();
   }
 
