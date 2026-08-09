@@ -25,8 +25,16 @@ export function expandEvents(events, dayCount) {
   return out;
 }
 
+/**
+ * 地図に出せる座標を持つか。
+ *
+ * `!= null` だけでは足りない。NaN も Infinity も null ではないので素通りし、
+ * そのまま L.marker / L.latLngBounds へ渡って地図が無言で壊れる。
+ * validate.js が読み込み時に同じことを検査するが、こちらは実行経路そのものの
+ * 防御なので、検査を通っていないデータが来ても崩れないようにしておく。
+ */
 export function hasCoords(ev) {
-  return ev.lat != null && ev.lng != null;
+  return Number.isFinite(ev.lat) && Number.isFinite(ev.lng);
 }
 
 export function collectLocations(events, catFilter) {

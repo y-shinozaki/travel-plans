@@ -1,7 +1,7 @@
 import { timeLabel } from "./time.js";
 import { icon } from "./icons.js";
 import { catMeta, iconOf } from "./categories.js";
-import { escapeHtml } from "./dom.js";
+import { escapeHtml, safeHttpUrl } from "./dom.js";
 
 /**
  * 右から出る詳細シートの器。
@@ -13,9 +13,10 @@ export function createSheet({ root, overlay, titleEl, bodyEl, footEl, closeBtn }
   let lastFocused = null;
 
   // 閉じるボタンのアイコンも他と同じく icon() から作る。
-  // HTML に <use href="#i-x"> を直書きすると、injectSprite() より前に
-  // 解決を試みることになり（iOS Safari で実績のある不具合）、
-  // このボタン唯一の手がかりであるグリフが消えかねない。
+  // HTML に <use href="#i-x"> を直書きすると、パース時点＝injectSprite() が
+  // スプライトを挿す前に参照が解決されることになる。WebKit は解決に失敗した
+  // <use> を、参照先の symbol が後から DOM に入っても解決し直さないことがあり、
+  // そうなるとこのボタン唯一の手がかりであるグリフが空のまま残る。
   closeBtn.innerHTML = icon("i-x", "ico--sm");
 
   /**
@@ -55,6 +56,11 @@ export function createSheet({ root, overlay, titleEl, bodyEl, footEl, closeBtn }
     setOpen(true);
     document.body.style.overflow = "hidden";
     bodyEl.scrollTop = 0;
+    // フッターにボタンがあればそちらへフォーカスする。Phase B ではここに
+    // 「保存」「削除」といったそのシートの主目的の操作が並ぶので、開いた直後の
+    // フォーカスは閉じるボタンより主操作にあるほうが自然。
+    // Phase A では footNodes を渡す呼び出しが無く footEl は常に空なので、
+    // 実際には必ず closeBtn 側に落ちる（今は死んだ分岐に見えるが消さないこと）。
     (footEl.querySelector("button") ?? closeBtn).focus();
   }
 
@@ -81,9 +87,26 @@ export function createSheet({ root, overlay, titleEl, bodyEl, footEl, closeBtn }
 const metaRow = (iconId, label, value) =>
   `<div class="panel__mrow">${icon(iconId)}<dt>${label}</dt><dd>${value}</dd></div>`;
 
+/**
+ * days[] の添字は validate.js が読み込み時に検査している。
+ * ここで再度確かめるのは、検査を通っていないデータ（Phase B の未保存の入力など）が
+ * 来たときに、素の "Cannot read properties of undefined" ではなく
+ * どのイベントのどの値が範囲外なのかが分かる形で落とすため。
+ */
+function dayAt(days, index, ev, which) {
+  const day = days[index];
+  if (!day) {
+    throw new RangeError(
+      `renderEventDetail: ${ev.id ?? "(id なし)"} の ${which} が範囲外です` +
+        `（${index} / 有効な範囲は 0〜${days.length - 1}）`
+    );
+  }
+  return day;
+}
+
 function dayRangeLabel(ev, days) {
-  const from = days[ev.startDay];
-  const to = days[Math.max(ev.endDay, ev.startDay)];
+  const from = dayAt(days, ev.startDay, ev, "startDay");
+  const to = dayAt(days, Math.max(ev.endDay, ev.startDay), ev, "endDay");
   return ev.endDay > ev.startDay
     ? `${escapeHtml(from.date)}（${escapeHtml(from.dow)}） → ${escapeHtml(to.date)}（${escapeHtml(to.dow)}）`
     : `${escapeHtml(from.date)}（${escapeHtml(from.dow)}）`;
@@ -95,14 +118,26 @@ export function renderEventDetail(ev, days) {
          style="object-position:${escapeHtml(ev.imagePos || "center")}">`
     : "";
 
-  const link = ev.url
-    ? metaRow(
-        "i-external",
-        "Link",
-        `<a href="${escapeHtml(ev.url)}" target="_blank" rel="noopener">
+  // 許可リストを通らなかった URL は、行ごと消さずに素のテキストとして出す。
+  // 消すと「url が空だった」のか「弾かれた」のかが画面から分からず、
+  // Phase B で URL を打ち間違えた人が原因に辿り着けない。
+  // テキストなら値は読めるがクリックしても何も起きない（＝実行されない）。
+  const safeUrl = ev.url ? safeHttpUrl(ev.url) : null;
+  const link = !ev.url
+    ? ""
+    : safeUrl
+      ? metaRow(
+          "i-external",
+          "Link",
+          `<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener">
            開く ${icon("i-external", "ico--sm")}</a>`
-      )
-    : "";
+        )
+      : metaRow(
+          "i-external",
+          "Link",
+          `<span class="ferror">開けない形式の URL です（http / https のみ）: ` +
+            `${escapeHtml(ev.url)}</span>`
+        );
 
   const coords =
     ev.lat != null && ev.lng != null

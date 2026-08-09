@@ -62,6 +62,25 @@ test("hasCoords は両方揃ったときだけ true", () => {
   assert.equal(hasCoords({ lat: 0, lng: 0 }), true);
 });
 
+test("hasCoords は有限の数値だけを座標として認める", () => {
+  // `!= null` だけの判定では NaN も Infinity も文字列も素通りし、
+  // L.marker / L.latLngBounds まで届いて地図が無言で壊れる
+  for (const bad of [NaN, Infinity, -Infinity, "13.7", true, {}]) {
+    assert.equal(hasCoords({ lat: bad, lng: 100.5 }), false, `lat=${String(bad)}`);
+    assert.equal(hasCoords({ lat: 13.7, lng: bad }), false, `lng=${String(bad)}`);
+  }
+});
+
+test("collectLocations は有限でない座標のイベントを地図に出さない", () => {
+  const evs = [
+    { id: "ok", cat: "cat-move", lat: 13.69, lng: 100.75 },
+    { id: "nan", cat: "cat-move", lat: NaN, lng: NaN },
+    { id: "inf", cat: "cat-move", lat: Infinity, lng: 100.75 },
+    { id: "str", cat: "cat-move", lat: "13.7", lng: "100.5" },
+  ];
+  assert.deepEqual(collectLocations(evs, null).map((e) => e.id), ["ok"]);
+});
+
 test("collectLocations は同一座標を1件にまとめる", () => {
   const evs = [
     { id: "a", cat: "cat-move", lat: 13.69, lng: 100.75 },
