@@ -38,9 +38,12 @@ export function decideSync({ remoteUpdatedAt, localUpdatedAt, baseUpdatedAt, has
   if (base == null) return "remote-is-newer";
 
   // リモートが進んでいない。
-  // ここは大小で比べてよい。remote も base も出所は同じ「リモートの updatedAt」で
-  // （base は storeAdopted が stampOf(remote) をそのまま入れる）、同じ系列の値なので
-  // 順序に意味がある。
+  // ここは大小で比べてよい。remote も base も「リモートファイルの updatedAt」という
+  // 同じ系列の値だから（base に入るのは storeAdopted が渡された本文から取った
+  // stampOf の値で、publish() 経由なら自端末の時計で押した直後の値だが、
+  // それはそのまま PUT する本文の updatedAt でもある）。
+  // ただし公開する端末が複数あって時計がずれていれば、この系列自体が単調でなくなる
+  // ── 設計書 §13 の「時計ずれで他端末の公開を黙って上書きしうる」がそれ。
   if (remote <= base) return "use-local";
 
   // ここから先はリモートが base より新しい。ローカルが触られているかで分かれる。

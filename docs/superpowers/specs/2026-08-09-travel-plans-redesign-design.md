@@ -844,16 +844,17 @@ assets/data/archive.enc
 - **`canPersist()` の書き込みプローブは 1 バイト。** 容量ぎりぎりの端末では
   プローブだけ通って本番の書き込みが失敗しうる（失敗自体は画面に出る）
 - **`sync.load()` が投げるとトークン設定への導線も出ない。** `publish-ui` は
-  読み込みのあとに組み立てるため（`schedule.js:337`。`load()` は `:300`）。
-  リモートの `days` / `events` が壊れていると `sync.js:170` の `validateEvents` が投げ、
-  `schedule.js:306` がそのまま再送出して `main()` が落ちる ── 公開ボタンもトークン設定も
+  読み込みのあとに組み立てるため（`schedule.js` の `main()` は `await sync.load()` の
+  あとで `createPublishUI()` を呼ぶ）。リモートの `days` / `events` が壊れていると
+  `sync.js` の `load()` がリモートを検証するところで `validateEvents` が投げ、
+  `main()` の `catch` がそのまま再送出して落ちる ── 公開ボタンもトークン設定も
   DOM に現れないので、**この状態をブラウザから直す手段は無く、復旧はリポジトリへの
   git コミットだけになる。** `events.json` の手編集は `CLAUDE.md` が正規の手順として
   案内しているので、`days` を縮めたまま古い添字を参照するイベントを残す、といった形で
   現実に起こりうる。
   直すなら `publish-ui` を `load()` より前に組み立てて、読み込みに失敗しても
   トークン設定と公開だけは使える状態にする。
-  なお `assertRemoteNotAhead()`（`sync.js:277-`）が突き合わせを省いて公開を通すのは
+  なお `sync.js` の `assertRemoteNotAhead()` が突き合わせを省いて公開を通すのは
   **これとは別の壊れ方**（`validateEvents` を通るが `updatedAt` だけ読めない）に対する
   措置で、そちらはページが開くので公開が実際に復旧手段になる。
   以前は同関数のコメントが両者を区別せず「公開こそが復旧手段になる」と書いていた。
