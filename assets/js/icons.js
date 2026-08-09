@@ -94,13 +94,8 @@ export const ICON_IDS = [
   "i-chat", "i-search", "i-luggage", "i-lock", "i-note", "i-pool", "i-x",
 ];
 
-export const CATEGORY_ICON = {
-  "cat-move": "i-flight",
-  "cat-sight": "i-camera",
-  "cat-food": "i-food",
-  "cat-hotel": "i-hotel",
-  "cat-shop": "i-shop",
-};
+// カテゴリ既定アイコンの対応表（旧 CATEGORY_ICON）は categories.js にある。
+// このファイルはスプライトそのもの（symbol の実体と id の一覧）だけを扱う。
 
 export function injectSprite(doc = document) {
   if (doc.querySelector("svg.sprite")) return;

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { SPRITE, ICON_IDS, icon, CATEGORY_ICON, injectSprite } from "../assets/js/icons.js";
+import { SPRITE, ICON_IDS, icon, injectSprite } from "../assets/js/icons.js";
 
 const idsInSprite = () => [...SPRITE.matchAll(/<symbol[^>]*\bid="([^"]+)"/g)].map((m) => m[1]);
 
@@ -53,24 +53,17 @@ test("icon() は未知の id を拒否する", () => {
   assert.throws(() => icon("i-nope"), /i-nope/);
 });
 
-test("すべてのカテゴリに既定アイコンがある", () => {
-  for (const cat of ["cat-move", "cat-sight", "cat-food", "cat-hotel", "cat-shop"]) {
-    assert.ok(CATEGORY_ICON[cat], `${cat} の既定アイコンがありません`);
-    assert.ok(ICON_IDS.includes(CATEGORY_ICON[cat]));
-  }
-});
-
-test("events.json が参照するアイコンがすべて存在する", () => {
-  // 描画時に <use> が解決できず、アイコンが消えるのを防ぐ
+test("events.json が参照する個別アイコンがすべて存在する", () => {
+  // 描画時に <use> が解決できず、アイコンが消えるのを防ぐ。
+  // カテゴリ既定アイコンとの突き合わせは categories.test.js が受け持つ。
   const data = JSON.parse(
     readFileSync(new URL("../assets/data/events.json", import.meta.url), "utf8")
   );
   // 空配列だとループが 0 回で素通りするので、件数そのものを先に確かめる
   assert.equal(data.events.length, 40, "events.json の件数が想定と違います");
   for (const ev of data.events) {
-    const id = ev.icon ?? CATEGORY_ICON[ev.cat];
-    assert.ok(id, `${ev.title}: カテゴリ ${ev.cat} に既定アイコンがありません`);
-    assert.ok(ICON_IDS.includes(id), `${ev.title}: ${id} がスプライトにありません`);
+    if (!ev.icon) continue;
+    assert.ok(ICON_IDS.includes(ev.icon), `${ev.title}: ${ev.icon} がスプライトにありません`);
   }
 });
 

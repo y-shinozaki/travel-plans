@@ -50,13 +50,14 @@
     </main>
 
     <div class="sheet-overlay" id="sheet-overlay"></div>
+    <!-- 閉じているあいだ inert になる（sheet.js）。inert は支援技術からも
+         隠すため、aria-hidden をここに書いて付け外しする必要はない。
+         アイコンは他と揃えて icon() が入れる（中身は空で始める）。 -->
     <aside class="sheet" id="sheet" role="dialog" aria-modal="true"
-           aria-labelledby="sheet-title" aria-hidden="true">
+           aria-labelledby="sheet-title">
       <div class="sheet__head">
         <p class="eyebrow" id="sheet-title">予定</p>
-        <button class="rowbtn" id="sheet-close" aria-label="閉じる">
-          <svg class="ico ico--sm"><use href="#i-x"/></svg>
-        </button>
+        <button class="rowbtn" id="sheet-close" aria-label="閉じる"></button>
       </div>
       <div class="sheet__body" id="sheet-body"></div>
       <div class="sheet__foot" id="sheet-foot"></div>

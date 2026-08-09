@@ -1,6 +1,7 @@
 import { timeLabel } from "./time.js";
-import { icon, CATEGORY_ICON } from "./icons.js";
-import { CAT_META } from "./calendar.js";
+import { icon } from "./icons.js";
+import { catMeta, iconOf } from "./categories.js";
+import { escapeHtml } from "./dom.js";
 
 /**
  * 右から出る詳細シートの器。
@@ -10,6 +11,12 @@ import { CAT_META } from "./calendar.js";
  */
 export function createSheet({ root, overlay, titleEl, bodyEl, footEl, closeBtn }) {
   let lastFocused = null;
+
+  // 閉じるボタンのアイコンも他と同じく icon() から作る。
+  // HTML に <use href="#i-x"> を直書きすると、injectSprite() より前に
+  // 解決を試みることになり（iOS Safari で実績のある不具合）、
+  // このボタン唯一の手がかりであるグリフが消えかねない。
+  closeBtn.innerHTML = icon("i-x", "ico--sm");
 
   /**
    * body 直下の子要素のうち、シート自身とオーバーレイを除いたもの。
@@ -23,6 +30,21 @@ export function createSheet({ root, overlay, titleEl, bodyEl, footEl, closeBtn }
     return [...document.body.children].filter((el) => el !== root && el !== overlay);
   }
 
+  /**
+   * シート自身の inert。背景側（inertTargets）とは常に逆になる。
+   * 閉じているシートは transform で画面外へ出ているだけなので、inert を
+   * 付けないと閉じるボタンが「見えないタブストップ」として残ってしまう。
+   * これで aria-hidden の付け外しは不要になる（inert は支援技術からも隠す）。
+   */
+  function setOpen(open) {
+    root.classList.toggle("is-open", open);
+    overlay.classList.toggle("is-open", open);
+    root.inert = !open;
+    for (const el of inertTargets()) el.inert = open;
+  }
+
+  setOpen(false);
+
   function open(title, bodyHtml, footNodes = []) {
     lastFocused = document.activeElement;
     titleEl.textContent = title;
@@ -30,23 +52,18 @@ export function createSheet({ root, overlay, titleEl, bodyEl, footEl, closeBtn }
     footEl.innerHTML = "";
     for (const node of footNodes) footEl.appendChild(node);
 
-    root.classList.add("is-open");
-    overlay.classList.add("is-open");
-    root.setAttribute("aria-hidden", "false");
+    setOpen(true);
     document.body.style.overflow = "hidden";
-    for (const el of inertTargets()) el.inert = true;
     bodyEl.scrollTop = 0;
     (footEl.querySelector("button") ?? closeBtn).focus();
   }
 
   function close() {
-    root.classList.remove("is-open");
-    overlay.classList.remove("is-open");
-    root.setAttribute("aria-hidden", "true");
+    // setOpen(false) がシートを inert にした時点で、シート内にあった
+    // フォーカスは body へ外れる。背景の inert もここで同時に解けるので、
+    // 直後の lastFocused.focus() は必ず成功する。
+    setOpen(false);
     document.body.style.overflow = "";
-    // フォーカスを戻す前に inert を解かないと、対象要素が
-    // まだフォーカス不能なままで focus() が失敗する
-    for (const el of inertTargets()) el.inert = false;
     lastFocused?.focus();
   }
 
@@ -61,11 +78,6 @@ export function createSheet({ root, overlay, titleEl, bodyEl, footEl, closeBtn }
   return { open, close, isOpen };
 }
 
-const iconOf = (ev) => ev.icon || CATEGORY_ICON[ev.cat];
-
-const escapeHtml = (s) =>
-  String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-
 const metaRow = (iconId, label, value) =>
   `<div class="panel__mrow">${icon(iconId)}<dt>${label}</dt><dd>${value}</dd></div>`;
 
@@ -73,8 +85,8 @@ function dayRangeLabel(ev, days) {
   const from = days[ev.startDay];
   const to = days[Math.max(ev.endDay, ev.startDay)];
   return ev.endDay > ev.startDay
-    ? `${from.date}（${from.dow}） → ${to.date}（${to.dow}）`
-    : `${from.date}（${from.dow}）`;
+    ? `${escapeHtml(from.date)}（${escapeHtml(from.dow)}） → ${escapeHtml(to.date)}（${escapeHtml(to.dow)}）`
+    : `${escapeHtml(from.date)}（${escapeHtml(from.dow)}）`;
 }
 
 export function renderEventDetail(ev, days) {
@@ -93,7 +105,9 @@ export function renderEventDetail(ev, days) {
     : "";
 
   const coords =
-    ev.lat != null && ev.lng != null ? metaRow("i-pin", "Coords", `${ev.lat}, ${ev.lng}`) : "";
+    ev.lat != null && ev.lng != null
+      ? metaRow("i-pin", "Coords", `${escapeHtml(ev.lat)}, ${escapeHtml(ev.lng)}`)
+      : "";
 
   const notes = ev.notes
     ? `<p class="body" style="margin-top:var(--s3);white-space:pre-wrap">${escapeHtml(ev.notes)}</p>`
@@ -101,13 +115,13 @@ export function renderEventDetail(ev, days) {
 
   return `
     ${image}
-    <span class="panel__cat ${ev.cat}">
-      ${icon(iconOf(ev), "ico--sm")} ${CAT_META[ev.cat].label}
+    <span class="panel__cat ${escapeHtml(ev.cat)}">
+      ${icon(iconOf(ev), "ico--sm")} ${escapeHtml(catMeta(ev.cat).label)}
     </span>
     <h3 class="panel__title">${escapeHtml(ev.title) || "（無題）"}</h3>
     <dl class="panel__meta">
       ${metaRow("i-calendar", "Date", dayRangeLabel(ev, days))}
-      ${metaRow("i-clock", "Time", timeLabel(ev))}
+      ${metaRow("i-clock", "Time", escapeHtml(timeLabel(ev)))}
       ${ev.location ? metaRow("i-pin", "Location", escapeHtml(ev.location)) : ""}
       ${coords}
       ${link}

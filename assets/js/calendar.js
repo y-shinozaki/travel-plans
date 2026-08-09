@@ -1,50 +1,18 @@
 import { timeLabel } from "./time.js";
 import { expandEvents } from "./events.js";
 import { assignLanes } from "./lanes.js";
-import { icon, CATEGORY_ICON } from "./icons.js";
+import { icon } from "./icons.js";
+import { iconOf } from "./categories.js";
+import { el, makeSelectable } from "./dom.js";
 
 /** 1時間あたりのピクセル高さ。tokens.css の --hour-h と一致させること。 */
 export const HOUR_H = 44;
 
-export const CAT_META = {
-  "cat-move": { label: "移動" },
-  "cat-sight": { label: "観光" },
-  "cat-food": { label: "食事" },
-  "cat-hotel": { label: "宿泊" },
-  "cat-shop": { label: "買物" },
-};
-
-const iconOf = (ev) => ev.icon || CATEGORY_ICON[ev.cat];
-
-function el(tag, cls, text) {
-  const node = document.createElement(tag);
-  if (cls) node.className = cls;
-  if (text != null) node.textContent = text;
-  return node;
-}
-
-/**
- * キーボードでも到達・実行できるようにする。
- * カレンダーのブロック／ピルは見た目上カード状で <button> の既定スタイルと
- * 相性が悪いため、role="button" + tabindex + keydown で最小限に済ませる。
- * map.js のロケーション一覧行でも同じパターンが必要になるため export する
- * （同じロジックを 2 箇所に書き写さない）。
- */
-export function makeSelectable(node, ev, label, onSelect) {
-  node.tabIndex = 0;
-  node.setAttribute("role", "button");
-  node.setAttribute("aria-label", `${ev.title}、${label}`);
-  node.addEventListener("click", () => onSelect(ev));
-  node.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" || e.key === " " || e.key === "Spacebar") {
-      e.preventDefault();
-      onSelect(ev);
-    }
-  });
-}
-
 export function renderCalendar({ mount, days, events, viewStart, viewEnd, catFilter, onSelect }) {
   mount.innerHTML = "";
+  // 列数は days の件数で決まる。CSS 側に repeat(6, ...) と焼き込むと
+  // 日数が変わったときに黙って 2 行目へ折り返すため、データから供給する。
+  mount.style.setProperty("--day-count", String(days.length));
   const segments = expandEvents(events, days.length);
 
   mount.appendChild(buildHeader(days));
@@ -81,7 +49,10 @@ function buildAllDayRow(days, segments, { catFilter, onSelect }) {
     for (const seg of visible) {
       const ev = seg.ref;
       const pill = el("div", `allday-pill ${ev.cat}`);
-      pill.innerHTML = `${icon(iconOf(ev), "ico--sm")}<span>${ev.title}</span>`;
+      // アイコンだけ innerHTML（自前で組み立てた固定文字列）で、
+      // イベント由来の文字列は textContent 経由でしか入れない
+      pill.innerHTML = icon(iconOf(ev), "ico--sm");
+      pill.appendChild(el("span", null, ev.title));
       makeSelectable(pill, ev, timeLabel(ev), onSelect);
       cell.appendChild(pill);
     }
@@ -151,9 +122,9 @@ function buildBlock(seg, { viewStart, viewEnd, order, onSelect }) {
 
   const label = timeLabel(ev);
   const head = el("div", "ev__hd");
+  head.innerHTML = icon(iconOf(ev));
   // 高さが足りないと時刻が読めないので、そのときは省いてタイトルを優先する
-  head.innerHTML =
-    icon(iconOf(ev)) + (height >= 36 ? `<span class="ev__t">${label}</span>` : "");
+  if (height >= 36) head.appendChild(el("span", "ev__t", label));
   block.appendChild(head);
   block.appendChild(el("div", "ev__n", ev.title));
   block.title = `${ev.title} / ${label}`;
