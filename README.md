@@ -65,13 +65,12 @@ travel-plans/
 │   │   └── calendar.css   schedule.html 専用（カレンダー・地図・レスポンシブ）
 │   ├── js/                menu.js / schedule.js（各ページのエントリポイント）、
 │   │                      calendar.js / map.js / sheet.js / nav.js / reveal.js / icons.js、
+│   │                      categories.js / dom.js（ページをまたいで使う共通部品）、
 │   │                      time.js / events.js / lanes.js（node --test が対象にする純粋関数）
 │   ├── data/
 │   │   └── events.json    旅程データ（唯一のソース。表示用文字列は持たない）
 │   └── vendor/
 │       └── leaflet/       Leaflet 1.9.4 のセルフホスト版
-├── tools/
-│   └── extract-events.mjs 旧版の埋め込みデータを events.json へ移した変換スクリプト
 ├── tests/                 node --test 用のテスト
 ├── DESIGN.md              デザインシステムのドキュメント
 ├── CLAUDE.md

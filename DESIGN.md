@@ -112,19 +112,28 @@ aman.com の computed style から採取したサイズ・字間の一部:
 
 > 大文字化（`text-transform: uppercase`）は、10〜12px・字間 1.2〜2px のミクロラベルとコントロール類にのみ使う。見出しと本文には使わない。
 
-これは本プロジェクトの決定であり、上表「小ラベル（ナビ・カテゴリラベル等） | 10.1px | 2px」の実測値そのものではない（実測は 1 ロール分の測定値、こちらは実際にコードで `text-transform: uppercase` を使っている全ロールの範囲）。`assets/css/base.css` / `assets/css/controls.css` から転記した実例:
+これは本プロジェクトの決定であり、上表「小ラベル（ナビ・カテゴリラベル等） | 10.1px | 2px」の実測値そのものではない（実測は 1 ロール分の測定値、こちらは実際にコードで `text-transform: uppercase` を使っている全ロールの範囲）。
 
-| ルール | font-size | letter-spacing | 出所 |
-|---|---|---|---|
-| `.eyebrow` | 10px | 2px | モック |
-| `.swipe` | 10px | 2px | モック |
-| `.field2 label` | 10px | 2px | モック |
-| `.shead__idx` | 10px | 2px | モック |
-| `.rowbtn--confirm` | 10px | 1.4px | モック |
-| `.chip` | 11px | 1.4px | モック |
-| `.tbtn` | 11px | 1.2px | モック |
-| `.nav__link` | 11px | 1.4px | 本プロジェクトで新規追加（Task 8, ページ間ナビ） |
-| `.btn` | 12px | 1.6px | モック |
+以下は `text-transform: uppercase` を使っている**全ルールの一覧**であり、抜粋ではない。`grep -rn 'text-transform: uppercase' assets/css/` の結果と 1 対 1 で対応させること（ルールを増やしたらこの表にも足す）。
+
+| ルール | ファイル | font-size | letter-spacing | 出所 |
+|---|---|---|---|---|
+| `.eyebrow` | base.css | 10px | 2px | モック |
+| `.shead__idx` | base.css | 10px | 2px | モック |
+| `.nav__link` | base.css | 11px | 1.4px | 本プロジェクトで新規追加（Task 8, ページ間ナビ） |
+| `.btn` | controls.css | 12px | 1.6px | モック |
+| `.chip` | controls.css | 11px | 1.4px | モック |
+| `.swipe` | controls.css | 10px | 2px | モック |
+| `.panel__cat` | controls.css | 10px | 1.8px | 本プロジェクトで新規追加（Task 11, 詳細シート） |
+| `.panel__mrow dt` | controls.css | 10px | 1.8px | 本プロジェクトで新規追加（Task 11, 詳細シート） |
+| `.field2 label` | controls.css | 10px | 2px | モック |
+| `.tbtn` | controls.css | 11px | 1.2px | モック |
+| `.rowbtn--confirm` | controls.css | 10px | 1.4px | モック |
+| `.cal__dow` | calendar.css | 10px | 2px | モック |
+| `.cal__allday-label`, `.cal__hdr-gutter` | calendar.css | 10px | 1.6px | モック |
+| `.loc__cat` | calendar.css | 10px | 1.6px | モック |
+
+`.panel__cat` は当初 9.5px で、この 10〜12px の下限を割っていた（10px に修正済み）。
 
 ### 行間
 

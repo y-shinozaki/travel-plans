@@ -32,10 +32,13 @@ travel-plans/
 │   │   ├── time.js         10進時間 ⇔ HH:MM 変換、timeLabel()
 │   │   ├── events.js       expandEvents()（複数日イベントを日単位セグメントに展開）
 │   │   ├── lanes.js        assignLanes()（重なるイベントのレーン配置）
-│   │   ├── icons.js        インライン SVG スプライトの注入、CATEGORY_ICON
-│   │   ├── calendar.js     renderCalendar()、CAT_META、HOUR_H
-│   │   ├── map.js          Leaflet 初期化、位置情報リスト
-│   │   ├── sheet.js        詳細シート（読み取り専用）
+│   │   ├── icons.js        インライン SVG スプライトの注入と icon()（スプライトのみを扱う）
+│   │   ├── categories.js   CAT_META（ラベル・既定アイコン）、catMeta() / iconOf() /
+│   │   │                   accentToken() / accentColor()。カテゴリの知識はここだけ
+│   │   ├── dom.js          el() / makeSelectable() / escapeHtml()（描画の共通部品）
+│   │   ├── calendar.js     renderCalendar()、HOUR_H
+│   │   ├── map.js          Leaflet 初期化、位置情報リスト、popupHtml() / locationRowHtml()
+│   │   ├── sheet.js        詳細シート（読み取り専用）、renderEventDetail()
 │   │   ├── nav.js          ページ間ナビ
 │   │   ├── reveal.js       IntersectionObserver によるスクロール出現演出
 │   │   ├── menu.js         index.html のエントリポイント
@@ -44,9 +47,7 @@ travel-plans/
 │   │   └── events.json     旅程データの唯一のソース（表示用文字列は持たない）
 │   └── vendor/
 │       └── leaflet/        Leaflet 1.9.4 を自前で配置（理由は「外部ライブラリ」参照）
-├── tools/
-│   └── extract-events.mjs  旧 index.html の埋め込みデータを events.json へ移した変換スクリプト（一度きり）
-├── tests/                  node --test で実行する純粋関数テスト
+├── tests/                  node --test で実行する純粋関数・静的検証のテスト
 ├── DESIGN.md               デザイン仕様（aman.com 由来）
 └── docs/design-reference/mock-aman.html   検証済みの参照実装（実装対象ではなく、値を写す元）
 ```
@@ -137,7 +138,13 @@ map.js の createMap() → 座標を持つイベントからマーカーと位�
 ### カレンダーの時間範囲を変更
 
 `assets/js/schedule.js` の `state.viewStart` / `state.viewEnd` の初期値を編集する。
-`fillHourOptions()` が呼ばれるドロップダウンの範囲もこの値を基準に生成される。
+これは**セレクトの初期選択値**であって、選択肢の範囲ではない。
+
+選択肢の範囲は同ファイルの `START_HOUR_CHOICES`（0〜12）と `END_HOUR_CHOICES`（13〜24）
+という別の定数で決まり、`fillHourOptions()` にそのまま渡される。範囲を
+`state.viewStart` / `viewEnd` から導くと選択肢が 1 個しかないセレクトになるため、
+意図的に分けてある。初期値は必ず対応する範囲に収まる値にすること
+（範囲外にすると、どの option も選択されていないセレクトになる）。
 
 ### マップタイルを更新
 
@@ -184,10 +191,22 @@ Leaflet を更新する際は `assets/vendor/leaflet/` 配下のファイルを�
 node --test
 ```
 
-依存ゼロ、ビルド不要。`tests/` 配下は `time.js` / `events.js` / `lanes.js` / `icons.js` / `tokens.css` の
-純粋関数・静的な検証のみを対象にしている（`package.json` は `"type": "module"` を宣言するためだけに存在する）。
+依存ゼロ、ビルド不要。`tests/` 配下は `time.js` / `events.js` / `lanes.js` / `icons.js` /
+`categories.js` / `tokens.css` の純粋関数・静的な検証と、`tests/renderers.test.js` の
+エスケープ検証を対象にしている（`package.json` は `"type": "module"` を宣言するためだけに存在する）。
 
-カレンダー描画・地図・reveal 演出・レスポンシブ崩れなど、DOM やブラウザの computed style に依存する部分は
+`tokens.test.js` は色そのものに加えて次の 2 つの約束も機械的に守らせている:
+
+- `--hour-h`（tokens.css）と `HOUR_H`（calendar.js）が同じ値であること
+- `base.css` / `controls.css` / `calendar.css` に色リテラルを書かないこと
+  （半透明が必要なら `rgb(var(--ink-rgb) / 0.14)` のようにチャンネルトークンを使う）
+
+`renderers.test.js` の `renderCalendar` のテストは、`document.createElement` だけを備えた
+最小スタブを噛ませて「どの文字列が `innerHTML` に入り、どれが `textContent` に入ったか」を
+記録して検証している。
+
+地図の実際の挙動（Leaflet の fitBounds / flyTo）・reveal 演出・レスポンシブ崩れなど、
+本物の DOM やブラウザの computed style に依存する部分は
 `node --test` ではカバーできない。ブラウザの DevTools で実際に数値を測って確認すること
 （横溢れの有無、`--hour-h` と `HOUR_H` の一致、`prefers-reduced-motion` 時の可視性など）。
 
@@ -225,8 +244,12 @@ node --test
 - 状態管理ライブラリなし — 各ページの `<script type="module">`（例: `assets/js/schedule.js`）が
   モジュールスコープの `state` オブジェクトを持つ。ページをまたぐ共有状態はまだない
 - コンポーネントフレームワークなし — DOM 構築は `document.createElement` ベースのヘルパー
-  （`calendar.js` の `el()` など）と一部 `innerHTML` の併用。ユーザー入力を `innerHTML` に
-  そのまま流し込む箇所は避けること
+  （`dom.js` の `el()`）と一部 `innerHTML` の併用。**イベント由来の文字列を `innerHTML` に
+  そのまま流し込まないこと。** 平文なら `el()`（`textContent`）を使い、どうしても
+  `innerHTML` に載せる必要があるときは `dom.js` の `escapeHtml()` を必ず通す。
+  `tests/renderers.test.js` が 3 つの描画経路すべてについてこれを検証している。
+  Phase B ではブラウザで入力した文字列を、リポジトリ書き込み権限を持つトークンを
+  抱えたページ自身で描画することになるため、この規約は必須
 - Leaflet MarkerCluster は未実装。イベント密度が大幅に増加した場合に追加検討
 - Dancing Script（旧デザインの筆記体タイトル）は Aman 由来のデザインへの刷新に伴い廃止した。
   現在の見出しフォントは `--serif`（Newsreader / Noto Serif JP）
