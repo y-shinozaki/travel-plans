@@ -39,52 +39,90 @@ archive.html     Gmail / LINE 横断検索（復号が必要）
 
 ### 2.2 ファイル構成
 
+**印の読み方**: 印の無い行は Phase A / B1 で実在するファイル。`[B2]` `[B3]` `[C]` は
+そのフェーズで追加する予定のもので、まだリポジトリに無い。
+
 ```
 travel-plans/
 ├── index.html / schedule.html / packing.html / archive.html
+│                           （packing / archive はリンクだけの仮ページ）
 ├── assets/
 │   ├── css/
 │   │   ├── tokens.css      CSS 変数（唯一の色・余白・角丸・モーションの定義場所）
 │   │   ├── base.css        リセット、タイポグラフィ、共通レイアウト、reveal 演出
-│   │   ├── controls.css    ボタン／チップ／チェックボックス／入力欄／シート
-│   │   ├── calendar.css    schedule.html 専用
-│   │   ├── packing.css     packing.html 専用
-│   │   └── archive.css     archive.html 専用
+│   │   ├── controls.css    ボタン／チップ／チェックボックス／入力欄／シート／
+│   │   │                   編集フォーム／公開まわり（パネル・状態表示・同期バー）
+│   │   ├── calendar.css    schedule.html 専用（カレンダー・地図）
+│   │   ├── packing.css     packing.html 専用                            [B2]
+│   │   └── archive.css     archive.html 専用                            [C]
 │   ├── js/
-│   │   ├── store.js        localStorage ラッパ（名前空間・JSON 入出力・変更検知）
-│   │   ├── sync.js         リモート JSON の取得、版の比較、GitHub への公開
-│   │   ├── auth.js         合言葉入力、鍵導出、sessionStorage への保持、遷移ガード
-│   │   ├── crypto.js       PBKDF2 / AES-GCM の復号（archive 専用）
+│   │   │  ── 表示（Phase A）──
+│   │   ├── time.js         10 進時間 ⇄ HH:MM、timeLabel()
+│   │   ├── events.js       expandEvents()（複数日 → 日単位セグメント）
+│   │   ├── lanes.js        assignLanes()（重なりのレーン配置）
+│   │   ├── categories.js   CAT_META とカテゴリの参照関数
+│   │   ├── validate.js     validateEvent()（1 件）/ validateEvents()（全体）
+│   │   ├── dom.js          el() / escapeHtml() / safeHttpUrl() / makeSelectable()
 │   │   ├── icons.js        インライン SVG スプライトの注入
-│   │   ├── comments.js     汎用コメント（対象キー → 本文）
-│   │   ├── sheet.js        右から出る詳細／編集シートの共通実装
-│   │   ├── calendar.js / packing.js / archive.js / menu.js
+│   │   ├── calendar.js     renderCalendar() と HOUR_H
+│   │   ├── map.js          Leaflet 初期化、マーカーと位置情報リスト
+│   │   ├── sheet.js        右から出る詳細／編集シートの器
+│   │   ├── nav.js / reveal.js / countdown.js
+│   │   │  ── 保存と公開（Phase B1、§5）──
+│   │   ├── store.js        localStorage ラッパ（名前空間・JSON / 生文字列）
+│   │   ├── base64.js       UTF-8 対応の base64（btoa は日本語で落ちる）
+│   │   ├── sync-decide.js  decideSync()。ローカルとリモートの選択（純粋関数）
+│   │   ├── github.js       Contents API の呼び出し
+│   │   ├── token.js        公開用トークンの置き場所（tp:gh-token の唯一の出入口）
+│   │   ├── sync.js         リモート JSON の取得、版の比較、GitHub への公開
+│   │   ├── event-form.js   編集フォームの HTML・読み取り・formProblems()
+│   │   ├── event-editor.js 採番・併合・保存・削除
+│   │   ├── publish-ui.js   トークン設定・公開ボタン・起動時の案内バー
+│   │   │  ── エントリポイント ──
+│   │   ├── menu.js         index.html
+│   │   ├── schedule.js     schedule.html
+│   │   ├── stub-page.js    packing.html / archive.html（CSP のため外部ファイル）
+│   │   ├── packing.js      packing.html のエントリポイント               [B2]
+│   │   ├── comments.js     汎用コメント（対象キー → 本文）               [B3]
+│   │   ├── auth.js         合言葉入力、鍵導出、sessionStorage、遷移ガード [C]
+│   │   ├── crypto.js       PBKDF2 / AES-GCM の復号（archive 専用）        [C]
+│   │   └── archive.js      archive.html のエントリポイント               [C]
 │   ├── data/
 │   │   ├── events.json     旅程（公開対象・リモートが正）
-│   │   ├── packing.json    持ち物（公開対象・リモートが正）
-│   │   ├── comments.json   コメント（公開対象・リモートが正）
-│   │   └── archive.enc     Gmail / LINE を暗号化したバイナリ
+│   │   ├── packing.json    持ち物（公開対象・リモートが正）              [B2]
+│   │   ├── comments.json   コメント（公開対象・リモートが正）            [B3]
+│   │   └── archive.enc     Gmail / LINE を暗号化したバイナリ             [C]
 │   └── vendor/
 │       └── leaflet/        Leaflet 1.9.4 を自前で配置（後述のセキュリティ理由）
+├── tests/                  node --test（依存ゼロ・ビルドなし）
 ├── tools/
-│   └── build-archive.mjs   private/ の生データ → 正規化 → 暗号化 → archive.enc
-├── private/                .gitignore 対象。Gmail 抽出結果と LINE エクスポート
+│   └── build-archive.mjs   private/ の生データ → 正規化 → 暗号化 → archive.enc [C]
+├── private/                .gitignore 対象。Gmail 抽出結果と LINE エクスポート  [C]
 ├── DESIGN.md               新デザイン仕様（Aman 由来）
 ├── CLAUDE.md / README.md
 ```
+
+B1 で `store.js` / `sync.js` の 2 本という当初の想定を 6 本
+（`store` / `base64` / `sync-decide` / `github` / `token` / `sync`）に割った。
+通信・保存・判断を別々に差し替えられないと、公開フローを `node --test` で
+回せないため。B2 で `sync.js` を 2 つ目の JSON に使う前に §13 の
+「`createSync()` は旅程専用。2 つ目の JSON には使えない」を読むこと。
 
 JS は `<script type="module">` で読み込む。`file://` 直開きでは CORS により動作しないため、
 ローカル開発は `python3 -m http.server 8000` を必須とする。CLAUDE.md と README.md を更新する。
 
 ### 2.3 実装フェーズ
 
-| Phase | 内容 | 依存 |
-|---|---|---|
-| A | ファイル分割、`tokens.css`、`DESIGN.md` 刷新、SVG スプライト、`schedule.html` を新デザインで再構築 | なし |
-| B | `store.js` / `sync.js` / 公開フロー、予定エディタ、持ち物リストとエディタ、コメント機能 | A |
-| C | `build-archive.mjs`、暗号化、`auth.js`、`archive.html` | A |
+| Phase | 内容 | 依存 | 状態 |
+|---|---|---|---|
+| A | ファイル分割、`tokens.css`、`DESIGN.md` 刷新、SVG スプライト、`schedule.html` を新デザインで再構築 | なし | **完了**（PR #5、2026-08-09） |
+| B1 | CSP、`store.js` / `sync.js` / トークン UI / 公開フロー、予定エディタ | A | **完了**（2026-08-09） |
+| B2 | 持ち物リストページとエディタ | B1 | |
+| B3 | コメント機能（イベント／日／持ち物／全体の 4 対象） | B1 | |
+| C | `build-archive.mjs`、暗号化、`auth.js`、`archive.html` | A | |
 
-実装計画は Phase ごとに作る。
+実装計画はこの単位で作る。B を 3 つに割ったのは、B1 だけで「UI で旅程を編集して公開できる」
+という動くものが揃い、そこで方向を見直せるため（2026-08-09 決定）。
 
 ---
 
@@ -381,19 +419,28 @@ fetch が失敗した場合（オフライン、Pages 障害）はローカル�
 GitHub Contents API を使う。
 
 ```
-1. GET  /repos/{owner}/{repo}/contents/assets/data/events.json  → 現在の sha
-2. updatedAt を現在時刻に更新
-3. PUT  同 URL  { message, content: base64(JSON), sha }
-4. 成功 → baseUpdatedAt を更新、「公開しました」を表示
+1. 検証。validateEvents を通らなければここで止める（壊れたものを push しない）
+2. GET  /repos/{owner}/{repo}/contents/assets/data/events.json  → sha と本文
+3. 本文の updatedAt を baseUpdatedAt と比較する ← 競合検出はここ
+     進んでいれば「取り込んでから公開し直してください」で中断する
+4. updatedAt を現在時刻に更新
+5. PUT  同 URL  { message, content: base64(JSON), sha }
+6. 成功 → baseUpdatedAt を更新、「公開しました」を表示
 ```
 
 注意点:
 
 - **base64 化に `btoa()` を直接使わない**。日本語を含む UTF-8 は例外になる。
   `TextEncoder` でバイト列にしてから base64 化する
-- sha が古い場合 API は 409 を返す。別端末から公開した場合に起きる。
-  「リモートが更新されています。取り込んでから公開し直してください」と表示し、
-  勝手に上書きしない
+- **競合検出を sha に頼らないこと。** GET の直後に PUT するので sha はほぼ常に最新で、
+  409 が返るのは GET と PUT の間の数十ミリ秒に別の公開が挟まった場合だけ。
+  現実の競合は「B がページを開いて 30 分編集する間に A が公開する」という形で起きる。
+  この場合 sha は新しいままなので **PUT は成功し、A の作業が黙って消える**。
+  手順 3 の `updatedAt` 比較が本当の砦であり、GET が返す本文を捨ててはならない。
+  409 の処理は残すが、それは最後の保険であって主たる検出手段ではない
+  （2026-08-09、Task 7 のレビューで判明。当初この節は sha 競合を主たる検出手段と書いていた）
+- ページ起動時の `decideSync` はページを開いた瞬間しか見ないので、
+  開いたまま編集している間に起きた公開は検出できない。公開時にもう一度確かめる必要がある
 - Pages への反映には 1 分程度かかる。公開直後に「反映まで少し時間がかかります」と添える
 - 公開は 3 つの JSON をまとめてではなく、変更のあったファイルのみ
 
@@ -619,17 +666,67 @@ assets/data/archive.enc
 
 ## 12. 未解決の事項
 
-- 既定の持ち物リストの中身（現在は 3 区分 13 項目の仮データ）。実際に必要な項目は
-  実装時に詰める
+- 既定の持ち物リストの中身（現在は 3 区分 13 項目の仮データ）。UI から編集できるので、
+  種として妥当なら実装時に詰め直さなくてよい
 - Gmail から抽出する対象の絞り込み条件（検索クエリ）。Phase C の着手時に決める
-- コメントの「書いた人」の識別方法。現状は入力時に固定値を割り当てる想定
+
+### 決着したもの
+
+- **コメントの「書いた人」**: 端末ごとに一度だけ名前を選び、`localStorage["tp:author"]` に
+  保存する。以降のコメントには自動でその名前が付く。毎回選ばせない
+  （2026-08-09 決定）
 
 ---
 
-## 13. Phase A からの繰り越し
+## 13. 繰り越し（未解決の項目）
 
-Phase A の実装とレビューで見つかり、Phase A の範囲外として意図的に残した項目。
-着手前にこの節を読むこと。
+各フェーズの実装とレビューで見つかり、そのフェーズの範囲外として意図的に残した項目。
+着手前にこの節を読むこと。前半が Phase A からの繰り越し、後半が Phase B1 からの繰り越し。
+
+**Phase B1 で解消し、この節から削除した項目**:
+
+- **CSP を入れていない** → 4 ページの `<head>` に
+  `<meta http-equiv="Content-Security-Policy">` を置いた（4 ページで同一）。
+  `script-src 'self'`（`'unsafe-inline'` なし）、`connect-src` は `'self'` と
+  `https://api.github.com` のみ。`packing.html` / `archive.html` のインライン module は
+  `assets/js/stub-page.js` へ移した。`tests/csp.test.js` が
+  「CSP の存在」「`script-src` が `'self'` のみ」「インライン script と `on*` 属性が
+  1 つも無い」「`connect-src` に GitHub API がある」を 4 ページすべてで検査する。
+  コミット `9d541f4`（テスト側の矛盾の訂正が `9b58fd7` と `f71c8c5`）。
+  これにより `javascript:` スキームの URL も実行されなくなった
+  （`ev.url` の検証自体は Phase A の `safeHttpUrl()` で、フォーム入力の検証は
+  Task 6 の `formProblems()` で塞いである。CSP はその 3 枚目）
+- **`map.js` の再描画判定が `id` と座標だけを見ている** → `signatureOf` が
+  マーカーと一覧が読む項目（`cat` / `icon` / `title` / `location` / `image` /
+  `startDay` / `allDay`）も含むようになった。タイトルだけの編集でも一覧と
+  ポップアップが追従する。コミット `319f1b2`
+- **`toTime()` の重複** → `sync-decide.js` から `export` し、`sync.js` が import する。
+  向きは `decideSync` の import と同じなので循環しない
+- **`CONFLICT_MESSAGE` の重複** → `github.js` が `export` し、
+  自分の `explain(409)` と `sync.js` の突き合わせ側の両方がその 1 個を使う。
+  文字列を書き写す場所が無くなったので、ずれようがない
+- **`schedule.js` の `icons.js` 二重 import と `sheet-body` の二重取得** → 解消。
+  本文要素は `sheetBodyEl` に 1 度だけ引き、`createSheet` と `createEventEditor` の
+  両方へ渡す（別々に引くと、片方だけ差し替えたときに editor が入力欄を
+  見つけられなくなる）
+
+**Phase B1 の最終レビューで見つけて直した項目**（§13 に載る前に解消したが、
+下の「時計ずれ」の項目と混同されやすいので経緯を残す）:
+
+- **`decideSync()` が下書きを黙って消しうる（Critical）。** `local > base` という
+  順序比較で「この端末に未公開の変更があるか」を判断していた。`base` は公開した端末の
+  時計で、下書きの `updatedAt` は編集した端末の時計で押される別系列の値なので、
+  公開側の時計が進んでいると**編集済みの下書きが `base` より古くなり、順序比較は
+  「触られていない」と読む** → `load()` が `storeAdopted()` で下書きを上書きする。
+  被害を受けるのはトークンを持たない側の端末で、一度も公開していない以上
+  git 履歴にも控えが無く、編集は完全に消える。
+  生の文字列の一致比較（`localUpdatedAt !== baseUpdatedAt`）に変更した。
+  `base` には `storeAdopted()` が書いた `updatedAt` がそのまま入り、`saveLocal()` は
+  必ず `updatedAt` を進めるので、「違う ＝ 編集された」で判断できる。
+  `sync.js` の `hasUnpublishedChanges()` が一致で見ているのと同じ理由で、
+  両者は互いを指すコメントを持つ。
+  なお `remote <= base` は順序比較のまま ── どちらもリモートの `updatedAt` が出所で
+  同じ系列だから。**片方だけ順序に戻さないこと**
 
 **Phase A で解消し、この節から削除した項目**（PR #5 のレビュー指摘による。
 3 人のレビュアーが独立に「Phase B まで待てない」と判断したため繰り越しを取り消した）:
@@ -646,39 +743,175 @@ Phase A の実装とレビューで見つかり、Phase A の範囲外として�
 - `menu.js` に例外処理が無く、失敗すると index.html が真っ白になる →
   `schedule.js` と同じ `try` / `catch` / `finally` にした
 
-### セキュリティ（Phase B の公開機能に直結する）
+### セキュリティ（Phase A からの繰り越し）
 
-- **CSP を入れていない。** `<meta http-equiv="Content-Security-Policy">` で
-  `script-src` から `unsafe-inline` を外せば、文字列組み立てによる注入をまとめて塞げる。
-  今なら `packing.html` / `archive.html` のインライン module を外部ファイルへ移すだけで済む。
-  トークンの導線ができたあとに入れると監査コストが上がる
-- **画像を 4 つの外部ホストから直リンクしている**（`menu.js` と `events.json`）。
-  リンク切れと閲覧者 IP の漏出。`.gitignore` の `*.png` / `*.jpg` を
+- **画像を複数の外部ホストから直リンクしている**（`menu.js` と `events.json`）。
+  リンク切れと閲覧者 IP の漏出。CSP の `img-src` を `https:` のワイルドカードに
+  せざるを得ないのもこれが理由。`.gitignore` の `*.png` / `*.jpg` を
   スクリーンショット用のパスに絞れば自前配置できる
 
-### 設計の負債
+### 設計の負債（Phase A からの繰り越し）
 
-- **`map.js` の再描画判定が `id` と座標だけを見ている。** `title` や `image` を
-  その場で編集しても一覧が更新されない。Phase B の編集機能で顕在化する
 - **`iconOf` は `ev.icon` があると `ev.cat` を検証しない。** 不正なカテゴリが
   カレンダーだけ無言で通る（地図と詳細シートは throw する）。
   読み込み時の `validateEvents()` が `cat` を検査するようになったため、
-  `events.json` 経由では到達しない。Phase B のフォーム入力を検査外で描画すると復活する
-- **`hhmmToDec` は `"24:30"` を受け入れる。** Phase B でフォーム入力を通す前に上限を決める
-  （`validateEvents()` は `start` / `end` を 0〜24 に制限しているが、
-  `hhmmToDec` 自体の上限はまだ `h > 24` のまま）
-- **シートに閉じる操作を拒否する手段がない。** Phase B の編集フォームは未保存の変更を
-  黙って捨てることになる。`confirm()` は使えないので `canClose` 述語などが要る
-- **`sheet.open()` は本文を文字列で受け取る。** フォームを載せるなら Node も
-  受け取れるほうが、描画後に `bodyEl` から入力欄を引き直さずに済む
+  `events.json` 経由では到達しない。B1 のエディタも保存前に配列全体を
+  `validateEvents()` へ通すので現状は到達しないが、検査を経ない描画経路を足すと復活する
+- **`hhmmToDec` は `"24:30"` を受け入れる**（`h > 24` でしか弾かない）。
+  B1 のフォーム経路では `formProblems()` → `validateEvent()` が `start` / `end` を
+  0〜24 に制限するので `24:30`（= 24.5）は保存前に弾かれる。
+  つまり残っているのは `hhmmToDec` を直接呼ぶ新しい経路を足したときのリスクだけ
+- **シートに閉じる操作を拒否する手段がない。** B1 の編集フォームは、閉じると未保存の
+  入力を黙って捨てる（実際にそうなっている）。`confirm()` は使えないので
+  `canClose` 述語などが要る
+- **`sheet.open()` は本文を文字列で受け取る。** B1 のエディタは
+  `eventFormHtml()` の文字列を渡し、描画後に `bodyEl` から入力欄を引き直している
+  （`event-editor.js` の `requireField`）。Node も受け取れれば引き直しは要らない
 
-### 小さいもの
+### 小さいもの（Phase A からの繰り越し）
 
-- CSS の色リテラル検査（`tokens.test.js`）は対象ファイルをハードコードしている。
-  `packing.css` を足すと無検査になる
+- CSS の色リテラル検査（`tokens.test.js`）は対象ファイルをハードコードしている
+  （`base.css` / `controls.css` / `calendar.css`）。`packing.css` を足すと無検査になる
 - 名前付き色（`red` など）とコメント内の色は検査対象外
 - `.ev` の padding が `box-sizing: border-box` 下で高さの下限になり、表示終端まで
   13.6 分未満のイベントで約 5.6px はみ出す（実データでは発生しない）
 - メニューカードが `ul` / `li` で包まれていない
-- Phase B/C 用の CSS 約 250 行が今も配信されている（モックからの一括転記による）
+- 呼び出し側のない CSS が今も配信されている（モックからの一括転記による）。
+  B1 で編集フォームと公開まわりは実際に使われるようになり、`.catpick` は削除した。
+  `.rowbtn--del` / `.rowbtn--confirm` / `.inp--note` / `.inp--group` は持ち物リスト待ち
 - `createMap()` と `createSheet()` の本体は `node --test` の対象外。ブラウザ実測でのみ検証
+
+### Phase B1 からの繰り越し（保存と公開）
+
+- **`createSync()` は旅程専用。2 つ目の JSON には使えない。B2 が最初に踏む。**
+  §5.2・§5.3 は同期する JSON を 3 つ（`events` / `packing` / `comments`）想定しているが、
+  `sync.js` で注入できるのは `store` / `fetchImpl` / `config` / `now` の 4 つで、
+  `config` は `owner` / `repo` / `branch` / `path` しか持たない。**イベント固有の要素が
+  3 種類、注入の外にある:**
+
+  1. **保存キー** — `DRAFT_KEY = "events"`（`:20`）と `BASE_KEY = "events-base"`（`:33`）が
+     モジュール定数
+  2. **検証器** — `validateEvents` を module top で import し（`:16`）、
+     5 か所が直に呼ぶ: 下書きの検査（`:145`）、リモートの検査（`:170`）、
+     `saveLocal`（`:235`）、`adoptRemote`（`:246`）、`publish`（`:309`）
+  3. **コミットメッセージ** — `publish()` が
+     `stamped.events.length` と `Update itinerary from the browser (N events)`（`:316-317`）
+
+  **今のまま `createSync({ config: { …, path: "assets/data/packing.json" } })` を作っても、
+  黙って壊れはしない。全経路が投げる**（§4.2 の `packing.json` は `days` も `events` も
+  持たないので `validateEvents` を通らない）── `saveLocal` は `:235` で、
+  `publish` は `:309` で、`adoptRemote` は `:246` で、`load` はリモートを検査する `:170` で
+  投げる。`sync.js` は**検証してから書く**順序なので、この段階では旅程の下書きは無傷。
+  `load()` の下書き棄却（`:141-151` → `:182` の `if (!draftRejected)`）も
+  `storeAdopted()` を飛ばす動き、つまり上書きを**防ぐ**側であって、失う側ではない。
+
+  **危ないのは部分的に直したときで、そこが本当の罠。** 「検証器を注入すればいい」と
+  気付いて検証器だけを `config` へ出すと、持ち物の下書きが自分の検証を通るようになり、
+  **そこで初めて `saveLocal` が `store.write(DRAFT_KEY, …)` に到達して
+  `tp:events` を持ち物データで上書きする。旅程の未公開の編集はこの瞬間に消える**
+  （持ち物側で `publish()` まで進めば `storeAdopted()` が `tp:events-base` も塗り替える）。
+  人が気付くのは次に旅程ページを開いたときで、`load()` が「旅程の形になっていない」と
+  警告して手元の下書きを捨て、リモートの内容に戻る ── 棄却は損失が起きた場所ではなく、
+  損失が見えた場所にすぎない。
+
+  **直し方: `config` に保存キーの接頭辞と検証器の両方を足し、既定を今の値
+  （`events` / `events-base` / `validateEvents`）にする。コミットメッセージの組み立ても
+  ファイルごとに差し替えられるようにする。3 つを一度に直すこと** ──
+  どれか 1 つだけを注入可能にすると上の静かなデータ消失が生まれる。
+  **B2 で 2 つ目の `createSync` を作る前に必ず直す。**
+- **時計ずれで他端末の公開を黙って上書きしうる（残存リスク）。**
+  `tp:events-base` に入る `updatedAt` は公開した端末の時計で押される。押す端末が
+  複数あるので順序関係は保たれない ── A の時計が遅れていれば、A があとから公開した版の
+  `updatedAt` が B の版より古くなり、B の端末の base を下回る。`assertRemoteNotAhead()` は
+  「リモートは進んでいない」と判断し、A の公開を上書きする。
+  免疫を付けるには内容のハッシュか sha が要るが、読み込みはトークン無しの素の `fetch`
+  なので sha が手に入らない（トークンを持たない端末でも旅程を開けるようにするための選択）。
+  上書きしてもコミットは git 履歴に残るので復旧はできる。
+  `assets/js/sync.js` の `BASE_KEY` のコメントがこの節を指している。
+
+  **これは公開側（リモートが上書きされる）の話で、受け入れている理由は
+  「git 履歴から戻せる」こと。** 同じ時計ずれが起動時の判断
+  （`decideSync()`）に及ぶと**手元の下書きが消える**という別の被害になり、
+  そちらは git 履歴に控えが無いので受け入れられない ── B1 の最終レビューで
+  Critical として直してある（上の「最終レビューで見つけて直した項目」）。
+  **2 つを同じ残存リスクとして扱わないこと**
+- **保存領域に書けない端末（プライベートブラウジング、容量超過）では公開が毎回 409 になる。**
+  base を残せないため。`publish-ui.js` は「取り込んでから公開し直す」という成立しない
+  案内を出さないよう文言を分けてあるが（`MESSAGES.cannotPersist`）、根治していない。
+  直すなら「公開が成功した直後に限り base が無くても通す」を sync 層に入れる
+- **壊れた下書きを拒否した回は base を更新しない。** 救出できる中身を上書きしないための
+  判断だが、次の公開は必ず 409 になる（「取り込む」を押せば済むが、その端末の編集は失われる）
+- **`canPersist()` の書き込みプローブは 1 バイト。** 容量ぎりぎりの端末では
+  プローブだけ通って本番の書き込みが失敗しうる（失敗自体は画面に出る）
+- **`storeAdopted()` は途中まで書けたときに画面と保存領域がずれる。** 下書き → base の
+  順に書くので（この順である理由は同関数のコメント参照）、base の書き込みだけ失敗すると
+  `adoptRemote()` が投げ、`publish-ui` は「取り込めませんでした」と出し、
+  `onAdopt` を呼ばないまま終わる ── **保存領域にはリモートが入っているのに画面は
+  古いまま**で、次の編集がその古い内容を保存し直して取り込みを黙って巻き戻す。
+  base は 30 バイト程度の文字列なのでここだけ失敗する状況は極めて狭いが、
+  順序の非対称性が書かれていないのは片手落ち
+- **一度押した「取り込む」ボタンは構えたまま戻らない。** `publish-ui.js` の同期バーの
+  ボタンは 1 度目で身構え 2 度目で実行するが、トークン削除ボタンと違って
+  `updatePanel()` に相当する解除の経路がない。ラベルが変わるので状態は見えており、
+  害は「押しっぱなしに見える」だけ
+- **`sync.load()` が投げるとトークン設定への導線も出ない。** `publish-ui` は
+  読み込みのあとに組み立てるため（`schedule.js` の `main()` は `await sync.load()` の
+  あとで `createPublishUI()` を呼ぶ）。リモートの `days` / `events` が壊れていると
+  `sync.js` の `load()` がリモートを検証するところで `validateEvents` が投げ、
+  `main()` の `catch` がそのまま再送出して落ちる ── 公開ボタンもトークン設定も
+  DOM に現れないので、**この状態をブラウザから直す手段は無く、復旧はリポジトリへの
+  git コミットだけになる。** `events.json` の手編集は `CLAUDE.md` が正規の手順として
+  案内しているので、`days` を縮めたまま古い添字を参照するイベントを残す、といった形で
+  現実に起こりうる。
+  直すなら `publish-ui` を `load()` より前に組み立てて、読み込みに失敗しても
+  トークン設定と公開だけは使える状態にする。
+  なお `sync.js` の `assertRemoteNotAhead()` が突き合わせを省いて公開を通すのは
+  **これとは別の壊れ方**（`validateEvents` を通るが `updatedAt` だけ読めない）に対する
+  措置で、そちらはページが開くので公開が実際に復旧手段になる。
+  以前は同関数のコメントが両者を区別せず「公開こそが復旧手段になる」と書いていた。
+  B2 でこの項目に着手するときは、コメントの区別も一緒に見直すこと
+- **`StoreWriteError` で終わった公開はコミット URL を出せない。** URL を得たあと
+  `storeAdopted()` で投げるため。リンクの代わりにリポジトリを見てもらうしかない
+- **公開ボタンに件数を出せない。** base に持っているのは時刻だけで内容がないため、
+  何件変わったかを算出できない。出すなら取り込んだ本文を 3 つ目のキーに持つ必要がある
+
+### Phase B1 からの繰り越し（設計の負債）
+
+- **`validateEvent()` の戻り値がメッセージ文字列の配列。** `{field, message}` を返すほうが
+  本来は綺麗で、`event-form.js` の `FIELD_RE`（キー名を画面の項目名へ置換する正規表現）も
+  要らなくなる。B2/B3 で入力欄が増える前に判断する
+- **`isEventObject`（`event-form.js`）が `isPlainObject`（`validate.js` / `sync.js`）と重複**
+- **`ev.imagePos` が `style="object-position:…"` へそのまま入る**（`sheet.js`）。
+  通しているのは `escapeHtml()` だけで、これが変換するのは属性から抜け出す 5 文字
+  （`& < > " '`）だけ。`;` も CSS の関数記法も素通りするので、宣言を追加できる。
+  `style-src` は Leaflet のために `'unsafe-inline'` が要るので CSP も止めない。
+  **今は到達しない** ── `imagePos` の入力欄はフォームに無く、`validateEvents()` も
+  このキーを見ないため、値は `events.json` を手で書いた分しか存在しない。
+  ただし実データ 40 件すべてがこのキーを持っている。
+  **B2 で画像位置の入力欄を足すなら、先に `imagePos` を許可リストで検証すること**
+  （`object-position` が実際に取る形＝キーワードと長さ／パーセントだけ）。
+  `escapeHtml()` を重ねても防げない
+- **内容だけの編集でも地図が `fitBounds` し直す。** 再描画の署名がマーカー用と一覧用で
+  共通なので、タイトルを直すとパン・ズームが初期位置へ戻る。署名を 2 つに分ければ解決
+- **`clearProblems()` が `role="alert"` を残す**（`className` と中身だけ消している）。
+  `aria-invalid` を付けているのもタイトル欄だけ
+- **`showPublishFailure()` が dirty の再計算を呼び出し側の `finally` に頼っている。**
+  結合が暗黙的で、呼び出し順を変えると静かにずれる
+- **`store.write(key, undefined)` は例外にならない。** `JSON.stringify(undefined)` が
+  `undefined` を返すので `"undefined"` が保存され、次の `read` が警告つきで既定値に落ちる。
+  呼び出し側の誤用だが「書けたつもり」の系統ではある
+- **`decideSync()` は `hasLocal: false` なのに `localUpdatedAt` が渡された呼び出しを
+  検知せず `use-remote` を返す。** この関数で唯一「迷ったら人に聞く」に倒れない経路
+- **`decideSync()` の先頭 2 つのガード（`remoteUpdatedAt == null` → `offline`、
+  `!hasLocal` → `use-remote`）だけ理由のコメントが無い。** 以降のガードには
+  「なぜその判断に倒すのか」が書いてあるので、この 2 行だけ根拠が読み取れない
+  （上の項目もこの 2 行目に関わる）
+
+### Phase B1 からの繰り越し（テストの穴）
+
+- **4 ページの CSP が同一であることを検査していない。** ページごとに見ているのは
+  「CSP の存在」「`script-src`」「インライン script と `on*` 属性」「`connect-src`」で、
+  `img-src` / `font-src` は `schedule.html` でしか見ていない
+- **`fromBase64Utf8()` の型ガードにテストがない**（`toBase64Utf8()` 側にはある）
+（`decideSync()` の「ローカルの `updatedAt` だけが不正」のケースは B1 の最終レビューで
+テストを追加したので、この節から落とした）

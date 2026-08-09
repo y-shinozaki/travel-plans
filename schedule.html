@@ -3,6 +3,22 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Phase B でリポジトリ書き込み権限を持つトークンをブラウザに保存するため、
+         スクリプトの実行元を自分自身だけに絞る。'unsafe-inline' を入れないので
+         インライン script と javascript: URL は実行されない。
+         style は Leaflet と自前コードが style 属性を多用するため許可が要る
+         （狙いはスクリプト実行の遮断であって、スタイルではない）。 -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self';
+               script-src 'self';
+               style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+               font-src https://fonts.gstatic.com;
+               img-src 'self' data: https:;
+               connect-src 'self' https://api.github.com;
+               base-uri 'self';
+               form-action 'none'"
+    />
     <title>旅程 — Thailand 2026</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -18,6 +34,11 @@
   </head>
   <body>
     <nav class="nav" id="nav"></nav>
+
+    <!-- 起動時の案内バー（別端末が先に公開していた／最新を確認できなかった）。
+         中身は publish-ui.js が入れる。空のまま出すと隙間だけが残るので
+         hidden で始める（CSS 側で display:flex を [hidden] より弱くしてある）。 -->
+    <div class="syncbar" id="syncbar" role="region" aria-label="同期の状態" hidden></div>
 
     <main class="wrap sec">
       <div class="shead reveal">
@@ -39,6 +60,22 @@
         <div class="toolbar__group" id="cat-filters">
           <span class="eyebrow">Category</span>
         </div>
+        <!-- 中身（アイコンとラベル）は schedule.js が入れる。
+             旅程を読み終えるまでは押せない（押しても開けるフォームが無い）。 -->
+        <div class="toolbar__group toolbar__group--end">
+          <button class="tbtn" id="ev-edit-toggle" aria-pressed="false" disabled></button>
+          <button class="tbtn" id="ev-add" disabled></button>
+          <!-- 公開ボタンとトークン設定の置き場。トークンが無いときに
+               公開ボタンを置かないので、中身は publish-ui.js が入れる。 -->
+          <span class="toolbar__group" id="pub-controls"></span>
+        </div>
+      </div>
+
+      <!-- トークン設定（開閉）と、公開・取り込みの結果。
+           結果は押した直後に出るが、割り込みたいほどではないので polite。 -->
+      <div class="pub">
+        <div class="pubpanel" id="pub-panel" hidden></div>
+        <div class="pubstat" id="pub-status" role="status" aria-live="polite" hidden></div>
       </div>
 
       <div class="cal" id="cal"></div>

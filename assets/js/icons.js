@@ -86,12 +86,24 @@ export const SPRITE = `
   <symbol id="i-x" viewBox="0 0 24 24">
     <path d="M6 6l12 12M18 6 6 18"/>
   </symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24">
+    <path d="M16.4 3.9 20.1 7.6 8.3 19.4l-4.6.9.9-4.6z"/>
+    <path d="M14.2 6.1 17.9 9.8"/>
+  </symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24">
+    <path d="M12 4.8v14.4M4.8 12h14.4"/>
+  </symbol>
+  <symbol id="i-check" viewBox="0 0 24 24">
+    <path d="m4.5 12.6 5.2 5.2L19.5 6.6"/>
+  </symbol>
 </svg>`.trim();
 
 export const ICON_IDS = [
   "i-flight", "i-camera", "i-food", "i-hotel", "i-shop", "i-car", "i-boat",
   "i-arrow-right", "i-calendar", "i-clock", "i-pin", "i-external",
   "i-chat", "i-search", "i-luggage", "i-lock", "i-note", "i-pool", "i-x",
+  // Phase B の編集 UI（ツールバーとシートのフッター）
+  "i-edit", "i-plus", "i-check",
 ];
 
 // カテゴリ既定アイコンの対応表（旧 CATEGORY_ICON）は categories.js にある。
