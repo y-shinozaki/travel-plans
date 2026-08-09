@@ -47,7 +47,13 @@ export function createSheet({ root, overlay, titleEl, bodyEl, footEl, closeBtn }
   setOpen(false);
 
   function open(title, bodyHtml, footNodes = []) {
-    lastFocused = document.activeElement;
+    // 戻り先を覚えるのは「閉じているシートを開くとき」だけ。
+    // すでに開いているシートの中身を差し替える場面（詳細 →「この予定を編集」）で
+    // 更新してしまうと、そのときの activeElement はこれから innerHTML="" で
+    // 消えるフッターのボタンなので、戻り先が失われる（detach された要素への
+    // focus() は何も起きず、閉じたあとフォーカスが body へ落ちる）。
+    // 背景は inert なので、開いている間に外の要素から open() が呼ばれることはない。
+    if (!isOpen()) lastFocused = document.activeElement;
     titleEl.textContent = title;
     bodyEl.innerHTML = bodyHtml;
     footEl.innerHTML = "";

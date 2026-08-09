@@ -22,6 +22,10 @@ export function el(tag, cls, text) {
  * 地図のロケーション一覧行でも同じパターンが必要になるため共通化している。
  */
 export function makeSelectable(node, ev, label, onSelect) {
+  // 保存して描き直したあと、同じ予定の要素へフォーカスを戻すための目印
+  // （event-editor.js の focusEvent）。作り直された要素は別物なので、
+  // 参照ではなく id で引き直すしかない。
+  node.dataset.evId = ev.id;
   node.tabIndex = 0;
   node.setAttribute("role", "button");
   node.setAttribute("aria-label", `${ev.title}、${label}`);

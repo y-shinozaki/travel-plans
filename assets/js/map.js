@@ -17,10 +17,31 @@ const TILE_ATTR =
 const keyOf = (ev) => `${ev.lat},${ev.lng}`;
 
 /**
- * 表示中のロケーション集合を表す文字列。
- * 時間帯セレクトの変更では集合が変わらないため、これが同じなら再描画しない。
+ * 表示中のロケーションを表す文字列。
+ * 時間帯セレクトの変更では中身が変わらないため、これが同じなら再描画しない。
+ *
+ * id と座標だけでは足りない。Phase B ではタイトル・カテゴリ・時刻がブラウザから
+ * 編集できるので、「同じ地点の集合」のまま中身だけが変わる。マーカーと一覧が
+ * 読む値をすべて並べて、編集が黙って無視されないようにする
+ * （ここに無い値を drawList / drawMarkers が読み始めたら、ここにも足すこと）。
  */
-const signatureOf = (locations) => locations.map((ev) => `${ev.id}@${keyOf(ev)}`).join("|");
+const signatureOf = (locations) =>
+  JSON.stringify(
+    locations.map((ev) => [
+      ev.id,
+      ev.lat,
+      ev.lng,
+      ev.cat,
+      ev.icon ?? null,
+      ev.title,
+      ev.location ?? null,
+      ev.image ?? null,
+      ev.startDay,
+      ev.allDay ?? false,
+      ev.start ?? null,
+      ev.end ?? null,
+    ])
+  );
 
 /**
  * ポップアップとロケーション行の HTML 組み立ては、DOM も Leaflet も要らない

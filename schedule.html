@@ -55,6 +55,12 @@
         <div class="toolbar__group" id="cat-filters">
           <span class="eyebrow">Category</span>
         </div>
+        <!-- 中身（アイコンとラベル）は schedule.js が入れる。
+             旅程を読み終えるまでは押せない（押しても開けるフォームが無い）。 -->
+        <div class="toolbar__group toolbar__group--end">
+          <button class="tbtn" id="ev-edit-toggle" aria-pressed="false" disabled></button>
+          <button class="tbtn" id="ev-add" disabled></button>
+        </div>
       </div>
 
       <div class="cal" id="cal"></div>

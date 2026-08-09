@@ -183,6 +183,8 @@ function installDomStub() {
       tabIndex: -1,
       children: [],
       attrs: {},
+      // makeSelectable が data-ev-id（保存後にフォーカスを戻す目印）を書く
+      dataset: {},
       style: { _props: {}, setProperty(k, v) { this._props[k] = String(v); } },
       appendChild(child) { this.children.push(child); return child; },
       setAttribute(k, v) { this.attrs[k] = String(v); },

@@ -54,6 +54,18 @@
 .btn--ghost:hover::before {
   transform: scaleX(1);
 }
+/* 2 度押しの削除で、1 度目を押したあとの姿。
+   confirm() を使わない代わりに、次の一押しが破壊的であることを色で示す。 */
+.btn--danger {
+  color: var(--sand-lt);
+  border-color: var(--c-food);
+}
+.btn--danger::before {
+  background: var(--c-food);
+}
+.btn--danger:hover {
+  color: var(--c-food);
+}
 
 .chip {
   position: relative;
@@ -382,6 +394,12 @@
   overflow-wrap: anywhere;
   line-height: 1.6;
 }
+/* 保存できなかった理由の置き場（フォーム末尾）。空のときは class を持たない
+   ので、余白も出ない。.ferror は 1 件 1 行、複数行の文言は .ferror--block。 */
+.fproblems {
+  display: grid;
+  gap: 8px;
+}
 .switch {
   display: flex;
   align-items: center;
@@ -392,35 +410,11 @@
   font-size: 13px;
   letter-spacing: 0.4px;
 }
-.catpick {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.catpick button {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 9px 14px;
-  font-size: 12px;
-  letter-spacing: 0.6px;
-  border: 1px solid var(--line-soft);
-  border-radius: var(--r-pill);
-  background: transparent;
-  color: var(--ink-2);
-  transition: all var(--t-fast) var(--e-out);
-}
-.catpick button:hover {
-  border-color: var(--ink);
-  color: var(--ink);
-}
-.catpick button[aria-pressed="true"] {
-  background: var(--bg);
-  border-color: var(--bar);
-  color: var(--tx);
-}
-.catpick button[aria-pressed="true"] .ico {
-  color: var(--bar);
+/* 終日に切り替えたときの時刻欄。.fgrid が display: grid を持っているので
+   hidden 属性では消えない（UA の [hidden] { display: none } が負ける）。
+   宣言順に依存しないよう !important を付けた数少ない例外。 */
+.is-hidden {
+  display: none !important;
 }
 
 /* ── ツールバーボタン ── */
@@ -452,6 +446,11 @@
 .tbtn--danger:hover {
   color: var(--c-food);
   border-color: var(--c-food);
+}
+/* 旅程を読み終えるまでの編集ボタン。押せないことを見た目でも示す */
+.tbtn:disabled {
+  opacity: 0.35;
+  pointer-events: none;
 }
 
 /* ── 行アクションボタン ── */

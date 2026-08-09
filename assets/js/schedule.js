@@ -4,9 +4,13 @@ import { renderNav } from "./nav.js";
 import { renderCalendar } from "./calendar.js";
 import { CAT_META } from "./categories.js";
 import { createMap } from "./map.js";
-import { createSheet, renderEventDetail } from "./sheet.js";
-import { escapeHtml } from "./dom.js";
-import { validateEvents, EventDataError } from "./validate.js";
+import { createSheet } from "./sheet.js";
+import { el, escapeHtml } from "./dom.js";
+import { EventDataError } from "./validate.js";
+import { icon } from "./icons.js";
+import { createStore } from "./store.js";
+import { createSync } from "./sync.js";
+import { createEventEditor } from "./event-editor.js";
 
 /** HTTP エラー・通信断。取りに行けなかった、という種類の失敗。 */
 class DataFetchError extends Error {
@@ -24,7 +28,14 @@ class DataParseError extends Error {
   }
 }
 
+/**
+ * data が正で、days / events はその一部を指すだけの控え。
+ * 保存は data 全体（updatedAt を含む）に対して行うので、setData で
+ * 必ず 3 つまとめて差し替える ── 片方だけ更新すると、画面に出ている旅程と
+ * 保存される旅程が食い違う。
+ */
 const state = {
+  data: null,
   days: [],
   events: [],
   viewStart: 6,
@@ -32,6 +43,12 @@ const state = {
   catFilter: null,
   onSelect: null,
 };
+
+function setData(data) {
+  state.data = data;
+  state.days = data.days;
+  state.events = data.events;
+}
 
 /**
  * 時間帯セレクトに並べる選択肢の範囲。
@@ -48,6 +65,8 @@ const els = {
   viewStart: document.getElementById("view-start"),
   viewEnd: document.getElementById("view-end"),
   catFilters: document.getElementById("cat-filters"),
+  evEditToggle: document.getElementById("ev-edit-toggle"),
+  evAdd: document.getElementById("ev-add"),
 };
 
 function draw() {
@@ -147,6 +166,36 @@ function buildCategoryFilters() {
 }
 
 /**
+ * 編集ツールバー。
+ *
+ * 2 つのボタンは HTML 側で disabled にしてある。旅程が読めていない状態で
+ * 押されると、編集の入口が「押しても何も起きないボタン」になってしまう
+ * （データが無いので開けるフォームが無い）。読み込みが済んだここで初めて外す。
+ *
+ * ラベルは textContent、アイコンだけ innerHTML で入れる。HTML に
+ * <use href="#i-edit"> を直書きすると、injectSprite() より前にパースされ、
+ * WebKit が参照を解決し直さないことがある（sheet.js の閉じるボタンと同じ理由）。
+ */
+function buildEditorToolbar(editor) {
+  const label = el("span", null, "予定を編集");
+  els.evEditToggle.innerHTML = icon("i-edit", "ico--sm");
+  els.evEditToggle.appendChild(label);
+  els.evEditToggle.addEventListener("click", () => {
+    const on = !editor.editMode();
+    editor.setEditMode(on);
+    els.evEditToggle.setAttribute("aria-pressed", String(on));
+    label.textContent = on ? "編集を終える" : "予定を編集";
+  });
+
+  els.evAdd.innerHTML = icon("i-plus", "ico--sm");
+  els.evAdd.appendChild(el("span", null, "予定を追加"));
+  els.evAdd.addEventListener("click", () => editor.openNew());
+
+  els.evEditToggle.disabled = false;
+  els.evAdd.disabled = false;
+}
+
+/**
  * 失敗の種類ごとに違う案内を出す。
  *
  * 以前は 1 つの文言ですべてを説明しようとしていた。だが JSON の書き間違いや
@@ -196,6 +245,9 @@ function showLoadError(error) {
 async function main() {
   injectSprite();
 
+  const store = createStore();
+  const sync = createSync({ store });
+
   const sheet = createSheet({
     root: document.getElementById("sheet"),
     overlay: document.getElementById("sheet-overlay"),
@@ -205,60 +257,41 @@ async function main() {
     closeBtn: document.getElementById("sheet-close"),
   });
 
-  // Phase B でここに編集ボタンが増える。
-  //
-  // renderEventDetail(...) は sheet.open() の引数として評価されるので、
-  // ここで落ちると sheet.open() 自体が呼ばれない ── 画面は微動だにせず、
-  // 利用者には「押し損ねた」のか「壊れた」のかが区別できない。
-  // 本文の生成に失敗したときは、シートは必ず開いてその中で失敗を伝える。
-  const openDetail = (ev) => {
-    let body;
-    try {
-      body = renderEventDetail(ev, state.days);
-    } catch (error) {
-      console.error(
-        `schedule: 詳細の生成に失敗しました（${ev?.id ?? "id なし"} / ${ev?.title ?? ""}）`,
-        error
-      );
-      sheet.open(
-        "詳細を表示できません",
-        `<p class="ferror ferror--block">${escapeHtml(
-          `この予定（${ev?.id ?? "id なし"}）の詳細を組み立てられませんでした。\n` +
-            "旅程データが壊れている可能性があります。\n\n" +
-            `${error?.name ?? "Error"}: ${error?.message ?? String(error)}`
-        )}</p>`
-      );
-      return;
-    }
-    sheet.open("予定の詳細", body);
-  };
-  state.onSelect = openDetail;
+  const editor = createEventEditor({
+    sheet,
+    bodyEl: document.getElementById("sheet-body"),
+    getData: () => state.data,
+    // 保存の順序が意味を持つ: 検証（editor 側）→ 下書きへ書く → 反映。
+    // saveLocal が投げたら state も画面も動かない ── 保存できていないのに
+    // 画面だけ新しい、という食い違いを作らない。
+    // 再描画の失敗は safeDraw が拾う（保存は済んでいるので、ここで
+    // 例外にすると editor が「保存に失敗しました」と嘘をつく）。
+    commit: (next) => {
+      setData(sync.saveLocal(next));
+      safeDraw("予定の保存");
+    },
+    fallbackFocus: els.evAdd,
+  });
+  state.onSelect = editor.select;
 
   renderNav(document.getElementById("nav"), "schedule");
 
-  let response;
+  // 下書き（localStorage）とリモートを突き合わせて、見せるほうを受け取る。
+  // 検証は sync.load() が両方に対して済ませている。
+  // source（use-remote / remote-is-newer …）に応じた案内は Task 9 で出す。
+  let loaded;
   try {
-    response = await fetch("assets/data/events.json");
+    loaded = await sync.load();
   } catch (error) {
-    // fetch が reject するのは通信断・CORS・file:// のとき（HTTP エラーでは reject しない）
-    throw new DataFetchError(`events.json へ到達できません: ${error.message}`);
+    // sync.load() の失敗は「取りに行けなかった」「JSON として読めなかった」
+    // 「中身が旅程の形になっていない」の 3 種類で、直し方がそれぞれ違う。
+    // 案内を出し分けられるよう、ここで種別を付け直す
+    // （JSON の解釈失敗だけは cause が SyntaxError になる）。
+    if (error instanceof EventDataError) throw error;
+    if (error?.cause instanceof SyntaxError) throw new DataParseError(error.message, error.cause);
+    throw new DataFetchError(error?.message ?? String(error));
   }
-  if (!response.ok) {
-    throw new DataFetchError(`events.json の取得に失敗しました: HTTP ${response.status}`);
-  }
-
-  let data;
-  try {
-    data = await response.json();
-  } catch (error) {
-    throw new DataParseError(`events.json を JSON として解釈できません: ${error.message}`, error);
-  }
-
-  // 描画より前に一度だけ検査する。ここを通った後のコードは
-  // 「days の添字は有効」「座標は有限」を前提にしてよい
-  validateEvents(data);
-  state.days = data.days;
-  state.events = data.events;
+  setData(loaded.data);
 
   fillHourOptions(els.viewStart, START_HOUR_CHOICES, state.viewStart);
   fillHourOptions(els.viewEnd, END_HOUR_CHOICES, state.viewEnd);
@@ -280,6 +313,7 @@ async function main() {
   });
 
   buildCategoryFilters();
+  buildEditorToolbar(editor);
   draw();
 }
 
