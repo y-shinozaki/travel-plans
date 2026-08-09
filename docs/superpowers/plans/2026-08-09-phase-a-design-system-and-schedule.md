@@ -271,7 +271,11 @@ import { runInNewContext } from "node:vm";
 const SRC = "index.html";
 const OUT = "assets/data/events.json";
 
-// Material Symbols 名 → スプライトの symbol id
+/**
+ * Material Symbols 名 → スプライトの symbol id。
+ * 左辺は現行 index.html に実在する 9 種類すべて。
+ * 未知の名前が来たら警告を出してカテゴリ既定に落とす。
+ */
 const ICON_MAP = {
   flight: "i-flight",
   photo_camera: "i-camera",
@@ -280,8 +284,8 @@ const ICON_MAP = {
   shopping_bag: "i-shop",
   directions_car: "i-car",
   directions_boat: "i-boat",
-  sailing: "i-boat",
-  pool: "i-camera",
+  pool: "i-pool",
+  luggage: "i-luggage",
 };
 
 const CAT_DEFAULT_ICON = {
@@ -328,7 +332,18 @@ function sliceArrayLiteral(src, name) {
 
 const html = readFileSync(SRC, "utf8");
 const days = runInNewContext(sliceArrayLiteral(html, "days"));
-const rawEvents = runInNewContext(sliceArrayLiteral(html, "events"));
+
+// 切り出しが途中で終わっていないかを独立した方法で照合する。
+// 括弧の数え間違いで配列が黙って短くなるのが一番怖い失敗なので、
+// テキスト中の title: の出現数とパース結果の件数が一致することを確かめる。
+const eventsSource = sliceArrayLiteral(html, "events");
+const rawEvents = runInNewContext(eventsSource);
+const titleOccurrences = (eventsSource.match(/\btitle:\s*"/g) ?? []).length;
+if (titleOccurrences !== rawEvents.length) {
+  throw new Error(
+    `切り出しが不完全です: title の出現数 ${titleOccurrences} に対し ${rawEvents.length} 件しかパースできていません`
+  );
+}
 
 const warnings = [];
 
@@ -400,16 +415,18 @@ console.log(`  座標あり: ${events.filter((e) => e.lat != null).length} 件`)
 
 Run: `node tools/extract-events.mjs`
 
-Expected: エラーなく完了し、次のように出る。件数は現行データに対する期待値。
+Expected: エラーなく完了し、次のとおり出る。この数字は現行 `index.html` を実測した値。
 
 ```
-assets/data/events.json を書き出しました: 6 日, 39 件
+assets/data/events.json を書き出しました: 6 日, 40 件
   終日: 5 件
-  日またぎ: 2 件
-  座標あり: 24 件
+  日またぎ: 3 件
+  座標あり: 21 件
 ```
 
-件数が違った場合は現行データを読み直して原因を特定すること。**件数が合わないまま先へ進まない。**
+警告が出ないこと（`ICON_MAP` は実在する 9 種類をすべて網羅している）。
+
+**件数が合わないまま先へ進まない。** 違っていたら現行データを読み直して原因を特定すること。
 
 - [ ] **Step 3: 生成された JSON を目視で検証する**
 
@@ -423,13 +440,20 @@ console.log("日またぎ:", d.events.filter(e=>e.endDay>e.startDay).map(e=>`${e
 console.log("start/end 欠落:", d.events.filter(e=>!e.allDay && (e.start==null||e.end==null)).map(e=>e.title));
 console.log("片側だけ座標:", d.events.filter(e=>(e.lat==null)!==(e.lng==null)).map(e=>e.title));
 console.log("cat 欠落:", d.events.filter(e=>!e.cat).map(e=>e.title));
+console.log("id 重複:", d.events.length - new Set(d.events.map(e=>e.id)).size);
+console.log("座標の重複排除後:", new Set(d.events.filter(e=>e.lat!=null).map(e=>e.lat+","+e.lng)).size);
 '
 ```
 
 Expected:
 - 日数: 6
-- 日またぎ: バンコクホテル（0→2、15〜11）とパタヤホテル の 2 件
+- 日またぎ: 次の 3 件がこの値で出ること
+  - `バンコクホテル 0→2 15-11`
+  - `パタヤホテル 2→4 14-12`
+  - `帰国フライト（依田家） 4→5 22.17-6.33`
 - `start/end 欠落`、`片側だけ座標`、`cat 欠落` はいずれも空配列
+- `id 重複`: 0
+- `座標の重複排除後`: 17 — これが地図に立つピンの数になる（Task 10 の期待値）
 
 - [ ] **Step 4: コミット**
 
@@ -1202,9 +1226,13 @@ const idsInSprite = () => [...SPRITE.matchAll(/<symbol[^>]*\bid="([^"]+)"/g)].ma
 
 test("Phase A で使うアイコンがすべて含まれている", () => {
   const required = [
-    "i-flight", "i-camera", "i-food", "i-hotel", "i-shop", "i-car", "i-boat",
+    // カテゴリ既定
+    "i-flight", "i-camera", "i-food", "i-hotel", "i-shop",
+    // events.json が個別に指定するもの（現行データに実在する 9 種類のうち上記以外）
+    "i-car", "i-boat", "i-pool", "i-luggage",
+    // UI 部品
     "i-arrow-right", "i-calendar", "i-clock", "i-pin", "i-external",
-    "i-chat", "i-search", "i-luggage", "i-lock", "i-note",
+    "i-chat", "i-search", "i-lock", "i-note",
   ];
   for (const id of required) {
     assert.ok(ICON_IDS.includes(id), `${id} が ICON_IDS にありません`);
@@ -1249,6 +1277,24 @@ test("すべてのカテゴリに既定アイコンがある", () => {
     assert.ok(ICON_IDS.includes(CATEGORY_ICON[cat]));
   }
 });
+
+test("events.json が参照するアイコンがすべて存在する", () => {
+  // 描画時に <use> が解決できず、アイコンが消えるのを防ぐ
+  const data = JSON.parse(
+    readFileSync(new URL("../assets/data/events.json", import.meta.url), "utf8")
+  );
+  for (const ev of data.events) {
+    const id = ev.icon ?? CATEGORY_ICON[ev.cat];
+    assert.ok(id, `${ev.title}: カテゴリ ${ev.cat} に既定アイコンがありません`);
+    assert.ok(ICON_IDS.includes(id), `${ev.title}: ${id} がスプライトにありません`);
+  }
+});
+```
+
+このテストは `assets/data/events.json` を読むので、ファイル先頭に import を足すこと:
+
+```js
+import { readFileSync } from "node:fs";
 ```
 
 - [ ] **Step 2: テストを実行して失敗を確認する**
@@ -1340,12 +1386,18 @@ export const SPRITE = `
     <path d="M4.6 3.8h14.8v16.4H4.6z"/>
     <path d="M8 8.4h8M8 12h8M8 15.6h4.6"/>
   </symbol>
+  <symbol id="i-pool" viewBox="0 0 24 24">
+    <path d="M2.6 15.4c1.6 0 1.6 1.5 3.2 1.5s1.6-1.5 3.2-1.5 1.6 1.5 3.2 1.5 1.6-1.5 3.2-1.5 1.6 1.5 3.2 1.5"/>
+    <path d="M2.6 19.4c1.6 0 1.6 1.5 3.2 1.5s1.6-1.5 3.2-1.5 1.6 1.5 3.2 1.5 1.6-1.5 3.2-1.5 1.6 1.5 3.2 1.5"/>
+    <path d="M7.6 15V4.8a2.2 2.2 0 0 1 4.4 0M16.4 14.2V4.8a2.2 2.2 0 0 0-4.4 0"/>
+    <path d="M8 8.6h8"/>
+  </symbol>
 </svg>`.trim();
 
 export const ICON_IDS = [
   "i-flight", "i-camera", "i-food", "i-hotel", "i-shop", "i-car", "i-boat",
   "i-arrow-right", "i-calendar", "i-clock", "i-pin", "i-external",
-  "i-chat", "i-search", "i-luggage", "i-lock", "i-note",
+  "i-chat", "i-search", "i-luggage", "i-lock", "i-note", "i-pool",
 ];
 
 export const CATEGORY_ICON = {
@@ -1980,14 +2032,14 @@ main();
       if (eb.right > cb.right + 1 || eb.bottom > cb.bottom + 1 || eb.left < cb.left - 1) overflow++;
     }
   }
-  const multi = [...document.querySelectorAll(".ev__n")]
-    .filter(n => n.textContent === "バンコクホテル").length;
+  const named = (t) => [...document.querySelectorAll(".ev__n")]
+    .filter(n => n.textContent === t).length;
   return {
     columns: cols.length,                                      // 6
     columnHeight: cols[0].getBoundingClientRect().height,      // 704 (= 16h * 44)
-    events: document.querySelectorAll(".ev").length,           // 34
     allday: document.querySelectorAll(".allday-pill").length,  // 5
-    multiDaySegments: multi,                                   // 3
+    bangkokHotelSegments: named("バンコクホテル"),               // 3 (8/12→8/14)
+    pattayaHotelSegments: named("パタヤホテル"),                 // 3 (8/14→8/16)
     eventOverflow: overflow,                                   // 0
     brokenUse: [...document.querySelectorAll("use")]
       .filter(u => !document.getElementById(u.getAttribute("href").slice(1))).length, // 0
@@ -1995,6 +2047,10 @@ main();
   };
 })()
 ```
+
+`.ev` の総数は表示時間帯（既定 6:00–22:00）で変わるので、固定値では確認しない。
+代わりに、日をまたぐ 2 件が正しくセグメントに割れていることと、はみ出しが 0 件で
+あることを見る。
 
 そのうえで手で確認する:
 - カテゴリのチップを押すとカレンダーが絞り込まれ、「すべて」で戻る
@@ -2565,8 +2621,8 @@ DevTools を 1440 × 900 に戻し、`schedule.html` で:
   return {
     unrevealed: document.querySelectorAll(".reveal:not(.is-in)").length,  // 0
     hOverflow: document.documentElement.scrollWidth > innerWidth,          // false
-    events: document.querySelectorAll(".ev").length,                       // 34
     pins: document.querySelectorAll(".pin").length,                        // 17
+    locRows: document.querySelectorAll(".loc").length,                     // 17
   };
 })()
 ```
@@ -2659,9 +2715,9 @@ python3 -m http.server 8000
 | `.reveal:not(.is-in)` | 最下部までジャンプ後も 0 件 |
 | 横溢れ（390px / 1440px） | 4 ページとも なし |
 | CDN からの JS 読み込み | なし |
-| カレンダーのイベント | 34 件、列からのはみ出し 0 件 |
-| 日またぎのホテル | 3 セグメントに分割表示 |
-| 地図のピン | 17 件 |
+| カレンダーのイベント | 列からのはみ出し 0 件 |
+| 日またぎ（バンコクホテル・パタヤホテル） | それぞれ 3 セグメントに分割表示 |
+| 地図のピン / ロケーション一覧 | 17 件 |
 
 ---
 
