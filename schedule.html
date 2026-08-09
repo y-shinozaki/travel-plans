@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="assets/css/tokens.css" />
     <link rel="stylesheet" href="assets/css/base.css" />
     <link rel="stylesheet" href="assets/css/controls.css" />
+    <link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css" />
     <link rel="stylesheet" href="assets/css/calendar.css" />
   </head>
   <body>
@@ -41,8 +42,14 @@
       </div>
 
       <div class="cal" id="cal"></div>
+
+      <div class="mapsec reveal">
+        <div id="leaflet-map"></div>
+        <div class="loclist" id="loclist"></div>
+      </div>
     </main>
 
+    <script src="assets/vendor/leaflet/leaflet.js"></script>
     <script type="module" src="assets/js/schedule.js"></script>
   </body>
 </html>

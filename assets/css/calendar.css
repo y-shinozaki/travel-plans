@@ -365,6 +365,28 @@
   fill: none;
 }
 
+/* Leaflet のポップアップをデザインに合わせる */
+.leaflet-popup-content-wrapper {
+  border-radius: var(--r-sm);
+  background: var(--sand-lt);
+  color: var(--ink);
+}
+.leaflet-popup-tip {
+  background: var(--sand-lt);
+}
+.pop__title {
+  font-family: var(--serif);
+  font-size: 16px;
+  font-weight: 300;
+  letter-spacing: 0.3px;
+}
+.pop__meta {
+  font-size: 11px;
+  letter-spacing: 0.3px;
+  color: var(--ink-2);
+  margin-top: 5px;
+}
+
 /* ══════════════════════════════════════════════════════════
    RESPONSIVE
    出典: 同ファイル 2072 行以降の RESPONSIVE ブロックのうち、

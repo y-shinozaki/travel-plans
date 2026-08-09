@@ -34,6 +34,9 @@ npm-debug.log*
 *.jpg
 .playwright-mcp/
 
+# Leaflet はセルフホストするベンダーファイルなので *.png の対象外にする
+!assets/vendor/leaflet/images/*.png
+
 # Temp
 .tmp/
 

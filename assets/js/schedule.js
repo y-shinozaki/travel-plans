@@ -2,6 +2,7 @@ import { injectSprite } from "./icons.js";
 import { initReveal } from "./reveal.js";
 import { renderNav } from "./nav.js";
 import { renderCalendar, CAT_META } from "./calendar.js";
+import { createMap } from "./map.js";
 
 const state = {
   days: [],
@@ -10,6 +11,8 @@ const state = {
   viewEnd: 22,
   catFilter: null,
 };
+
+let mapView = null;
 
 const els = {
   cal: document.getElementById("cal"),
@@ -28,6 +31,7 @@ function draw() {
     catFilter: state.catFilter,
     onSelect: (ev) => console.log("選択:", ev.title),
   });
+  mapView?.update(state.events, state.catFilter);
 }
 
 function fillHourOptions(select, min, max, selected) {
@@ -90,6 +94,13 @@ async function main() {
   els.viewEnd.addEventListener("change", (e) => {
     state.viewEnd = Number(e.target.value);
     draw();
+  });
+
+  mapView = createMap({
+    mapMount: document.getElementById("leaflet-map"),
+    listMount: document.getElementById("loclist"),
+    days: state.days,
+    onSelect: (ev) => console.log("選択:", ev.title),
   });
 
   buildCategoryFilters();
