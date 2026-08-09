@@ -1,8 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { CAT_META } from "../assets/js/categories.js";
 
 const css = readFileSync(new URL("../assets/css/tokens.css", import.meta.url), "utf8");
+const readCss = (name) =>
+  readFileSync(new URL(`../assets/css/${name}`, import.meta.url), "utf8");
 
 function readTokens(src) {
   const map = new Map();
@@ -44,7 +47,13 @@ function distance(a, b) {
 
 const T = readTokens(css);
 const L = readLengthTokens(css);
-const CATEGORIES = ["move", "sight", "food", "hotel", "shop"];
+/**
+ * カテゴリ一覧は CAT_META から導く。ここに書き写すと、CAT_META に
+ * cat-transport を足して CSS を忘れても全テストが通ってしまう
+ * （＝無色のピンが出る状態を誰も検知できない）。
+ */
+const CAT_KEYS = Object.keys(CAT_META);
+const CATEGORIES = CAT_KEYS.map((key) => key.slice("cat-".length));
 
 test("パースが壊れていない（主要な色トークンが十分な数取れている）", () => {
   // readTokens が空／ほぼ空でも他のテストはループ0回で素通りしてしまうため、
@@ -59,12 +68,53 @@ test("基本トークンがすべて定義されている", () => {
   }
 });
 
+test("CAT_META からカテゴリ一覧が取れている（テストが空回りしていない）", () => {
+  assert.ok(CATEGORIES.length >= 5, `カテゴリが ${CATEGORIES.length} 件しか取れていません`);
+});
+
 test("カテゴリごとに3値が揃っている", () => {
   for (const c of CATEGORIES) {
     for (const suffix of ["", "-bg", "-tx"]) {
       const name = `c-${c}${suffix}`;
-      assert.ok(T.has(name), `--${name} が定義されていません`);
+      assert.ok(T.has(name), `--${name} が定義されていません（tokens.css）`);
     }
+  }
+});
+
+test("CAT_META のカテゴリには calendar.css の .cat-xxx ブロックが必ずある", () => {
+  /*
+   * カテゴリを 1 つ足すのに触るファイルは 3 つある:
+   *   categories.js（CAT_META） / tokens.css（--c-xxx の 3 値） /
+   *   calendar.css（.cat-xxx が --bar / --bg / --tx を供給する）
+   *
+   * 3 つ目を忘れると、イベントブロックも終日ピルも詳細バッジも
+   * 未定義のカスタムプロパティを参照して無色になる。JS 側は何も気付かない。
+   */
+  const calendar = readCss("calendar.css");
+  for (const key of CAT_KEYS) {
+    const block = new RegExp(`\\.${key}\\s*\\{([^}]*)\\}`).exec(calendar);
+    assert.ok(block, `calendar.css に .${key} { … } がありません`);
+    for (const [prop, token] of [
+      ["--bar", `--c-${key.slice("cat-".length)}`],
+      ["--bg", `--c-${key.slice("cat-".length)}-bg`],
+      ["--tx", `--c-${key.slice("cat-".length)}-tx`],
+    ]) {
+      assert.match(
+        block[1],
+        new RegExp(`${prop}\\s*:\\s*var\\(\\s*${token}\\s*\\)`),
+        `.${key} が ${prop}: var(${token}) を供給していません`
+      );
+    }
+  }
+});
+
+test("calendar.css に CAT_META にないカテゴリのブロックが残っていない", () => {
+  // 消したカテゴリの取り残しを拾う（逆向きのずれ）
+  const calendar = readCss("calendar.css").replace(/\/\*[\s\S]*?\*\//g, "");
+  const declared = [...calendar.matchAll(/^\.(cat-[a-z0-9-]+)\s*\{/gm)].map((m) => m[1]);
+  assert.ok(declared.length > 0, "calendar.css から .cat-xxx を 1 つも読み取れていません");
+  for (const key of declared) {
+    assert.ok(CAT_KEYS.includes(key), `calendar.css の .${key} は CAT_META にありません`);
   }
 });
 
@@ -148,9 +198,8 @@ test("tokens.css 以外の CSS に色リテラルを書かない", () => {
   // CSS 側には無かったので 4 箇所すり抜けていた。
   const files = ["base.css", "controls.css", "calendar.css"];
   for (const name of files) {
-    const src = readFileSync(new URL(`../assets/css/${name}`, import.meta.url), "utf8")
-      // コメント中の例示や出典メモは対象外
-      .replace(/\/\*[\s\S]*?\*\//g, "");
+    // コメント中の例示や出典メモは対象外
+    const src = readCss(name).replace(/\/\*[\s\S]*?\*\//g, "");
     assert.doesNotMatch(src, /#[0-9a-fA-F]{3,8}\b/, `${name}: 16進の色リテラルがあります`);
     // rgb(var(--ink-rgb) / 0.4) は許す。数値を直接書いた形だけを弾く
     assert.doesNotMatch(
