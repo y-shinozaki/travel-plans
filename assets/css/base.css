@@ -367,3 +367,35 @@ button {
 .card__arrow {
   margin-top: var(--s4);
 }
+
+/* ══════════════════════════════════════════════════════════
+   RESPONSIVE
+   出典: docs/design-reference/mock-aman.html 2072 行以降の
+   RESPONSIVE ブロックのうち、メニューとセクション見出しに関する
+   指定のみ（カレンダー・地図は calendar.css、Phase B/C の
+   .login .paneldemo .pack__* .hit はそれぞれの担当タスクで扱う）
+   ══════════════════════════════════════════════════════════ */
+@media (max-width: 1180px) {
+  .menu__grid {
+    grid-template-columns: 1fr;
+  }
+  .shead {
+    grid-template-columns: 1fr;
+    gap: var(--s3);
+  }
+  .shead__idx {
+    padding-top: 0;
+  }
+  .shead__idx .n {
+    display: inline-block;
+    margin-right: var(--s2);
+    margin-bottom: 0;
+    font-size: 26px;
+    vertical-align: -3px;
+  }
+}
+@media (max-width: 760px) {
+  :root {
+    --s8: 96px;
+  }
+}

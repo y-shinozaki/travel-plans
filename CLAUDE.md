@@ -4,198 +4,196 @@
 
 ## クイックスタート
 
-ビルドツール不要。シングルページ HTML アプリケーション。
+ビルドツール不要。ただし JS はすべて `<script type="module">` で読み込むため、
+`file://` で直接開くと CORS エラーになり、ページが何も表示されないまま失敗する。
+必ずローカルサーバー経由でアクセスすること。
 
 ```bash
-# 方法1: ブラウザで直接開く
-open index.html
-
-# 方法2: Python 3 でローカルサーバーを起動
 python3 -m http.server 8000
 # その後 http://localhost:8000 にアクセス
 ```
 
 ## アーキテクチャ概要
 
-### シングル HTML ファイル (`index.html`)
+### ファイル構成（Phase A 時点）
 
-アプリケーション全体が 1 つのファイルに含まれ、3 つのメインセクションからなります：
+```
+travel-plans/
+├── index.html / schedule.html   実装済み（メニュー／旅程カレンダー・地図）
+├── packing.html / archive.html  Phase B/C の仮ページ（リンクのみ、中身は未実装）
+├── assets/
+│   ├── css/
+│   │   ├── tokens.css      色・余白・角丸・モーションの唯一の定義場所
+│   │   ├── base.css        リセット、タイポグラフィ、共通レイアウト、reveal 演出、
+│   │   │                   メニューとセクション見出しのレスポンシブ
+│   │   ├── controls.css    ボタン・チップ・チェックボックス・入力欄・詳細シート
+│   │   └── calendar.css    schedule.html 専用（カレンダー・地図・レスポンシブ）
+│   ├── js/
+│   │   ├── time.js         10進時間 ⇔ HH:MM 変換、timeLabel()
+│   │   ├── events.js       expandEvents()（複数日イベントを日単位セグメントに展開）
+│   │   ├── lanes.js        assignLanes()（重なるイベントのレーン配置）
+│   │   ├── icons.js        インライン SVG スプライトの注入、CATEGORY_ICON
+│   │   ├── calendar.js     renderCalendar()、CAT_META、HOUR_H
+│   │   ├── map.js          Leaflet 初期化、位置情報リスト
+│   │   ├── sheet.js        詳細シート（読み取り専用）
+│   │   ├── nav.js          ページ間ナビ
+│   │   ├── reveal.js       IntersectionObserver によるスクロール出現演出
+│   │   ├── menu.js         index.html のエントリポイント
+│   │   └── schedule.js     schedule.html のエントリポイント
+│   ├── data/
+│   │   └── events.json     旅程データの唯一のソース（表示用文字列は持たない）
+│   └── vendor/
+│       └── leaflet/        Leaflet 1.9.4 を自前で配置（理由は「外部ライブラリ」参照）
+├── tools/
+│   └── extract-events.mjs  旧 index.html の埋め込みデータを events.json へ移した変換スクリプト（一度きり）
+├── tests/                  node --test で実行する純粋関数テスト
+├── DESIGN.md               デザイン仕様（aman.com 由来）
+└── docs/design-reference/mock-aman.html   検証済みの参照実装（実装対象ではなく、値を写す元）
+```
 
-1. **`<style>` ブロック**（行 14～1075）
-   - CSS カスタムプロパティ（トークン）: カラー、間隔、タイポグラフィ
-   - レスポンシブブレークポイント: 960px（カレンダーレイアウト）、600px（モバイル）
-   - コンポーネントスタイル: ヒーロー、カレンダーグリッド、マップ、位置情報フィルター、詳細パネル
-   - アニメーション: fadeUp、cardIn、reveal エフェクト
+Phase B（持ち物リスト・保存・公開・認証）と Phase C（検索アーカイブ）で
+`assets/css/packing.css` `archive.css`、`assets/js/store.js` `sync.js` `auth.js` `crypto.js` `comments.js`、
+`assets/data/packing.json` `comments.json` `archive.enc` などが追加される予定。
+詳細は `docs/superpowers/specs/2026-08-09-travel-plans-redesign-design.md` を参照。
 
-2. **`<body>` HTML**（行 1078～1165）
-   - セマンティック構造: ヒーロー → スケジュール → マップセクション → フッター → 詳細パネル
-   - カレンダーコンテナ（`#cal`）
-   - Leaflet マップコンテナ（`#leaflet-map`）
-   - フィルターボタンと位置情報リスト
+### イベントのデータ構造
 
-3. **`<script>` ブロック**（行 1167～終了）
-   - イベントデータ: `days[]`、`catMeta{}`、`events[]`
-   - コア関数: `renderCalendar()`、`collectLocations()`、`expandEvents()`
-   - Leaflet + CartoDB Voyager タイルを使用したマップ初期化
-   - フィルター状態: `locFilter`、`viewStart`、`viewEnd`、`showHotels`
-
-### キーとなるデータ構造
-
-**イベントオブジェクト**（3 つのタイプ）:
+イベントは `assets/data/events.json` の `events` 配列に 1 種類の形式で格納する
+（旧版にあった「時間指定／複数日／終日」の 3 形式は廃止し、`startDay` / `endDay` に統一した）。
 
 ```javascript
-// タイプ1: 時間指定イベント（単一日、カレンダーとマップに表示）
-{ d: 0, cat: 'cat-food', icon: 'restaurant', title: '...',
-  start: 12.5, end: 13.5, time: '12:30 → 13:30',
-  location: '...', lat: 13.7563, lng: 100.5018, notes: '...' }
-
-// タイプ2: 複数日イベント（複数のカレンダーセルと日にまたがる）
-{ multiDay: true, startDay: 0, endDay: 2, startHour: 15, endHour: 11,
-  cat: 'cat-hotel', icon: 'hotel', title: '...',
-  location: '...', lat: 13.7278, lng: 100.5601, notes: '...' }
-
-// タイプ3: 終日イベント（マップマーカーなし、ホテルリストのみ）
-{ d: 0, icon: 'hotel', title: '...', allDay: true, time: '終日',
-  location: '...', notes: '' }
+{
+  id: "ev-006",
+  cat: "cat-move",              // cat-move / cat-sight / cat-food / cat-hotel / cat-shop
+  title: "出国フライト（依田家）",
+  allDay: false,                 // true ならホテル欄などの終日表示（start/end は無視）
+  startDay: 0,                   // 日インデックス（0 始まり）
+  endDay: 0,                     // 複数日にまたがる場合はここが startDay より後ろになる
+  start: 10.58,                  // 10進時間。10.58 ≈ 10:35
+  end: 15.08,                    // 15.08 ≈ 15:05
+  location: "スワンナプーム国際空港",
+  lat: 13.69,
+  lng: 100.7501,                 // 地図に出さない場合（ホテルの終日行など）は lat/lng を null にする
+  url: "",
+  notes: "便名: ...",
+  image: "",
+  imagePos: "",
+}
 ```
+
+**表示用の文字列（`"10:35 → 15:05"` のようなもの）は JSON に持たせない。**
+`assets/js/time.js` の `timeLabel(ev)` が `start` / `end` / `allDay` から都度生成する。
+複数日イベントは `assets/js/events.js` の `expandEvents()` が日ごとのセグメントに展開してから描画する。
 
 **重要な定数:**
 
-- `HOUR_H = 44`: カレンダーグリッドの 1 時間あたりのピクセル高さ
+- `HOUR_H`（`assets/js/calendar.js`）: カレンダーグリッドの 1 時間あたりのピクセル高さ。
+  `assets/css/tokens.css` の `--hour-h` と必ず同じ値にすること（詳細は後述）。
 
 ### データフロー
 
 ```
-イベント（生データ）
+assets/data/events.json（fetch）
   ↓
 expandEvents() → 複数日イベントを日単位のセグメントに変換
+assignLanes()  → 同じ日・重なる時間帯のセグメントにレーンを割り当てる
   ↓
-renderCalendar() → 時間スロットグリッド（viewStart/viewEnd を尊重）
-collectLocations() → 緯度経度を抽出、座標ごとに重複排除
+renderCalendar() → 時間スロットグリッドを描画（viewStart/viewEnd を尊重）
+map.js の createMap() → 座標を持つイベントからマーカーと位置情報リストを構築
   ↓
-buildFilteredLocations() → カテゴリ + 日付フィルターを適用
-buildLocationList() → カードを描画、マーカー表示を更新
+カテゴリフィルター変更時に再描画
 ```
-
-### 時間フォーマット
-
-イベントは 10 進数時間フォーマットを使用（例: `12.5` = 12:30、`15.08` = 15:04）:
-
-```javascript
-start: 10.58,  // 10:35 (0.58 * 60 ≈ 35 分)
-end: 15.08     // 15:05 (0.08 * 60 ≈ 5 分)
-```
-
-変換式: `時間 + (分 / 60)`。
-
-### マップ＆フィルター状態
-
-```javascript
-let locFilter = { cat: null, day: null }; // null = すべて表示
-let viewStart = 6,
-  viewEnd = 22; // カレンダー時間範囲
-let showHotels = false; // ホテル表示/非表示切り替え
-```
-
-フィルター変更時は `buildFilteredLocations()` と `buildLocationList()` を呼び出します。
 
 ## デザインシステム
 
-すべてのカラーは CSS カスタムプロパティ（`:root` で定義）:
-
-- `--dark`: ブラック（#000000） — フッター、見出し
-- `--green`: ブラック（#000000） — 見出し
-- `--green-mid`: チャコール（#333333） — セカンダリテキスト
-- `--canvas`: クラフト紙クリーム（#f6f6f3） — ページ背景
-- `--ceramic`: カードサーフェス（#e5e5e1） — イベントカード背景
-
-詳細なパレットとタイポグラフィシステムは `DESIGN.md` を参照。
-
-**ハードコードされた 16 進数値を使用しないでください。** 常に CSS 変数を使用してください。
+すべての色・余白・角丸・モーションの値は `assets/css/tokens.css` の CSS カスタムプロパティに定義する。
+**ハードコードされた 16 進数値をコード中に書かないこと。** 色を変える／確認する手順は後述の
+「カラーを変更」を参照。パレットの出典と設計意図は `DESIGN.md` を参照。
 
 ## よく使う開発タスク
 
 ### 新しいイベントを追加
 
-1. `<script>` ブロック内の `events` 配列に追加
-2. 時間指定の場合: `d`（日インデックス）、`start`/`end`（10 進数時間）、`location`、`lat`/`lng` を設定
-3. 複数日の場合: `multiDay: true` で `startDay`、`endDay`、`startHour`、`endHour` を設定
-4. 終日（ホテル）の場合: `allDay: true` を設定、`lat`/`lng` は省略
-5. `cat` キーでカテゴリ化（例: `'cat-food'`、`'cat-sight'`）
-6. `icon`（Material Symbol 名）、`title`、`notes` を含める
-7. 関数はページ読み込み時に自動実行。ライブプレビューはブラウザをリロード
+1. `assets/data/events.json` の `events` 配列にオブジェクトを追加する
+   （Phase A では手編集。Phase B で UI から編集・保存できるようになる予定）
+2. `id` は一意な文字列、`cat` は `cat-move` / `cat-sight` / `cat-food` / `cat-hotel` / `cat-shop` のいずれか
+3. 単日・時間指定なら `startDay` と `endDay` を同じ値にし、`start` / `end` を10進時間で設定
+4. 複数日にまたがる場合は `endDay` を `startDay` より後ろにする
+5. 終日イベント（ホテルなど）は `allDay: true` にする。地図に出さない場合は `lat` / `lng` を `null` にする
+6. 保存後、ブラウザをリロードすれば反映される（ビルドステップなし）
 
 ### カレンダーグリッドの高さを変更
 
-1. `HOUR_H` 定数を更新（行 ~1170）
-2. `.cal-day-col` の背景画像 repeating-linear-gradient を同じ値で更新:
-   ```css
-   repeating-linear-gradient(
-     to bottom,
-     transparent 0px,
-     transparent ${HOUR_H - 1}px,
-     var(--border) ${HOUR_H - 1}px,
-     var(--border) ${HOUR_H}px
-   );
-   ```
+`assets/css/tokens.css` の `--hour-h` と `assets/js/calendar.js` の `HOUR_H` は同じ値を指す必要がある。
+**必ず両方を同時に変更すること。** 片方だけ変えると、時間軸の目盛りとイベントブロックの高さがずれる。
 
 ### カレンダーの時間範囲を変更
 
-1. `<script>` ブロック内の `viewStart` と `viewEnd` を修正（行 ~1285）
-2. `buildOptions()` 関数のドロップダウンオプションも同じ値で更新
+`assets/js/schedule.js` の `state.viewStart` / `state.viewEnd` の初期値を編集する。
+`fillHourOptions()` が呼ばれるドロップダウンの範囲もこの値を基準に生成される。
 
 ### マップタイルを更新
 
-マップ初期化の `L.tileLayer()` 呼び出しを置換:
-
-```javascript
-L.tileLayer(
-  "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-  {
-    attribution:
-      '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
-    subdomains: "abcd",
-    maxZoom: 19,
-  },
-).addTo(map);
-```
-
+`assets/js/map.js` 内の `L.tileLayer()` 呼び出しの URL を置換する。現在は CartoDB Voyager を使用。
 代替案: Stamen Watercolor、Esri World Imagery、OpenStreetMap デフォルト。
 
 ### カラーを変更
 
-1. `DESIGN.md` でカラーを探す（例: Tsutaya Red）
-2. `:root` 内の CSS 変数を更新（行 ~16）
-3. すべての使用箇所が自動的に変更を継承
+1. `DESIGN.md` で対象の役割（Surface / Category など）を確認する
+2. `assets/css/tokens.css` の CSS 変数を更新する。ハードコードした 16 進値をコードに書かない
+3. `node --test tests/tokens.test.js` を実行し、コントラスト比・色差のテストが通ることを確認する
+   （彩度や明度を動かしすぎると可読性のテストが失敗する）
 
 ## 外部ライブラリ
 
-すべて CDN から読み込み、npm/ビルドステップなし:
-
 ```html
-<!-- Google Fonts: Dancing Script (hero), Noto Sans JP (body/display) -->
+<!-- Google Fonts: Newsreader（セリフ表示用）、Inter（サンセリフ本文用）、
+     Noto Sans JP / Noto Serif JP（和文） -->
 <link
-  href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Noto+Sans+JP:wght@300;700&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,400,0,0&display=swap"
+  href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,200;6..72,300;6..72,400&family=Inter:wght@300;400;500&family=Noto+Sans+JP:wght@300;400;500&family=Noto+Serif+JP:wght@200;300;400&display=swap"
+  rel="stylesheet"
 />
 
-<!-- Leaflet (マッピング) -->
-<link
-  rel="stylesheet"
-  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Leaflet はセルフホスト。assets/vendor/leaflet/ に配置しており CDN からは読み込まない -->
+<link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css" />
+<script src="assets/vendor/leaflet/leaflet.js"></script>
 ```
 
-Leaflet 更新時は `<link>` と `<script>` タグのバージョンを一致させてください。
+**Leaflet を CDN からセルフホストへ変更した理由**: Phase B で GitHub トークンをブラウザに保存する
+（合言葉から導出した鍵で暗号化して sessionStorage に置く設計）。CDN 経由のスクリプトが差し替えられた場合、
+そのトークンを盗み出せてしまうため、サードパーティの JS を一切 CDN から読み込まない方針にした。
+Leaflet を更新する際は `assets/vendor/leaflet/` 配下のファイルを手動で差し替える。
+
+アイコンは Material Symbols フォントではなく、`assets/js/icons.js` が注入するインライン SVG スプライト
+（`<svg class="ico"><use href="#i-xxx"/></svg>`）を使う。
+
+## テスト
+
+```bash
+node --test
+```
+
+依存ゼロ、ビルド不要。`tests/` 配下は `time.js` / `events.js` / `lanes.js` / `icons.js` / `tokens.css` の
+純粋関数・静的な検証のみを対象にしている（`package.json` は `"type": "module"` を宣言するためだけに存在する）。
+
+カレンダー描画・地図・reveal 演出・レスポンシブ崩れなど、DOM やブラウザの computed style に依存する部分は
+`node --test` ではカバーできない。ブラウザの DevTools で実際に数値を測って確認すること
+（横溢れの有無、`--hour-h` と `HOUR_H` の一致、`prefers-reduced-motion` 時の可視性など）。
 
 ## レスポンシブデザイン
 
 **ブレークポイント:**
 
-- **960px**: マップ + サイドバーが縦並びに変更、ヒーロータイトルが縮小
-- **600px**: 詳細パネルが全幅表示、モバイル最適化パディング、ヒーロースクロール指標が非表示
+- **1180px 以下**: メニューの3カラムグリッドとセクション見出しの2カラムが1カラムに変わる
+  （`assets/css/base.css`）。地図とサイドリストの2カラムも1カラムになる（`assets/css/calendar.css`）
+- **760px 以下**: セクション間の余白 `--s8` が 154px から 96px に縮む（`assets/css/base.css`）。
+  カレンダーは6列を1画面に収めず横スクロールにし、時間列（`.cal__gutter` など）を
+  `position: sticky; left: 0` で固定する（`assets/css/calendar.css`）
 
-すべてのブレークポイントは `<style>` ブロック内の `@media` クエリで定義。
+すべてのブレークポイントは各 CSS ファイル内の `@media` クエリで定義。
+`@media (prefers-reduced-motion: reduce)` は `assets/css/base.css` にあり、
+`.reveal` の不透明度を強制的に `1` にすることで、演出が無効化されてもコンテンツが
+半永久的に不可視のままになる事故を防いでいる。
 
 ## ブラウザサポート
 
@@ -213,7 +211,11 @@ Leaflet 更新時は `<link>` と `<script>` タグのバージョンを一致�
 
 ## 今後の開発に向けたノート
 
-- 状態管理ライブラリなし — グローバル変数（`viewStart`、`showHotels`、`locFilter`）は許容。複雑度が増せば将来的にリファクタリングを検討
-- コンポーネントフレームワークなし — すべての DOM 更新は `innerHTML` 経由（ユーザー入力がないため安全）
+- 状態管理ライブラリなし — 各ページの `<script type="module">`（例: `assets/js/schedule.js`）が
+  モジュールスコープの `state` オブジェクトを持つ。ページをまたぐ共有状態はまだない
+- コンポーネントフレームワークなし — DOM 構築は `document.createElement` ベースのヘルパー
+  （`calendar.js` の `el()` など）と一部 `innerHTML` の併用。ユーザー入力を `innerHTML` に
+  そのまま流し込む箇所は避けること
 - Leaflet MarkerCluster は未実装。イベント密度が大幅に増加した場合に追加検討
-- Dancing Script（ヒーロータイトル用筆記体）はデザイン方針による意図的な選択 — 削除しないでください
+- Dancing Script（旧デザインの筆記体タイトル）は Aman 由来のデザインへの刷新に伴い廃止した。
+  現在の見出しフォントは `--serif`（Newsreader / Noto Serif JP）
