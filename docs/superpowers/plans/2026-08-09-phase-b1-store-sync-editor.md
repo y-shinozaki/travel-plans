@@ -820,7 +820,10 @@ test("getFile は日本語を正しく復号する", async () => {
 });
 
 test("GitHub が改行入りの base64 を返しても復号できる", async () => {
-  // Contents API は 60 文字ごとに改行を挟むことがある
+  // Contents API は 60 文字ごとに改行を挟むことがある。
+  // これを支えているのは atob が ASCII 空白を読み飛ばす仕様なので、
+  // このテストは github.js のコードではなく「依存している前提」を守っている。
+  // 厳格なデコーダに差し替えたときにここで気づける。
   const body = '{"a":1}';
   const wrapped = toBase64Utf8(body).replace(/(.{4})/g, "$1\n");
   const impl = fakeFetch(() => json(200, { sha: "s", content: wrapped }));
@@ -983,8 +986,9 @@ export function createGitHub({ owner, repo, branch, token, fetchImpl = fetch }) 
     const { response, body } = await call(url, { method: "GET", headers });
     if (response.status === 404) return null;
     if (!response.ok) throw new GitHubError(response.status, explain(response.status, body));
-    // Contents API は base64 に改行を挟むことがある
-    return { sha: body.sha, text: fromBase64Utf8(String(body.content).replace(/\s/g, "")) };
+    // Contents API は base64 に 60 文字ごとの改行を挟むことがあるが、
+    // atob は仕様上 ASCII 空白を読み飛ばすので、ここで除去する必要はない。
+    return { sha: body.sha, text: fromBase64Utf8(String(body.content)) };
   }
 
   async function putFile({ path, text, sha, message }) {
