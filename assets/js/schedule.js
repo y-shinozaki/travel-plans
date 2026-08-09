@@ -1,7 +1,8 @@
 import { injectSprite } from "./icons.js";
 import { initReveal } from "./reveal.js";
 import { renderNav } from "./nav.js";
-import { renderCalendar, CAT_META } from "./calendar.js";
+import { renderCalendar } from "./calendar.js";
+import { CAT_META } from "./categories.js";
 import { createMap } from "./map.js";
 import { createSheet, renderEventDetail } from "./sheet.js";
 
@@ -13,6 +14,14 @@ const state = {
   catFilter: null,
   onSelect: null,
 };
+
+/**
+ * 時間帯セレクトに並べる選択肢の範囲。
+ * state.viewStart / viewEnd は「初期選択値」であってこの範囲ではない。
+ * 範囲を state から導くと、選択肢が 1 つしかないセレクトになってしまう。
+ */
+const START_HOUR_CHOICES = { min: 0, max: 12 };
+const END_HOUR_CHOICES = { min: 13, max: 24 };
 
 let mapView = null;
 
@@ -33,10 +42,11 @@ function draw() {
     catFilter: state.catFilter,
     onSelect: state.onSelect,
   });
+  // 表示時間帯を変えただけのときは、地図側が自分で差分を見て何もしない
   mapView?.update(state.events, state.catFilter);
 }
 
-function fillHourOptions(select, min, max, selected) {
+function fillHourOptions(select, { min, max }, selected) {
   select.innerHTML = "";
   for (let h = min; h <= max; h++) {
     const option = document.createElement("option");
@@ -72,6 +82,20 @@ function buildCategoryFilters() {
   }
 }
 
+/**
+ * 失敗の理由は 1 つではない。GitHub Pages なら 404 や通信断、
+ * 手元なら file:// で開いている、JSON の書き間違いもある。
+ * どれか 1 つだけを名指しすると残りの場合に誤った案内になるので、
+ * 両方を挙げる。
+ */
+function showLoadError() {
+  els.cal.innerHTML =
+    '<p class="ferror">旅程データ（assets/data/events.json）を読み込めませんでした。' +
+    "通信状況を確認してページを再読み込みするか、" +
+    "手元で開いている場合は file:// ではなくローカルサーバー" +
+    "（python3 -m http.server）経由でアクセスしてください。</p>";
+}
+
 async function main() {
   injectSprite();
 
@@ -92,16 +116,14 @@ async function main() {
 
   const response = await fetch("assets/data/events.json");
   if (!response.ok) {
-    els.cal.innerHTML =
-      '<p class="ferror">旅程データを読み込めませんでした。ローカルサーバー経由で開いているか確認してください。</p>';
-    return;
+    throw new Error(`events.json の取得に失敗しました: HTTP ${response.status}`);
   }
   const data = await response.json();
   state.days = data.days;
   state.events = data.events;
 
-  fillHourOptions(els.viewStart, 0, 12, state.viewStart);
-  fillHourOptions(els.viewEnd, 13, 24, state.viewEnd);
+  fillHourOptions(els.viewStart, START_HOUR_CHOICES, state.viewStart);
+  fillHourOptions(els.viewEnd, END_HOUR_CHOICES, state.viewEnd);
 
   els.viewStart.addEventListener("change", (e) => {
     state.viewStart = Number(e.target.value);
@@ -121,7 +143,16 @@ async function main() {
 
   buildCategoryFilters();
   draw();
-  initReveal();
 }
 
-main();
+// initReveal() は必ず走らせる。.shead / .toolbar / .mapsec は opacity: 0 で
+// 待機しているため、ここを飛ばすと画面が「見えないレイアウト 780px と
+// エラー行 1 本」になってしまい、エラーそのものも読み取りづらい。
+main()
+  .catch((error) => {
+    console.error(error);
+    showLoadError();
+  })
+  .finally(() => {
+    initReveal();
+  });
