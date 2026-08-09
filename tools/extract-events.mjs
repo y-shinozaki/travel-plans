@@ -39,6 +39,11 @@ const CAT_DEFAULT_ICON = {
 /**
  * `const <name> = [` の直後から対応する `]` までを切り出す。
  * 文字列リテラルの中の括弧を数えないよう、クォートの状態を追う。
+ *
+ * 制約: `//` や `/* *\/` のコメントは見ていない。コメント内に `[` や `]` が
+ * あると depth がずれて誤った範囲を返しうる（現行データでは該当箇所なし、
+ * 確認済み）。この関数自身では切り詰めを検知できないため、
+ * 最後の砦として下の EXPECTED による実測値チェックがある。
  */
 function sliceArrayLiteral(src, name) {
   const decl = src.indexOf(`const ${name} = [`);
@@ -70,20 +75,26 @@ function sliceArrayLiteral(src, name) {
   throw new Error(`${name} の終端 ] が見つかりません`);
 }
 
+/**
+ * 実測値による検算。
+ * sliceArrayLiteral が括弧を数え違えて配列を途中で切り上げても、
+ * 切り出したテキストだけを見ている限り自己矛盾しないので気づけない。
+ * 外から測った既知の値と突き合わせるのが、唯一この失敗を捕まえられる方法。
+ * データを意図的に増減させたときは、ここも一緒に更新すること。
+ */
+const EXPECTED = {
+  days: 6,
+  events: 40,
+  allDay: 5,
+  multiDay: 3,
+  withCoords: 21,
+};
+
 const html = readFileSync(SRC, "utf8");
 const days = runInNewContext(sliceArrayLiteral(html, "days"));
 
-// 切り出しが途中で終わっていないかを独立した方法で照合する。
-// 括弧の数え間違いで配列が黙って短くなるのが一番怖い失敗なので、
-// テキスト中の title: の出現数とパース結果の件数が一致することを確かめる。
 const eventsSource = sliceArrayLiteral(html, "events");
 const rawEvents = runInNewContext(eventsSource);
-const titleOccurrences = (eventsSource.match(/\btitle:\s*"/g) ?? []).length;
-if (titleOccurrences !== rawEvents.length) {
-  throw new Error(
-    `切り出しが不完全です: title の出現数 ${titleOccurrences} に対し ${rawEvents.length} 件しかパースできていません`
-  );
-}
 
 const warnings = [];
 
@@ -134,6 +145,22 @@ const events = rawEvents.map((e, i) => {
 
   return out;
 });
+
+const actual = {
+  days: days.length,
+  events: events.length,
+  allDay: events.filter((e) => e.allDay).length,
+  multiDay: events.filter((e) => e.endDay > e.startDay).length,
+  withCoords: events.filter((e) => e.lat != null).length,
+};
+
+for (const key of Object.keys(EXPECTED)) {
+  if (actual[key] !== EXPECTED[key]) {
+    throw new Error(
+      `件数が実測値と一致しません（${key}）: 期待値 ${EXPECTED[key]} に対して実際 ${actual[key]}`
+    );
+  }
+}
 
 const payload = {
   updatedAt: new Date().toISOString(),
