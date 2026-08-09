@@ -29,9 +29,23 @@ export function decideSync({ remoteUpdatedAt, localUpdatedAt, baseUpdatedAt, has
   // 比較の基準がなく「未公開の変更がない」と断定できないので、選ばせる側に倒す。
   if (base == null) return "remote-is-newer";
 
-  // リモートが進んでいない
+  // リモートが進んでいない。
+  // ここは大小で比べてよい。remote も base も出所は同じ「リモートの updatedAt」で
+  // （base は storeAdopted が stampOf(remote) をそのまま入れる）、同じ系列の値なので
+  // 順序に意味がある。
   if (remote <= base) return "use-local";
 
-  // ここから先はリモートが base より新しい。ローカルが触られているかで分かれる
-  return local > base ? "remote-is-newer" : "use-remote";
+  // ここから先はリモートが base より新しい。ローカルが触られているかで分かれる。
+  //
+  // こちらは大小ではなく一致で見る。base は公開した端末の時計で押された値、
+  // local は saveLocal がこの端末の時計で押した値で、出所が違う。時計がずれていれば
+  // 編集したのに local < base になり、大小で見ると「触られていない」と読めてしまう
+  // ── そのまま use-remote に落ちると load() が storeAdopted() で下書きを上書きし、
+  // トークンを持たない端末の編集がどこにも残らないまま消える（設計書 §5.2）。
+  //
+  // 揃っている端末では base と下書きの updatedAt は storeAdopted が書いた同じ文字列に
+  // なる。saveLocal は必ず updatedAt を進めるので、「違う ＝ 編集された」で判断できる。
+  // sync.js の hasUnpublishedChanges() が一致で見ているのと同じ理由。
+  // 片方だけ大小に戻さないこと。
+  return localUpdatedAt !== baseUpdatedAt ? "remote-is-newer" : "use-remote";
 }

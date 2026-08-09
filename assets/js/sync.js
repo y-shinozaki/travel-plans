@@ -216,6 +216,10 @@ export function createSync({
    * 一切入らない。updatedAt を持たないデータ（どちらも null）も、それで
    * 正しく「揃っている」と出る。
    *
+   * 同じ 2 つの値を `decideSync()`（sync-decide.js）も見ている。**同じ規則で見ること。**
+   * 片方を大小に戻すと、時計がずれた端末で「未公開の変更あり」と表示しながら
+   * 起動時には黙ってリモートで上書きする、という食い違いが生まれる。
+   *
    * 下書きが無ければ false。公開するものが無い。
    */
   function hasUnpublishedChanges() {
