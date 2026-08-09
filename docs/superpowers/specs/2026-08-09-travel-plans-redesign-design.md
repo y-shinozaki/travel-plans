@@ -700,6 +700,33 @@ assets/data/archive.enc
   マーカーと一覧が読む項目（`cat` / `icon` / `title` / `location` / `image` /
   `startDay` / `allDay`）も含むようになった。タイトルだけの編集でも一覧と
   ポップアップが追従する。コミット `319f1b2`
+- **`toTime()` の重複** → `sync-decide.js` から `export` し、`sync.js` が import する。
+  向きは `decideSync` の import と同じなので循環しない
+- **`CONFLICT_MESSAGE` の重複** → `github.js` が `export` し、
+  自分の `explain(409)` と `sync.js` の突き合わせ側の両方がその 1 個を使う。
+  文字列を書き写す場所が無くなったので、ずれようがない
+- **`schedule.js` の `icons.js` 二重 import と `sheet-body` の二重取得** → 解消。
+  本文要素は `sheetBodyEl` に 1 度だけ引き、`createSheet` と `createEventEditor` の
+  両方へ渡す（別々に引くと、片方だけ差し替えたときに editor が入力欄を
+  見つけられなくなる）
+
+**Phase B1 の最終レビューで見つけて直した項目**（§13 に載る前に解消したが、
+下の「時計ずれ」の項目と混同されやすいので経緯を残す）:
+
+- **`decideSync()` が下書きを黙って消しうる（Critical）。** `local > base` という
+  順序比較で「この端末に未公開の変更があるか」を判断していた。`base` は公開した端末の
+  時計で、下書きの `updatedAt` は編集した端末の時計で押される別系列の値なので、
+  公開側の時計が進んでいると**編集済みの下書きが `base` より古くなり、順序比較は
+  「触られていない」と読む** → `load()` が `storeAdopted()` で下書きを上書きする。
+  被害を受けるのはトークンを持たない側の端末で、一度も公開していない以上
+  git 履歴にも控えが無く、編集は完全に消える。
+  生の文字列の一致比較（`localUpdatedAt !== baseUpdatedAt`）に変更した。
+  `base` には `storeAdopted()` が書いた `updatedAt` がそのまま入り、`saveLocal()` は
+  必ず `updatedAt` を進めるので、「違う ＝ 編集された」で判断できる。
+  `sync.js` の `hasUnpublishedChanges()` が一致で見ているのと同じ理由で、
+  両者は互いを指すコメントを持つ。
+  なお `remote <= base` は順序比較のまま ── どちらもリモートの `updatedAt` が出所で
+  同じ系列だから。**片方だけ順序に戻さないこと**
 
 **Phase A で解消し、この節から削除した項目**（PR #5 のレビュー指摘による。
 3 人のレビュアーが独立に「Phase B まで待てない」と判断したため繰り越しを取り消した）:
@@ -800,7 +827,14 @@ assets/data/archive.enc
   免疫を付けるには内容のハッシュか sha が要るが、読み込みはトークン無しの素の `fetch`
   なので sha が手に入らない（トークンを持たない端末でも旅程を開けるようにするための選択）。
   上書きしてもコミットは git 履歴に残るので復旧はできる。
-  `assets/js/sync.js` の `BASE_KEY` のコメントがこの節を指している
+  `assets/js/sync.js` の `BASE_KEY` のコメントがこの節を指している。
+
+  **これは公開側（リモートが上書きされる）の話で、受け入れている理由は
+  「git 履歴から戻せる」こと。** 同じ時計ずれが起動時の判断
+  （`decideSync()`）に及ぶと**手元の下書きが消える**という別の被害になり、
+  そちらは git 履歴に控えが無いので受け入れられない ── B1 の最終レビューで
+  Critical として直してある（上の「最終レビューで見つけて直した項目」）。
+  **2 つを同じ残存リスクとして扱わないこと**
 - **保存領域に書けない端末（プライベートブラウジング、容量超過）では公開が毎回 409 になる。**
   base を残せないため。`publish-ui.js` は「取り込んでから公開し直す」という成立しない
   案内を出さないよう文言を分けてあるが（`MESSAGES.cannotPersist`）、根治していない。
@@ -834,15 +868,21 @@ assets/data/archive.enc
 - **`validateEvent()` の戻り値がメッセージ文字列の配列。** `{field, message}` を返すほうが
   本来は綺麗で、`event-form.js` の `FIELD_RE`（キー名を画面の項目名へ置換する正規表現）も
   要らなくなる。B2/B3 で入力欄が増える前に判断する
-- **`toTime()` が `sync.js` と `sync-decide.js` に重複している**
-- **`CONFLICT_MESSAGE`（`sync.js`）が `github.js` の 409 の文言と重複していて、
-  テストで揃えていない。** 片方だけ直しても誰も気付かない
 - **`isEventObject`（`event-form.js`）が `isPlainObject`（`validate.js` / `sync.js`）と重複**
+- **`ev.imagePos` が `style="object-position:…"` へそのまま入る**（`sheet.js`）。
+  通しているのは `escapeHtml()` だけで、これが変換するのは属性から抜け出す 5 文字
+  （`& < > " '`）だけ。`;` も CSS の関数記法も素通りするので、宣言を追加できる。
+  `style-src` は Leaflet のために `'unsafe-inline'` が要るので CSP も止めない。
+  **今は到達しない** ── `imagePos` の入力欄はフォームに無く、`validateEvents()` も
+  このキーを見ないため、値は `events.json` を手で書いた分しか存在しない。
+  ただし実データ 40 件すべてがこのキーを持っている。
+  **B2 で画像位置の入力欄を足すなら、先に `imagePos` を許可リストで検証すること**
+  （`object-position` が実際に取る形＝キーワードと長さ／パーセントだけ）。
+  `escapeHtml()` を重ねても防げない
 - **内容だけの編集でも地図が `fitBounds` し直す。** 再描画の署名がマーカー用と一覧用で
   共通なので、タイトルを直すとパン・ズームが初期位置へ戻る。署名を 2 つに分ければ解決
 - **`clearProblems()` が `role="alert"` を残す**（`className` と中身だけ消している）。
   `aria-invalid` を付けているのもタイトル欄だけ
-- **`schedule.js` が `icons.js` を 2 回 import し、`sheet-body` を 2 回引いている**
 - **`showPublishFailure()` が dirty の再計算を呼び出し側の `finally` に頼っている。**
   結合が暗黙的で、呼び出し順を変えると静かにずれる
 - **`store.write(key, undefined)` は例外にならない。** `JSON.stringify(undefined)` が
@@ -861,5 +901,5 @@ assets/data/archive.enc
   「CSP の存在」「`script-src`」「インライン script と `on*` 属性」「`connect-src`」で、
   `img-src` / `font-src` は `schedule.html` でしか見ていない
 - **`fromBase64Utf8()` の型ガードにテストがない**（`toBase64Utf8()` 側にはある）
-- **`decideSync()` の「ローカルの `updatedAt` だけが不正」のケースにテストがない**
-  （リモート不正と同じ 1 行で処理しているのでリスクは低い）
+（`decideSync()` の「ローカルの `updatedAt` だけが不正」のケースは B1 の最終レビューで
+テストを追加したので、この節から落とした）

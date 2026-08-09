@@ -11,8 +11,8 @@
  * 設計書 §5.1〜§5.3 に対応。
  */
 
-import { decideSync } from "./sync-decide.js";
-import { createGitHub, GitHubError } from "./github.js";
+import { decideSync, toTime } from "./sync-decide.js";
+import { createGitHub, GitHubError, CONFLICT_MESSAGE } from "./github.js";
 import { validateEvents } from "./validate.js";
 import { readToken } from "./token.js";
 
@@ -47,13 +47,6 @@ export const DEFAULT_CONFIG = {
 };
 
 /**
- * 「リモートが進んでいるので公開できない」を伝える文言。
- * github.js が HTTP 409 に付ける文言と揃えてある。呼び出し側から見て
- * 「別の端末が先に公開した」は同じ出来事で、次にすることも同じ（取り込んでやり直す）。
- */
-const CONFLICT_MESSAGE = "リモートが更新されています。取り込んでから公開し直してください";
-
-/**
  * updatedAt が読めないリモートを decideSync に渡すための値。
  *
  * null を渡すと decideSync は「リモートが取れなかった」＝ offline と判断する。
@@ -67,13 +60,6 @@ const isPlainObject = (v) => typeof v === "object" && v !== null && !Array.isArr
 
 /** ISO8601 の文字列だけを時刻として認める。 */
 const stampOf = (data) => (typeof data?.updatedAt === "string" ? data.updatedAt : null);
-
-/** 比較できない値は null。Date.parse は形が違うと NaN を返す。 */
-function toTime(value) {
-  if (typeof value !== "string") return null;
-  const ms = Date.parse(value);
-  return Number.isNaN(ms) ? null : ms;
-}
 
 export function createSync({
   store,

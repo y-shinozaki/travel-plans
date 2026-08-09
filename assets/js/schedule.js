@@ -1,4 +1,4 @@
-import { injectSprite } from "./icons.js";
+import { injectSprite, icon } from "./icons.js";
 import { initReveal } from "./reveal.js";
 import { renderNav } from "./nav.js";
 import { renderCalendar } from "./calendar.js";
@@ -7,7 +7,6 @@ import { createMap } from "./map.js";
 import { createSheet } from "./sheet.js";
 import { el, escapeHtml } from "./dom.js";
 import { EventDataError } from "./validate.js";
-import { icon } from "./icons.js";
 import { createStore } from "./store.js";
 import { createSync } from "./sync.js";
 import { createEventEditor } from "./event-editor.js";
@@ -260,18 +259,23 @@ async function main() {
   const store = createStore();
   const sync = createSync({ store });
 
+  // シートと editor は同じ本文要素を見る。editor は sheet.open() が入れた
+  // HTML から入力欄を引き直すので、別の要素を渡すと黙って何も見つからなくなる。
+  // 引き直しを 1 か所にして、その取り違えを起こせなくしてある。
+  const sheetBodyEl = document.getElementById("sheet-body");
+
   const sheet = createSheet({
     root: document.getElementById("sheet"),
     overlay: document.getElementById("sheet-overlay"),
     titleEl: document.getElementById("sheet-title"),
-    bodyEl: document.getElementById("sheet-body"),
+    bodyEl: sheetBodyEl,
     footEl: document.getElementById("sheet-foot"),
     closeBtn: document.getElementById("sheet-close"),
   });
 
   const editor = createEventEditor({
     sheet,
-    bodyEl: document.getElementById("sheet-body"),
+    bodyEl: sheetBodyEl,
     getData: () => state.data,
     // 保存の順序が意味を持つ: 検証（editor 側）→ 下書きへ書く → 反映。
     // saveLocal が投げたら state も画面も動かない ── 保存できていないのに

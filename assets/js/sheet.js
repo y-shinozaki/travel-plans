@@ -119,6 +119,18 @@ function dayRangeLabel(ev, days) {
 }
 
 export function renderEventDetail(ev, days) {
+  // ⚠ imagePos を style 属性へ差し込んでいる。escapeHtml() は属性から抜け出す
+  // 5 文字（& < > " '）しか変換しないので、`;` も CSS の関数記法もそのまま通る。
+  // 引用符が消える以上タグからは抜け出せないが、宣言は増やせる（`top; position:fixed`
+  // のような形で、シートの外にまで被さる要素を作れる）。style-src に
+  // 'unsafe-inline' が要る（Leaflet のため）ので CSP も止めない。
+  //
+  // 今は届かない。imagePos の入力欄はフォームに無く（event-form.js）、
+  // 値は events.json を手で書いた分しか存在しない。ただし全 40 件がこのキーを
+  // 持っているので、B2 で画像位置の入力欄を足した瞬間に生きた経路になる。
+  // **入力欄を足すなら、先に imagePos を許可リストで検証すること**
+  // （object-position が実際に取る形 ── キーワードと長さ／パーセントだけ）。
+  // escapeHtml() を足しても防げない。設計書 §13 に項目がある。
   const image = ev.image
     ? `<img class="sheet__img" src="${escapeHtml(ev.image)}" alt=""
          style="object-position:${escapeHtml(ev.imagePos || "center")}">`

@@ -21,6 +21,16 @@ export class GitHubError extends Error {
   }
 }
 
+/**
+ * 「別の端末が先に公開した」を伝える文言。
+ *
+ * サーバーが 409 を返した場合（下の explain）と、sync.js が PUT の前の突き合わせで
+ * 自分から 409 を投げる場合の両方で使う。利用者から見れば同じ出来事で、
+ * 次にすることも同じ（取り込んでから公開し直す）。
+ * 以前は sync.js 側に同じ文字列を書き写していて、片方だけ直しても誰も気付かなかった。
+ */
+export const CONFLICT_MESSAGE = "リモートが更新されています。取り込んでから公開し直してください";
+
 function explain(status, body) {
   const detail = body?.message ? `（${body.message}）` : "";
   switch (status) {
@@ -29,7 +39,7 @@ function explain(status, body) {
     case 403:
       return `権限が足りません。トークンに Contents の書き込み権限があるか確認してください${detail}`;
     case 409:
-      return `リモートが更新されています。取り込んでから公開し直してください${detail}`;
+      return `${CONFLICT_MESSAGE}${detail}`;
     case 404:
       // getFile の 404 は null を返す経路で処理するため、ここに来るのは putFile だけ。
       return `対象が見つかりません。パスとブランチ名を確認してください${detail}`;

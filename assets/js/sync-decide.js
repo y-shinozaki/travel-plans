@@ -8,7 +8,15 @@
  * 設計書 §5.2 に対応。
  */
 
-function toTime(value) {
+/**
+ * ISO8601 の文字列をミリ秒へ。比較できない値は null。
+ * Date.parse は形が違うと NaN を返すので、そこで潰しておく。
+ *
+ * sync.js の assertRemoteNotAhead() も同じ判断（読めない updatedAt は null）で
+ * 動く。両方に置くと片方だけ緩めたときに気付けないので、ここから import している。
+ * この向き（sync.js → sync-decide.js）は decideSync の import と同じなので循環しない。
+ */
+export function toTime(value) {
   if (typeof value !== "string") return null;
   const ms = Date.parse(value);
   return Number.isNaN(ms) ? null : ms;
