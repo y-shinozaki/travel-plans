@@ -1384,6 +1384,12 @@ const updated = { ...original, ...readEventForm(getValue), id: original.id };
 **配列全体を `validateEvents()` に通してから保存すること。** 通らなければ保存せず、
 シート内にエラーを出す。
 
+これは `id` のためだけではない。`formProblems(ev, dayCount)` は渡された `dayCount` を
+そのまま信じる。整数でありさえすれば通るので、**古い日数や間違った日数を渡すと
+範囲外の `startDay` が素通りする**（Task 6 のレビューで指摘された残存リスク）。
+`validateEvents(data)` は `data.days.length` を自分で数えるので、ここが唯一の砦になる。
+`dayCount` は必ず `state.days.length` から渡し、保存前の全体検証を省略しないこと。
+
 - [ ] **Step 2: ブラウザで確認する**
 
 `schedule.html` で、フォームが実データに対して期待どおり動くことを確認する。**実際にキーを押し、
