@@ -30,9 +30,13 @@ export class EventDataError extends Error {
   }
 }
 
-/** エラー文でイベントを名指しするためのラベル。id が無くても位置は示す。 */
-function labelOf(ev, index) {
-  const id = ev && typeof ev.id === "string" && ev.id ? ev.id : `events[${index}]`;
+/**
+ * エラー文でイベントを名指しするためのラベル。
+ * id が無いイベントは where（配列上の位置など、呼び出し側が知っている
+ * 「どこの話か」）で代用する。
+ */
+function labelOf(ev, where) {
+  const id = ev && typeof ev.id === "string" && ev.id ? ev.id : where;
   const title = ev && typeof ev.title === "string" && ev.title ? `「${ev.title}」` : "";
   return `${id}${title}`;
 }
@@ -114,18 +118,35 @@ function checkCoords(ev, label, problems) {
   }
 }
 
-function checkEvent(ev, index, dayCount, seenIds, problems) {
-  const label = labelOf(ev, index);
+/**
+ * イベント 1 件を検査して、不備の一覧を返す（空配列なら妥当）。
+ *
+ * Phase B の編集フォームからも呼ぶために公開している。フォーム側が同じ規則を
+ * 書き写すと、写しがずれた瞬間に「保存はできるが次の読み込みで
+ * validateEvents に弾かれ、ページが起動しない」データを作れてしまう。
+ * イベント 1 件に対する規則の置き場所はここ 1 か所だけにする。
+ *
+ * @param {object} ev 検査するイベント
+ * @param {number} dayCount days の件数
+ * @param {Set<string>} seenIds すでに使われている id（重複の検出に使い、
+ *   通ったものを足していく）。1 件だけ検査するときは既定の空集合でよい
+ * @param {string} where id を持たないイベントの呼び方。validateEvents は
+ *   配列上の位置（"events[3]"）を渡す
+ * @returns {string[]} 不備の一覧
+ */
+export function validateEvent(ev, dayCount, seenIds = new Set(), where = "イベント") {
+  const problems = [];
+  const label = labelOf(ev, where);
 
   if (!isPlainObject(ev)) {
-    problems.push(`events[${index}] がオブジェクトではありません`);
-    return;
+    problems.push(`${where} がオブジェクトではありません`);
+    return problems;
   }
 
   // id は地図の再描画判定（map.js の signatureOf）の鍵になる。
   // 重複すると別の地点が同じものとして扱われる
   if (typeof ev.id !== "string" || !ev.id) {
-    problems.push(`events[${index}]: id が空でない文字列ではありません`);
+    problems.push(`${where}: id が空でない文字列ではありません`);
   } else if (seenIds.has(ev.id)) {
     problems.push(`${label}: id が重複しています`);
   } else {
@@ -167,6 +188,8 @@ function checkEvent(ev, index, dayCount, seenIds, problems) {
   }
 
   checkCoords(ev, label, problems);
+
+  return problems;
 }
 
 /**
@@ -186,7 +209,9 @@ export function validateEvents(data) {
     problems.push("events が配列ではありません");
   } else if (daysOk) {
     const seenIds = new Set();
-    data.events.forEach((ev, i) => checkEvent(ev, i, data.days.length, seenIds, problems));
+    data.events.forEach((ev, i) =>
+      problems.push(...validateEvent(ev, data.days.length, seenIds, `events[${i}]`))
+    );
   }
 
   if (problems.length) {
