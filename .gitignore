@@ -38,3 +38,6 @@ npm-debug.log*
 .tmp/
 
 # Local development (but keep .claude/settings.json for project config)
+
+# Superpowers subagent-driven-development の作業領域（コミット対象外）
+.superpowers/
