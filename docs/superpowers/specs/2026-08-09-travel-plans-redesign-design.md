@@ -106,7 +106,7 @@ B1 で `store.js` / `sync.js` の 2 本という当初の想定を 6 本
 （`store` / `base64` / `sync-decide` / `github` / `token` / `sync`）に割った。
 通信・保存・判断を別々に差し替えられないと、公開フローを `node --test` で
 回せないため。B2 で `sync.js` を 2 つ目の JSON に使う前に §13 の
-「`createSync()` は 1 ファイル分の下書き枠しか持てない」を読むこと。
+「`createSync()` は旅程専用。2 つ目の JSON には使えない」を読むこと。
 
 JS は `<script type="module">` で読み込む。`file://` 直開きでは CORS により動作しないため、
 ローカル開発は `python3 -m http.server 8000` を必須とする。CLAUDE.md と README.md を更新する。
@@ -756,19 +756,42 @@ assets/data/archive.enc
 
 ### Phase B1 からの繰り越し（保存と公開）
 
-- **`createSync()` は 1 ファイル分の下書き枠しか持てない。B2 が最初に踏む。**
-  `sync.js` の `DRAFT_KEY = "events"` と `BASE_KEY = "events-base"` はモジュール定数で、
-  注入できる `config`（`owner` / `repo` / `branch` / `path`）に入っていない。
+- **`createSync()` は旅程専用。2 つ目の JSON には使えない。B2 が最初に踏む。**
   §5.2・§5.3 は同期する JSON を 3 つ（`events` / `packing` / `comments`）想定しているが、
-  **`createSync({ config: { …, path: "assets/data/packing.json" } })` を作っても
-  読み書きするキーは `tp:events` / `tp:events-base` のまま**で、持ち物リストの下書きが
-  旅程の下書きを上書きし、`tp:events-base` も持ち物側の時刻で塗り替わる。
-  `validateEvents()` を通らない下書きは `load()` が警告して捨てるので、
-  症状は「旅程の編集が消える」という形で出る。
-  直し方は `config` にキーの接頭辞（`packing` / `packing-base` 等）を足し、
-  既定を今の値にすること。**B2 で 2 つ目の `createSync` を作る前に必ず直す。**
-  ついでに `publish()` の `stamped.events.length`（コミットメッセージの件数）も
-  `events` 固定なので、ファイルごとに変える必要がある
+  `sync.js` で注入できるのは `store` / `fetchImpl` / `config` / `now` の 4 つで、
+  `config` は `owner` / `repo` / `branch` / `path` しか持たない。**イベント固有の要素が
+  3 種類、注入の外にある:**
+
+  1. **保存キー** — `DRAFT_KEY = "events"`（`:20`）と `BASE_KEY = "events-base"`（`:33`）が
+     モジュール定数
+  2. **検証器** — `validateEvents` を module top で import し（`:16`）、
+     5 か所が直に呼ぶ: 下書きの検査（`:145`）、リモートの検査（`:170`）、
+     `saveLocal`（`:235`）、`adoptRemote`（`:246`）、`publish`（`:309`）
+  3. **コミットメッセージ** — `publish()` が
+     `stamped.events.length` と `Update itinerary from the browser (N events)`（`:316-317`）
+
+  **今のまま `createSync({ config: { …, path: "assets/data/packing.json" } })` を作っても、
+  黙って壊れはしない。全経路が投げる**（§4.2 の `packing.json` は `days` も `events` も
+  持たないので `validateEvents` を通らない）── `saveLocal` は `:235` で、
+  `publish` は `:309` で、`adoptRemote` は `:246` で、`load` はリモートを検査する `:170` で
+  投げる。`sync.js` は**検証してから書く**順序なので、この段階では旅程の下書きは無傷。
+  `load()` の下書き棄却（`:141-151` → `:182` の `if (!draftRejected)`）も
+  `storeAdopted()` を飛ばす動き、つまり上書きを**防ぐ**側であって、失う側ではない。
+
+  **危ないのは部分的に直したときで、そこが本当の罠。** 「検証器を注入すればいい」と
+  気付いて検証器だけを `config` へ出すと、持ち物の下書きが自分の検証を通るようになり、
+  **そこで初めて `saveLocal` が `store.write(DRAFT_KEY, …)` に到達して
+  `tp:events` を持ち物データで上書きする。旅程の未公開の編集はこの瞬間に消える**
+  （持ち物側で `publish()` まで進めば `storeAdopted()` が `tp:events-base` も塗り替える）。
+  人が気付くのは次に旅程ページを開いたときで、`load()` が「旅程の形になっていない」と
+  警告して手元の下書きを捨て、リモートの内容に戻る ── 棄却は損失が起きた場所ではなく、
+  損失が見えた場所にすぎない。
+
+  **直し方: `config` に保存キーの接頭辞と検証器の両方を足し、既定を今の値
+  （`events` / `events-base` / `validateEvents`）にする。コミットメッセージの組み立ても
+  ファイルごとに差し替えられるようにする。3 つを一度に直すこと** ──
+  どれか 1 つだけを注入可能にすると上の静かなデータ消失が生まれる。
+  **B2 で 2 つ目の `createSync` を作る前に必ず直す。**
 - **時計ずれで他端末の公開を黙って上書きしうる（残存リスク）。**
   `tp:events-base` に入る `updatedAt` は公開した端末の時計で押される。押す端末が
   複数あるので順序関係は保たれない ── A の時計が遅れていれば、A があとから公開した版の

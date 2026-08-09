@@ -157,9 +157,11 @@ map.js の createMap() → 座標を持つイベントからマーカーと位�
 （この 3 つのほかに `publish-ui.js` が `tp:write-probe` を一瞬だけ書いて消す。
 保存領域に書けるかを実際に試すためで、残さない。）
 
-**`DRAFT_KEY` / `BASE_KEY` は `config` に入っていないモジュール定数。** 2 つ目の JSON
+**`createSync()` は旅程専用。** 保存キー（`DRAFT_KEY` / `BASE_KEY`）も検証器
+（`validateEvents`）もコミットメッセージも `config` の外にある。2 つ目の JSON
 （B2 の `packing.json`）を同期させる前に、設計書 §13 の
-「`createSync()` は 1 ファイル分の下書き枠しか持てない」を読むこと。
+「`createSync()` は旅程専用。2 つ目の JSON には使えない」を読むこと ──
+**3 つのうち一部だけを注入可能にすると、旅程の下書きが黙って消える。**
 
 ### `updatedAt` がすべての比較の軸
 
