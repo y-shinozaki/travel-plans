@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { SPRITE, ICON_IDS, icon, CATEGORY_ICON } from "../assets/js/icons.js";
+import { SPRITE, ICON_IDS, icon, CATEGORY_ICON, injectSprite } from "../assets/js/icons.js";
 
 const idsInSprite = () => [...SPRITE.matchAll(/<symbol[^>]*\bid="([^"]+)"/g)].map((m) => m[1]);
 
@@ -39,8 +39,9 @@ test("すべての symbol が viewBox を持つ", () => {
 
 test("symbol に色が直接書かれていない", () => {
   // currentColor で継承させるため、fill / stroke を symbol 内に書かない
+  // クォートの種類（" / '）に関わらず検出できるようにする
   const body = SPRITE.replace(/<svg[^>]*>|<\/svg>/g, "");
-  assert.doesNotMatch(body, /(?:fill|stroke)="(?!none")[^"]+"/);
+  assert.doesNotMatch(body, /(?:fill|stroke)=["'](?!none["'])[^"']+["']/);
 });
 
 test("icon() は use 参照を返す", () => {
@@ -71,4 +72,39 @@ test("events.json が参照するアイコンがすべて存在する", () => {
     assert.ok(id, `${ev.title}: カテゴリ ${ev.cat} に既定アイコンがありません`);
     assert.ok(ICON_IDS.includes(id), `${ev.title}: ${id} がスプライトにありません`);
   }
+});
+
+// injectSprite が使うのは doc.querySelector と doc.body.insertAdjacentHTML の
+// 2 つだけなので、それだけを備えた最小スタブで足りる（Node には DOM がない）。
+const makeDocStub = ({ alreadyInjected = false } = {}) => {
+  const calls = { querySelector: [], insertAdjacentHTML: [] };
+  return {
+    calls,
+    doc: {
+      querySelector(sel) {
+        calls.querySelector.push(sel);
+        return alreadyInjected ? {} : null;
+      },
+      body: {
+        insertAdjacentHTML(...args) {
+          calls.insertAdjacentHTML.push(args);
+        },
+      },
+    },
+  };
+};
+
+test("injectSprite はスプライトが無ければ挿入する", () => {
+  const { doc, calls } = makeDocStub();
+  injectSprite(doc);
+  assert.deepEqual(calls.querySelector, ["svg.sprite"]);
+  assert.equal(calls.insertAdjacentHTML.length, 1);
+  assert.deepEqual(calls.insertAdjacentHTML[0], ["afterbegin", SPRITE]);
+});
+
+test("injectSprite はすでにあれば二重に挿入しない", () => {
+  const { doc, calls } = makeDocStub({ alreadyInjected: true });
+  injectSprite(doc);
+  assert.deepEqual(calls.querySelector, ["svg.sprite"]);
+  assert.equal(calls.insertAdjacentHTML.length, 0);
 });
