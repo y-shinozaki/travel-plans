@@ -1,0 +1,465 @@
+/* ══════════════════════════════════════════════════════════
+   CONTROLS
+   ══════════════════════════════════════════════════════════ */
+.btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 15px 30px;
+  background: transparent;
+  color: var(--reverse);
+  border: 1px solid var(--ink);
+  border-radius: var(--r-pill);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  overflow: hidden;
+  isolation: isolate;
+  transition: color var(--t-mid) var(--e-out);
+}
+.btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--ink);
+  transform-origin: right;
+  transition: transform var(--t-mid) var(--e-out);
+  z-index: -1;
+}
+.btn:hover {
+  color: var(--ink);
+}
+.btn:hover::before {
+  transform: scaleX(0);
+}
+.btn .ico {
+  transition: transform var(--t-mid) var(--e-out);
+}
+.btn:hover .ico {
+  transform: translateX(5px);
+}
+.btn--ghost {
+  color: var(--ink);
+}
+.btn--ghost::before {
+  transform: scaleX(0);
+  transform-origin: left;
+}
+.btn--ghost:hover {
+  color: var(--reverse);
+}
+.btn--ghost:hover::before {
+  transform: scaleX(1);
+}
+
+.chip {
+  position: relative;
+  padding: 9px 18px;
+  font-size: 11px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--ink-2);
+  overflow: hidden;
+  isolation: isolate;
+  transition: color var(--t-fast) var(--e-out),
+    border-color var(--t-fast) var(--e-out);
+}
+.chip::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--ink);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform var(--t-fast) var(--e-out);
+  z-index: -1;
+}
+.chip:hover {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+.chip[aria-pressed="true"] {
+  color: var(--reverse);
+  border-color: var(--ink);
+}
+.chip[aria-pressed="true"]::before {
+  transform: scaleX(1);
+}
+
+/* リンク下線のスイープ */
+.swipe {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding-bottom: 7px;
+}
+.swipe::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: var(--ink);
+  transform: scaleX(1);
+  transform-origin: right;
+  transition: transform var(--t-mid) var(--e-io);
+}
+.swipe:hover::after {
+  transform: scaleX(0);
+}
+.swipe .ico {
+  transition: transform var(--t-mid) var(--e-out);
+}
+.swipe:hover .ico {
+  transform: translateX(6px);
+}
+
+/* チェックボックス — チェックを描画するアニメーション */
+.check {
+  display: inline-flex;
+  cursor: pointer;
+  position: relative;
+}
+.check input {
+  position: absolute;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  cursor: pointer;
+}
+.check__box {
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-xs);
+  display: grid;
+  place-items: center;
+  transition: background var(--t-fast) var(--e-out),
+    border-color var(--t-fast) var(--e-out),
+    transform var(--t-fast) var(--e-out);
+}
+.check:hover .check__box {
+  border-color: var(--ink);
+}
+.check input:focus-visible + .check__box {
+  outline: 1px solid var(--ink);
+  outline-offset: 2px;
+}
+.check__box svg {
+  width: 13px;
+  height: 13px;
+  stroke: var(--sand);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+}
+.check__box svg path {
+  stroke-dasharray: 22;
+  stroke-dashoffset: 22;
+  transition: stroke-dashoffset 0.42s var(--e-out) 0.06s;
+}
+.check input:checked + .check__box {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+.check input:checked + .check__box svg path {
+  stroke-dashoffset: 0;
+}
+.check input:active + .check__box {
+  transform: scale(0.9);
+}
+
+/* ══════════════════════════════════════════════════════════
+   EVENT SHEET — 右から出る詳細／編集シート
+   ══════════════════════════════════════════════════════════ */
+.sheet-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(49, 49, 49, 0.4);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--t-mid) var(--e-out);
+  z-index: 940;
+}
+.sheet-overlay.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+.sheet {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(460px, 100vw);
+  background: var(--sand-lt);
+  border-left: 1px solid var(--line-soft);
+  transform: translateX(101%);
+  transition: transform var(--t-mid) var(--e-out);
+  z-index: 950;
+  display: flex;
+  flex-direction: column;
+  overscroll-behavior: contain;
+}
+.sheet.is-open {
+  transform: none;
+}
+.sheet__head {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: var(--s3);
+  border-bottom: 1px solid var(--line-soft);
+}
+.sheet__head .eyebrow {
+  flex: 1;
+}
+.sheet__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--s3);
+}
+.sheet__foot {
+  display: flex;
+  gap: 10px;
+  padding: var(--s3);
+  border-top: 1px solid var(--line-soft);
+  background: var(--sand);
+}
+.sheet__foot .grow {
+  flex: 1;
+}
+.sheet__img {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  border-radius: var(--r-md);
+  margin-bottom: var(--s3);
+}
+
+.fgrid {
+  display: grid;
+  gap: var(--s3);
+}
+.fgrid--2 {
+  grid-template-columns: 1fr 1fr;
+}
+.field2 label {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  margin-bottom: 7px;
+}
+.field2 .inp,
+.field2 select,
+.field2 textarea {
+  width: 100%;
+  padding: 10px 12px;
+  font-family: var(--sans);
+  font-size: 14px;
+  letter-spacing: 0.4px;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-sm);
+  outline: none;
+  transition: border-color var(--t-fast) var(--e-out);
+}
+.field2 textarea {
+  min-height: 84px;
+  resize: vertical;
+  line-height: 1.6;
+}
+.field2 .inp:focus,
+.field2 select:focus,
+.field2 textarea:focus {
+  border-color: var(--ink);
+}
+.field2 .inp[aria-invalid="true"] {
+  border-color: var(--c-food);
+}
+.fhint {
+  font-size: 11.5px;
+  letter-spacing: 0.3px;
+  color: var(--ink-2);
+  margin-top: 6px;
+}
+.ferror {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  letter-spacing: 0.3px;
+  color: var(--c-food);
+  background: var(--c-food-bg);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+}
+.switch {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+}
+.switch span {
+  font-size: 13px;
+  letter-spacing: 0.4px;
+}
+.catpick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.catpick button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 14px;
+  font-size: 12px;
+  letter-spacing: 0.6px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--ink-2);
+  transition: all var(--t-fast) var(--e-out);
+}
+.catpick button:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+.catpick button[aria-pressed="true"] {
+  background: var(--bg);
+  border-color: var(--bar);
+  color: var(--tx);
+}
+.catpick button[aria-pressed="true"] .ico {
+  color: var(--bar);
+}
+
+.ev.is-editable {
+  cursor: pointer;
+}
+.ev.is-editable::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px dashed transparent;
+  border-radius: inherit;
+  transition: border-color var(--t-fast) var(--e-out);
+}
+.ev.is-editable:hover::after {
+  border-color: currentColor;
+}
+
+/* ── ツールバーボタン ── */
+.tbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  font-size: 11px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--ink-2);
+  transition: color var(--t-fast) var(--e-out),
+    border-color var(--t-fast) var(--e-out),
+    background var(--t-fast) var(--e-out);
+}
+.tbtn:hover {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+.tbtn[aria-pressed="true"] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--sand);
+}
+.tbtn--danger:hover {
+  color: var(--c-food);
+  border-color: var(--c-food);
+}
+
+/* ── 行アクションボタン ── */
+.rowbtn {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--ink-2);
+  transition: background var(--t-fast) var(--e-out),
+    color var(--t-fast) var(--e-out);
+}
+.rowbtn:hover {
+  background: var(--sand);
+  color: var(--ink);
+}
+.rowbtn:disabled {
+  opacity: 0.25;
+  pointer-events: none;
+}
+.rowbtn--del:hover {
+  background: var(--c-food-bg);
+  color: var(--c-food);
+}
+.rowbtn--confirm {
+  width: auto;
+  padding: 0 12px;
+  font-size: 10px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  background: var(--c-food);
+  color: var(--sand-lt);
+}
+.rowbtn--confirm:hover {
+  background: var(--c-food-tx);
+  color: var(--sand-lt);
+}
+
+/* ── 入力欄 ── */
+.inp {
+  width: 100%;
+  padding: 7px 10px;
+  font-family: inherit;
+  font-size: 14px;
+  letter-spacing: 0.5px;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-xs);
+  outline: none;
+  transition: border-color var(--t-fast) var(--e-out);
+}
+.inp:focus {
+  border-color: var(--ink);
+}
+.inp--note {
+  margin-top: 5px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.inp--group {
+  font-family: var(--serif);
+  font-size: 18px;
+  font-weight: 300;
+  max-width: 320px;
+}
