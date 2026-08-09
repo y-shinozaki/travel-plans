@@ -203,6 +203,28 @@ export function createSync({
   }
 
   /**
+   * 未公開の変更があるか。
+   *
+   * decideSync の source では代用できない。use-local は「リモートが base より
+   * 進んでいない」であって「手元に編集がある」ではない ── 一度も編集せず
+   * ページを 2 回開いただけの端末が use-local になる（1 回目の use-remote で
+   * storeAdopted が下書きと base を書くため）。source で判断すると、
+   * その端末の公開ボタンが永久に「未公開の変更あり」を出し続ける。
+   *
+   * 時刻の大小ではなく一致で見る。base には storeAdopted が stampOf(data) を
+   * そのまま入れるので、揃っている端末では必ず同じ文字列になり、時計の話が
+   * 一切入らない。updatedAt を持たないデータ（どちらも null）も、それで
+   * 正しく「揃っている」と出る。
+   *
+   * 下書きが無ければ false。公開するものが無い。
+   */
+  function hasUnpublishedChanges() {
+    const draft = store.read(DRAFT_KEY, null);
+    if (!isPlainObject(draft)) return false;
+    return stampOf(draft) !== store.read(BASE_KEY, null);
+  }
+
+  /**
    * 下書きを保存する。updatedAt を現在時刻に進めるのは、次回の load() で
    * 「未公開の変更がある」と判断できるようにするため。
    *
@@ -314,5 +336,5 @@ export function createSync({
     return { commitUrl, conflictChecked };
   }
 
-  return { load, saveLocal, adoptRemote, publish };
+  return { load, saveLocal, adoptRemote, publish, hasUnpublishedChanges };
 }

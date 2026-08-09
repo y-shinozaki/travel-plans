@@ -76,7 +76,7 @@ const els = {
 
 /**
  * 公開の導線。旅程を読み終えるまで作れない（公開するものが無い）ので、
- * main() の後半で入る。保存のたびに markDirty() を呼ぶ必要があるが、
+ * main() の後半で入る。保存のたびに refreshDirty() を呼ぶ必要があるが、
  * editor は load() より前に組み立てるため、参照は後から差し込む。
  */
 let publishUI = null;
@@ -280,9 +280,10 @@ async function main() {
     // 例外にすると editor が「保存に失敗しました」と嘘をつく）。
     commit: (next) => {
       setData(sync.saveLocal(next));
-      // 保存できた時点で「未公開の変更」が生まれる。saveLocal が投げたら
-      // ここには来ない（保存できていないのに公開を促さない）
-      publishUI?.markDirty();
+      // 保存できた時点で「未公開の変更」が生まれる。有無の判断は publish-ui が
+      // ストアに聞き直すので、ここでは「動いた」ことだけ伝える。
+      // saveLocal が投げたらここには来ない（保存できていないのに公開を促さない）
+      publishUI?.refreshDirty();
       safeDraw("予定の保存");
     },
     fallbackFocus: els.evAdd,

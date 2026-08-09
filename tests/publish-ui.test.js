@@ -94,6 +94,16 @@ const findButton = (node, label) => buttonsIn(node).find((b) => textOf(b).includ
 function fire(node, type = "click") {
   assert.ok(node, "存在しない要素をクリックしようとしています");
   if (node.disabled) return;
+  dispatch(node, type);
+}
+
+/**
+ * disabled を無視してハンドラを直接呼ぶ。
+ * 実装側の多重実行ガードを試すときだけ使う ── fire() で 2 回押しても
+ * ハーネスの disabled 判定で止まるので、ガードを通っていないのに
+ * 「通った」と読めるテストになってしまう。
+ */
+function dispatch(node, type = "click") {
   for (const fn of node.listeners[type] ?? []) fn();
 }
 
@@ -228,6 +238,7 @@ function mount({
     ui,
     els,
     store,
+    sync,
     fetchImpl,
     adopted,
     raw: (k) => be._dump()[k],
@@ -321,6 +332,18 @@ test("保存済みのトークンを持って開いた画面にも、トーク�
   assert.equal(h.tokenField().value, "");
   assert.equal(h.dom().includes(TOKEN), false, "設定パネルにトークンが出ています");
   assert.equal(h.dom().includes(TOKEN.slice(0, 8)), false);
+});
+
+test("保存せずにパネルを閉じても、打ちかけの値は残らない", () => {
+  const h = mount();
+  const settings = findButton(h.els.controls, "公開用トークンを設定");
+  fire(settings);
+  h.tokenField().value = TOKEN;
+
+  fire(settings); // 保存せずに閉じる
+  assert.equal(h.els.panel.hidden, true);
+  assert.equal(h.tokenField().value, "", "閉じても打ちかけの値が残っています");
+  assert.equal(h.dom().includes(TOKEN), false);
 });
 
 test("空のまま保存を押しても、設定済みのトークンを消さない", () => {
@@ -460,6 +483,9 @@ test("保存領域に書けない端末の 409 には、取り込みボタンを
 });
 
 test("取り込んだあと画面の更新に失敗しても「取り込めなかった」とは言わない", async () => {
+  // 画面の更新の成否は schedule.js の safeDraw が自分の文言で伝える。
+  // ここが独自に文言を出すと、実運用（safeDraw は例外を飲む）では届かず、
+  // 届く場合は 2 つの文言が矛盾する
   const remote = plan("2026-08-09T11:30:00.000Z", [ev({ title: "リモートの昼食" })]);
   const be = memoryBackend({
     [DRAFT_KEY]: JSON.stringify(plan("2026-08-09T11:00:00.000Z")),
@@ -496,13 +522,21 @@ test("取り込んだあと画面の更新に失敗しても「取り込めな�
   // 下書きはもう入れ替わっている。「取り込めませんでした」は嘘になる
   assert.deepEqual(JSON.parse(be._dump()[DRAFT_KEY]), remote);
   assert.equal(textOf(els.status).includes(MESSAGES.adoptFailed), false);
-  assert.equal(textOf(els.status).includes(MESSAGES.adoptedNotDrawn), true);
+  assert.equal(textOf(els.status).includes(MESSAGES.adopted), true);
+  // 黙って消さない。unhandled rejection にもしない
+  assert.equal(LOGS.join("\n").includes("描き直せません"), true);
 });
 
 test("PUT のあとに保存できなかったときは「公開はできた」と伝える", async () => {
   // sync.publish は PUT の成功後にしか store へ書かない。
   // ここで StoreWriteError が来たということは、公開自体は済んでいる
-  const map = new Map(Object.entries({ "tp:gh-token": TOKEN, ...SYNCED }));
+  const map = new Map(
+    Object.entries({
+      "tp:gh-token": TOKEN,
+      [DRAFT_KEY]: JSON.stringify(plan("2026-08-09T11:00:00.000Z")),
+      ...SYNCED,
+    })
+  );
   const backend = {
     getItem: (k) => (map.has(k) ? map.get(k) : null),
     setItem: (k) => {
@@ -513,13 +547,65 @@ test("PUT のあとに保存できなかったときは「公開はできた」�
     _dump: () => Object.fromEntries(map),
   };
   const h = mount({ backend, handler: github() });
-  h.ui.markDirty();
+  assert.equal(h.ui.isDirty(), true, "前提: 未公開の変更がある状態");
+
   await click(findButton(h.els.controls, "公開"));
 
   assert.equal(h.fetchImpl.calls.at(-1).method, "PUT", "PUT まで進んでいません");
   assert.equal(h.statusText().includes(MESSAGES.publishedNotRecorded), true);
   assert.equal(h.statusText().includes(MESSAGES.cannotPersist), true);
-  assert.equal(h.ui.isDirty(), false, "公開できたのに未公開の変更が残っています");
+  // ボタンは「未公開の変更あり」のまま。控えを書けていないので、この端末の
+  // ストアから見れば実際にまだ揃っていない。UI が独自に下ろすと、
+  // ストアの言い分と画面が食い違う（説明は文言のほうが受け持つ）
+  assert.equal(h.ui.isDirty(), true);
+});
+
+test("バーを無視して公開して 409 になっても、取り込みボタンは 1 つだけ", async () => {
+  const h = mount({
+    source: "remote-is-newer",
+    token: TOKEN,
+    initial: { [DRAFT_KEY]: JSON.stringify(plan("2026-08-09T11:00:00.000Z")), ...SYNCED },
+    handler: github({ remote: plan("2026-08-09T11:30:00.000Z") }),
+  });
+  assert.equal(findButton(h.els.bar, "取り込む") !== null, true, "前提: バーが出ている");
+
+  await click(findButton(h.els.controls, "公開"));
+
+  const adoptButtons = [...buttonsIn(h.els.bar), ...buttonsIn(h.els.status)].filter((b) =>
+    textOf(b).includes("取り込む")
+  );
+  assert.equal(adoptButtons.length, 1, "取り込みボタンが 2 つ出ています");
+  // 残すのは失敗の理由の隣。バーの案内はこの失敗に追い越されている
+  assert.equal(h.els.bar.hidden, true);
+  assert.equal(findButton(h.els.status, "取り込む") !== null, true);
+});
+
+test("conflictChecked が返らなくなったら、警告は消えるのではなく出る", async () => {
+  // === false で見ていると、この項目が将来落ちたときに「突き合わせを省いた」
+  // 警告が黙って出なくなる。フェイルオープンではなくフェイルクローズドに
+  const els = {
+    controls: makeNode("div"),
+    panel: makeNode("div"),
+    status: makeNode("div"),
+    bar: makeNode("div"),
+  };
+  els.panel.id = "pub-panel";
+  const store = createStore(memoryBackend({ "tp:gh-token": TOKEN }));
+  const ui = createPublishUI({
+    els,
+    store,
+    sync: {
+      publish: async () => ({ commitUrl: COMMIT_URL }), // conflictChecked が無い
+      adoptRemote: async () => plan(REMOTE_STAMP),
+      hasUnpublishedChanges: () => false,
+    },
+    getData: () => plan(REMOTE_STAMP),
+    onAdopt: () => {},
+  });
+  ui.start("use-remote");
+
+  await click(findButton(els.controls, "公開"));
+  assert.equal(textOf(els.status).includes(MESSAGES.conflictCheckSkipped), true);
 });
 
 test("401 は GitHubError の文言をそのまま出す", async () => {
@@ -554,11 +640,52 @@ test("公開の最中は公開ボタンを押せない（二重送信を止め�
   assert.equal(button.disabled, true, "公開中にボタンが押せます");
   assert.equal(textOf(button).includes("公開中"), true);
 
-  await click(button); // disabled なので実 DOM では何も起きない
+  // disabled 越しではなくハンドラを直接呼ぶ。実装側の `if (busy) return` を
+  // 実際に通す（ハーネスの disabled 判定で止めると、ガードが無くても通る）
+  dispatch(button);
+  dispatch(button);
+  await settle();
+  assert.equal(
+    h.fetchImpl.calls.length,
+    1,
+    "busy ガードを抜けて 2 本目の公開が始まっています"
+  );
+
   release();
   await settle();
   assert.equal(h.fetchImpl.calls.filter((c) => c.method === "PUT").length, 1);
   assert.equal(button.disabled, false);
+});
+
+test("取り込みの最中は公開ボタンを「公開中…」にしない", async () => {
+  let release;
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  const remote = plan("2026-08-09T11:30:00.000Z");
+  const h = mount({
+    source: "remote-is-newer",
+    token: TOKEN,
+    initial: { [DRAFT_KEY]: JSON.stringify(plan("2026-08-09T11:00:00.000Z")), ...SYNCED },
+    handler: async () => {
+      await gate;
+      return jsonResponse(200, remote);
+    },
+  });
+
+  const adopt = findButton(h.els.bar, "取り込む");
+  await click(adopt); // 身構える
+  await click(adopt); // 実行（gate で止まる）
+
+  const publish = findButton(h.els.controls, "公開");
+  assert.equal(publish.disabled, true, "取り込み中に公開できます");
+  assert.equal(textOf(publish).includes("公開中"), false, "走っていない処理を名乗っています");
+  // バーのボタンも止める。押しても何も起きないボタンを残さない
+  assert.equal(adopt.disabled, true, "取り込み中もバーのボタンが押せます");
+
+  release();
+  await settle();
+  assert.equal(h.els.bar.hidden, true);
 });
 
 /* ══════════════════════════════════════════════════════════
@@ -573,21 +700,90 @@ test("use-remote では何も出さない", () => {
   assert.equal(textOf(findButton(h.els.controls, "公開")), "公開");
 });
 
-test("use-local では公開ボタンに未公開の変更があることを出す", () => {
-  const h = mount({ source: "use-local", token: TOKEN });
-  assert.equal(h.els.bar.hidden, true);
+/* 「未公開の変更あり」は source ではなくストアの中身で決まる。
+   source を使うと、一度も編集せずページを 2 回開いただけの端末
+   （1 回目の use-remote が下書きと base を書くので 2 回目は use-local）が
+   永久に「未公開の変更あり」を出し、指標として何も言わなくなる。 */
+
+test("下書きと base が揃っていれば、use-local でも未公開の変更は出さない", () => {
+  // ページを 2 回開いただけの端末。storeAdopted が書いた下書きと base は
+  // 同じ時刻を指している
+  const h = mount({
+    source: "use-local",
+    token: TOKEN,
+    initial: {
+      [DRAFT_KEY]: JSON.stringify(plan(REMOTE_STAMP)),
+      [BASE_KEY]: JSON.stringify(REMOTE_STAMP),
+    },
+  });
+  assert.equal(h.ui.isDirty(), false, "編集していない端末に未公開の変更が出ています");
+  assert.equal(textOf(findButton(h.els.controls, "公開")), "公開");
+});
+
+test("下書きが base より進んでいれば、未公開の変更として出す", () => {
+  const h = mount({
+    source: "use-local",
+    token: TOKEN,
+    initial: {
+      [DRAFT_KEY]: JSON.stringify(plan("2026-08-09T11:00:00.000Z")),
+      [BASE_KEY]: JSON.stringify(REMOTE_STAMP),
+    },
+  });
   assert.equal(h.ui.isDirty(), true);
   assert.equal(textOf(findButton(h.els.controls, "公開")).includes("未公開の変更あり"), true);
 });
 
+test("offline でも未公開の変更の有無は出せる（リモートを見ずに分かる）", () => {
+  const synced = mount({
+    source: "offline",
+    token: TOKEN,
+    initial: {
+      [DRAFT_KEY]: JSON.stringify(plan(REMOTE_STAMP)),
+      [BASE_KEY]: JSON.stringify(REMOTE_STAMP),
+    },
+  });
+  assert.equal(synced.ui.isDirty(), false);
+
+  const edited = mount({
+    source: "offline",
+    token: TOKEN,
+    initial: {
+      [DRAFT_KEY]: JSON.stringify(plan("2026-08-09T11:00:00.000Z")),
+      [BASE_KEY]: JSON.stringify(REMOTE_STAMP),
+    },
+  });
+  assert.equal(edited.ui.isDirty(), true);
+});
+
+test("下書きが無ければ未公開の変更も無い", () => {
+  const h = mount({ source: "use-remote", token: TOKEN, initial: {} });
+  assert.equal(h.ui.isDirty(), false);
+});
+
 test("保存すると公開ボタンの文言が変わる", () => {
-  const h = mount({ source: "use-remote", token: TOKEN });
-  h.ui.markDirty();
+  const h = mount({
+    source: "use-remote",
+    token: TOKEN,
+    initial: {
+      [DRAFT_KEY]: JSON.stringify(plan(REMOTE_STAMP)),
+      [BASE_KEY]: JSON.stringify(REMOTE_STAMP),
+    },
+  });
+  assert.equal(h.ui.isDirty(), false);
+
+  // 実際に保存する（下書きの updatedAt が進む）。UI 側のフラグは触らない
+  h.sync.saveLocal(plan("2020-01-01T00:00:00.000Z"));
+  h.ui.refreshDirty();
+
   assert.equal(textOf(findButton(h.els.controls, "公開")).includes("未公開の変更あり"), true);
 });
 
 test("remote-is-newer ではバーを出して選ばせる。黙って取り込まない", async () => {
-  const h = mount({ source: "remote-is-newer", token: TOKEN });
+  const h = mount({
+    source: "remote-is-newer",
+    token: TOKEN,
+    initial: { [DRAFT_KEY]: JSON.stringify(plan("2026-08-09T11:00:00.000Z")), ...SYNCED },
+  });
 
   assert.equal(h.els.bar.hidden, false);
   assert.equal(h.barText().includes("別の端末で新しい旅程が公開されています"), true);
@@ -623,6 +819,12 @@ test("バーの取り込みも 2 度押し。1 度目では下書きを消さな
   assert.deepEqual(JSON.parse(h.raw(DRAFT_KEY)), remote);
   assert.equal(h.els.bar.hidden, true, "取り込んだのにバーが残っています");
   assert.equal(h.ui.isDirty(), false);
+  // 押したボタンは文書から消えている。戻し先が無いとフォーカスは <body> へ落ちる
+  assert.equal(
+    h.els.controls.children[0].focused,
+    1,
+    "取り込んだあとフォーカスの戻し先がありません"
+  );
 });
 
 test("「自分の変更を残す」は何も取り込まず、次の公開で起きることを伝える", async () => {
@@ -672,8 +874,6 @@ test("offline は確認できなかったことだけ伝え、機能を落とさ
   const publish = findButton(h.els.controls, "公開");
   assert.equal(publish.disabled, false, "オフラインで公開ボタンが無効になっています");
   assert.equal(findButton(h.els.controls, "トークン設定") !== null, true);
-  // 確かめようがないものを「未公開の変更あり」とは言わない
-  assert.equal(h.ui.isDirty(), false);
 
   fire(findButton(h.els.bar, "閉じる"));
   assert.equal(h.els.bar.hidden, true);

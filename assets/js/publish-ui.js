@@ -70,9 +70,12 @@ export const MESSAGES = {
   keptLocal:
     "手元の変更を残しました。このまま公開すると" +
     "「リモートが更新されています」と表示されます（先に取り込みが必要です）",
-  adopted: "取り込みました。表示を最新の内容に更新しました",
-  adoptedNotDrawn:
-    "取り込みは済みましたが、画面の更新に失敗しました。ページを再読み込みしてください",
+  /**
+   * 「表示も更新しました」とは言わない。描き直しに失敗した場合は
+   * schedule.js の safeDraw が自分の文言で伝えるので、ここで先に
+   * 「更新しました」と言うと画面上で 2 つの文言が矛盾する。
+   */
+  adopted: "リモートの内容を取り込みました",
   adoptFailed: "取り込めませんでした。",
   publishFailed: "公開できませんでした。",
   tokenSaved: "トークンを保存しました",
@@ -155,10 +158,20 @@ function armedButton({ cls, armedCls, iconId, label, armedLabel, onConfirm }) {
  * @param {(data:object) => void} deps.onAdopt 取り込んだデータで画面を描き直す
  */
 export function createPublishUI({ els, store, sync, getData, onAdopt }) {
-  /** 未公開の変更があるか。分からないときは false（嘘の警告を出さない）。 */
+  /**
+   * 未公開の変更があるか。持っているのは表示用の控えで、正は常にストア
+   * （sync.hasUnpublishedChanges）。source から導かないこと ── use-local は
+   * 「リモートが進んでいない」であって「編集がある」ではない。
+   */
   let dirty = false;
-  /** 公開・取り込みの最中。二重送信を止めるためだけに持つ。 */
-  let busy = false;
+  /**
+   * 実行中の操作: null / "publish" / "adopt"。
+   * 真偽値ではなく種類で持つ ── 取り込みの最中に公開ボタンが
+   * 「公開中…」になっていると、何が走っているのかが嘘になる。
+   */
+  let busy = null;
+  /** 画面上部のバーに今出ているボタン。busy の間だけ止めるために持つ。 */
+  const barButtons = [];
 
   /* ── 状態表示（ツールバーの下） ─────────────────────── */
 
@@ -190,8 +203,17 @@ export function createPublishUI({ els, store, sync, getData, onAdopt }) {
   const publish = labelledButton("tbtn tbtn--pub", "i-check", PUBLISH_LABEL);
   const settings = labelledButton("tbtn", "i-lock", "トークン設定");
 
+  /**
+   * クリックから非同期処理を始める。投げっぱなしにすると、想定外の失敗が
+   * unhandled rejection として消える。握り潰さず console に残す
+   * （利用者向けの説明は doPublish / doAdopt が状態表示に出す）。
+   */
+  function launch(work, label) {
+    work().catch((error) => console.error(label, error));
+  }
+
   publish.button.addEventListener("click", () => {
-    void doPublish();
+    launch(doPublish, "publish-ui: 公開の処理が中断しました");
   });
   settings.button.addEventListener("click", () => setPanelOpen(els.panel.hidden));
   settings.button.setAttribute("aria-expanded", "false");
@@ -204,12 +226,11 @@ export function createPublishUI({ els, store, sync, getData, onAdopt }) {
   function renderControls() {
     const withToken = hasToken(store);
     settings.span.textContent = withToken ? "トークン設定" : "公開用トークンを設定";
-    publish.span.textContent = busy
-      ? PUBLISH_BUSY_LABEL
-      : dirty
-        ? PUBLISH_DIRTY_LABEL
-        : PUBLISH_LABEL;
-    publish.button.disabled = busy;
+    publish.span.textContent =
+      busy === "publish" ? PUBLISH_BUSY_LABEL : dirty ? PUBLISH_DIRTY_LABEL : PUBLISH_LABEL;
+    // 取り込みの最中も押させない（下書きが入れ替わる最中に公開したら
+    // どちらを公開したのか誰にも分からない）が、文言は変えない
+    publish.button.disabled = busy !== null;
     publish.button.className = dirty ? "tbtn tbtn--pub tbtn--dirty" : "tbtn tbtn--pub";
     els.controls.replaceChildren(
       ...(withToken ? [publish.button, settings.button] : [settings.button])
@@ -222,8 +243,19 @@ export function createPublishUI({ els, store, sync, getData, onAdopt }) {
     renderControls();
   }
 
-  function setBusy(next) {
-    busy = next;
+  /**
+   * 未公開の変更があるかをストアに聞き直す。判断を自前で持たないので、
+   * 保存・公開・取り込みのどれで状態が動いても呼ぶだけでよい。
+   */
+  const refreshDirty = () => setDirty(sync.hasUnpublishedChanges());
+
+  /**
+   * 実行中の操作を切り替える。バーのボタンも一緒に止める ── 残しておくと
+   * 「押したのに何も起きない」（doAdopt が busy で return する）になる。
+   */
+  function setBusy(kind) {
+    busy = kind;
+    for (const button of barButtons) button.disabled = kind !== null;
     renderControls();
   }
 
@@ -323,7 +355,11 @@ export function createPublishUI({ els, store, sync, getData, onAdopt }) {
       setPanelNote(null);
       updatePanel();
       tokenInput.focus();
+      return;
     }
+    // 閉じるときも空にする。保存済みのトークンではなく打ちかけの文字列だが、
+    // 「この欄にトークンが載っているのは打っている最中だけ」を無条件にしておく
+    tokenInput.value = "";
   }
 
   /* ── 公開 ────────────────────────────────────────────── */
@@ -340,8 +376,9 @@ export function createPublishUI({ els, store, sync, getData, onAdopt }) {
     console.error("publish-ui: 公開に失敗しました", error);
 
     if (error instanceof StoreWriteError) {
-      // 公開自体は済んでいるので、未公開の変更は無い
-      setDirty(false);
+      // PUT は通っている。ただし控えを書けていないので、ストアから見れば
+      // まだ「未公開の変更あり」のまま ── dirty は勝手に下ろさず聞き直す。
+      // 状況は文言で説明する
       setStatus([line(MESSAGES.publishedNotRecorded), line(MESSAGES.cannotPersist)], "warn");
       return;
     }
@@ -351,6 +388,10 @@ export function createPublishUI({ els, store, sync, getData, onAdopt }) {
         setStatus([line(MESSAGES.conflictUnverifiable), line(MESSAGES.cannotPersist)], "error");
         return;
       }
+      // 起動時のバーが出たまま公開して 409 になると、取り込みボタンが
+      // 2 つ並ぶ。バーの案内はこの失敗に追い越されているので引っ込め、
+      // 取り込みの入口を「今出ている理由の隣」1 か所にする
+      hideBar();
       setStatus([line(error.message), adoptRow()], "error");
       return;
     }
@@ -377,20 +418,23 @@ export function createPublishUI({ els, store, sync, getData, onAdopt }) {
       return;
     }
 
-    setBusy(true);
+    setBusy("publish");
     setStatus([line("公開しています…")], "ok");
     try {
       const { commitUrl, conflictChecked } = await sync.publish(data);
-      setDirty(false);
+      // === false ではなく !== true。将来この項目が返らなくなったときに
+      // 警告が黙って消えるより、余分に出るほうがまだよい
+      const skipped = conflictChecked !== true;
       const nodes = [line(MESSAGES.published)];
-      if (conflictChecked === false) nodes.push(line(MESSAGES.conflictCheckSkipped));
+      if (skipped) nodes.push(line(MESSAGES.conflictCheckSkipped));
       const link = commitLink(commitUrl);
       if (link) nodes.push(link);
-      setStatus(nodes, conflictChecked === false ? "warn" : "ok");
+      setStatus(nodes, skipped ? "warn" : "ok");
     } catch (error) {
       showPublishFailure(error);
     } finally {
-      setBusy(false);
+      setBusy(null);
+      refreshDirty();
     }
   }
 
@@ -406,7 +450,7 @@ export function createPublishUI({ els, store, sync, getData, onAdopt }) {
         iconId: "i-arrow-right",
         label: ADOPT_LABEL,
         armedLabel: ADOPT_ARMED_LABEL,
-        onConfirm: () => void doAdopt(),
+        onConfirm: () => launch(doAdopt, "publish-ui: 取り込みの処理が中断しました"),
       }).button
     );
     return row;
@@ -418,7 +462,7 @@ export function createPublishUI({ els, store, sync, getData, onAdopt }) {
    */
   async function doAdopt() {
     if (busy) return;
-    setBusy(true);
+    setBusy("adopt");
     setStatus([line("取り込んでいます…")], "ok");
 
     let data;
@@ -432,23 +476,28 @@ export function createPublishUI({ els, store, sync, getData, onAdopt }) {
       );
       return;
     } finally {
-      setBusy(false);
+      setBusy(null);
+      refreshDirty();
     }
 
     // ここから先は取り込み済み。描き直しに失敗しても「取り込めませんでした」とは
-    // 言わない（下書きはもう入れ替わっているので、それは嘘になる）
+    // 言わない（下書きはもう入れ替わっているので、それは嘘になる）。
+    // 画面の更新の成否は schedule.js の safeDraw が自分の文言で伝える
     hideBar();
-    setDirty(false);
     setStatus([line(MESSAGES.adopted)], "ok");
-    try {
-      onAdopt(data);
-    } catch (error) {
-      console.error("publish-ui: 取り込んだあとの再描画に失敗しました", error);
-      setStatus(
-        [line(MESSAGES.adoptedNotDrawn), line(error?.message ?? String(error), true)],
-        "warn"
-      );
-    }
+    // 押したボタンは hideBar / setStatus で文書から消えている。
+    // 戻し先を用意しないとフォーカスが <body> へ落ちる
+    focusFallback();
+    onAdopt(data);
+  }
+
+  /**
+   * 消えたボタンからフォーカスを逃がす先。ツールバーの先頭（トークンの有無に
+   * よらず必ず 1 つはある）へ戻す。event-editor の fallbackFocus と同じ考え方。
+   */
+  function focusFallback() {
+    const target = els.controls.children[0];
+    if (target && typeof target.focus === "function") target.focus();
   }
 
   /* ── 画面上部のバー ──────────────────────────────────── */
@@ -456,12 +505,17 @@ export function createPublishUI({ els, store, sync, getData, onAdopt }) {
   function hideBar() {
     els.bar.replaceChildren();
     els.bar.hidden = true;
+    barButtons.length = 0;
   }
 
   function showBar(message, tone, buttons) {
     els.bar.className = `syncbar syncbar--${tone}`;
     els.bar.replaceChildren(el("p", "syncbar__msg", message));
-    for (const button of buttons) els.bar.appendChild(button);
+    barButtons.length = 0;
+    for (const button of buttons) {
+      els.bar.appendChild(button);
+      barButtons.push(button);
+    }
     els.bar.hidden = false;
   }
 
@@ -470,25 +524,28 @@ export function createPublishUI({ els, store, sync, getData, onAdopt }) {
    *
    * - remote-is-newer: 取り込むか手元を残すかを選ばせる。黙って上書きしない
    * - offline: 確認できなかったことだけ伝える。機能は 1 つも落とさない
-   * - use-local: 未公開の変更がある。ボタンの文言だけで伝える（バーは出さない）
-   * - use-remote: 揃っている。何も出さない
+   * - use-local / use-remote: バーは出さない
+   *
+   * 未公開の変更の有無は source から導かない。use-local は「リモートが
+   * 進んでいない」であって編集の有無ではなく、一度も編集していない端末でも
+   * 2 回目の読み込みから use-local になる。ストアに聞けば、リモートを
+   * 見ていない offline でも同じ精度で答えが出る。
    */
   function start(source) {
-    renderControls();
     buildPanel();
     setPanelOpen(false);
     clearStatus();
+    refreshDirty();
+    renderControls();
 
     if (source === "remote-is-newer") {
-      dirty = true;
-      renderControls();
       const adopt = armedButton({
         cls: "tbtn",
         armedCls: "tbtn tbtn--armed",
         iconId: "i-arrow-right",
         label: ADOPT_LABEL,
         armedLabel: ADOPT_ARMED_LABEL,
-        onConfirm: () => void doAdopt(),
+        onConfirm: () => launch(doAdopt, "publish-ui: 取り込みの処理が中断しました"),
       }).button;
       const keep = labelledButton("tbtn", "i-x", "自分の変更を残す").button;
       keep.addEventListener("click", () => {
@@ -499,16 +556,7 @@ export function createPublishUI({ els, store, sync, getData, onAdopt }) {
       return;
     }
 
-    if (source === "use-local") {
-      dirty = true;
-      renderControls();
-      hideBar();
-      return;
-    }
-
     if (source === "offline") {
-      // 未公開の変更があるかは確かめようがない。分からないものを
-      // 「あります」とは出さない（dirty は触らない）
       const close = labelledButton("tbtn", "i-x", "閉じる").button;
       close.addEventListener("click", hideBar);
       showBar(MESSAGES.offline, "info", [close]);
@@ -520,8 +568,11 @@ export function createPublishUI({ els, store, sync, getData, onAdopt }) {
 
   return {
     start,
-    /** 予定を保存したときに呼ぶ。未公開の変更があることをボタンに出す。 */
-    markDirty: () => setDirty(true),
+    /**
+     * 予定を保存したあとに呼ぶ。値は渡さない ── 未公開の変更があるかは
+     * ストアが知っている。呼び出し側に判断を持たせると必ずずれる。
+     */
+    refreshDirty,
     isDirty: () => dirty,
   };
 }

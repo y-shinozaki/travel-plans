@@ -393,6 +393,77 @@ test("リモートが進んでいなければローカルを使う（source === 
   assert.deepEqual(out.data, draft);
 });
 
+// ------------------------------------------ sync: hasUnpublishedChanges
+
+test("ページを 2 回開いただけの端末に未公開の変更は無い", async () => {
+  // source では代用できないことの本体。1 回目の use-remote が下書きと base を
+  // 書くので、2 回目は編集していなくても use-local になる。それを「未公開の
+  // 変更あり」と読むと、公開ボタンが永久に警告を出し続ける
+  const remote = plan(REMOTE_STAMP);
+  const { sync } = setup({ handler: () => jsonResponse(200, remote) });
+
+  const first = await sync.load();
+  assert.equal(first.source, "use-remote");
+  assert.equal(sync.hasUnpublishedChanges(), false);
+
+  const second = await sync.load();
+  assert.equal(second.source, "use-local", "前提: 2 回目は use-local になる");
+  assert.equal(second.data.updatedAt, REMOTE_STAMP);
+  assert.equal(
+    sync.hasUnpublishedChanges(),
+    false,
+    "一度も編集していないのに未公開の変更があることになっています"
+  );
+});
+
+test("保存すると未公開の変更になり、公開すると消える", async () => {
+  const { sync, store } = setup({ initial: SYNCED, handler: github() });
+  store.write("events", plan(REMOTE_STAMP));
+  assert.equal(sync.hasUnpublishedChanges(), false);
+
+  sync.saveLocal(plan(REMOTE_STAMP, [ev({ title: "手元で直した昼食" })]));
+  assert.equal(sync.hasUnpublishedChanges(), true);
+
+  writeToken(store, "ghp_secret");
+  await sync.publish(plan(REMOTE_STAMP, [ev({ title: "手元で直した昼食" })]));
+  assert.equal(sync.hasUnpublishedChanges(), false, "公開したのに残っています");
+});
+
+test("取り込むと未公開の変更は消える", async () => {
+  const remote = plan("2026-08-09T12:30:00.000Z", [ev({ title: "リモートの昼食" })]);
+  const { sync } = setup({
+    initial: {
+      [DRAFT_KEY]: JSON.stringify(plan("2026-08-09T11:00:00.000Z")),
+      [BASE_KEY]: JSON.stringify(REMOTE_STAMP),
+    },
+    handler: () => jsonResponse(200, remote),
+  });
+  assert.equal(sync.hasUnpublishedChanges(), true);
+  await sync.adoptRemote();
+  assert.equal(sync.hasUnpublishedChanges(), false);
+});
+
+test("下書きが無ければ未公開の変更も無い", () => {
+  const { sync } = setup({ initial: SYNCED });
+  assert.equal(sync.hasUnpublishedChanges(), false);
+});
+
+test("base が無い下書きは未公開の変更として扱う", () => {
+  // 取り込んだ証拠がない ＝ 公開済みだと言い切れない。
+  // 判断できないほうへ倒すと「公開できるのにボタンが何も言わない」になる
+  const { sync } = setup({ initial: { [DRAFT_KEY]: JSON.stringify(plan(REMOTE_STAMP)) } });
+  assert.equal(sync.hasUnpublishedChanges(), true);
+});
+
+test("updatedAt を持たないリモートを取り込んだ端末も「揃っている」", () => {
+  // stampOf も base も null。時刻の大小で見ていると比較が成立しないが、
+  // 一致で見るので正しく「揃っている」になる
+  const { sync, store } = setup();
+  store.write("events", { days: DAYS, events: [ev()] });
+  store.write("events-base", null);
+  assert.equal(sync.hasUnpublishedChanges(), false);
+});
+
 // --------------------------------------------------------- sync: saveLocal
 
 test("saveLocal() は updatedAt を現在時刻に更新して保存する", () => {
