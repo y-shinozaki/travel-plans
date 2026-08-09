@@ -279,8 +279,18 @@ export function createSync({
 
     const remoteMs = toTime(remoteStamp);
     if (remoteMs === null) {
-      // 比べようがない。ここで止めると、リモートが壊れているときに
-      // ブラウザから直せなくなる（公開こそが復旧手段になる）ので通す
+      // 比べようがない。止めずに通すのは、ここへ来られる壊れ方に限っては
+      // 公開が復旧手段になるため ── validateEvents は updatedAt を見ないので、
+      // days / events は正しいのに updatedAt だけ無い（または壊れている）
+      // リモートはページとして普通に開き、公開ボタンも出る。その状態で公開すれば
+      // publish() が正しい updatedAt を押し直し、次回から突き合わせが復活する。
+      // ここで 409 にすると、その唯一の直し方まで塞いでしまう。
+      //
+      // 「リモートが壊れていれば何であれ公開で直せる」わけではない。
+      // days / events の側が壊れていると load() の validateEvents（:170）が投げ、
+      // schedule.js は publishUI を組み立てないまま終わる ── 公開ボタンも
+      // トークン設定も画面に無いので、その場合の復旧手段はリポジトリへの
+      // git コミットだけになる（設計書 §13 の繰り越し）。
       console.warn("sync: リモートの updatedAt が読めないため、公開前の突き合わせを省略します");
       return false;
     }
