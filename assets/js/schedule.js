@@ -11,6 +11,7 @@ import { icon } from "./icons.js";
 import { createStore } from "./store.js";
 import { createSync } from "./sync.js";
 import { createEventEditor } from "./event-editor.js";
+import { createPublishUI } from "./publish-ui.js";
 
 /** HTTP エラー・通信断。取りに行けなかった、という種類の失敗。 */
 class DataFetchError extends Error {
@@ -67,7 +68,18 @@ const els = {
   catFilters: document.getElementById("cat-filters"),
   evEditToggle: document.getElementById("ev-edit-toggle"),
   evAdd: document.getElementById("ev-add"),
+  pubControls: document.getElementById("pub-controls"),
+  pubPanel: document.getElementById("pub-panel"),
+  pubStatus: document.getElementById("pub-status"),
+  syncbar: document.getElementById("syncbar"),
 };
+
+/**
+ * 公開の導線。旅程を読み終えるまで作れない（公開するものが無い）ので、
+ * main() の後半で入る。保存のたびに markDirty() を呼ぶ必要があるが、
+ * editor は load() より前に組み立てるため、参照は後から差し込む。
+ */
+let publishUI = null;
 
 function draw() {
   renderCalendar({
@@ -268,6 +280,9 @@ async function main() {
     // 例外にすると editor が「保存に失敗しました」と嘘をつく）。
     commit: (next) => {
       setData(sync.saveLocal(next));
+      // 保存できた時点で「未公開の変更」が生まれる。saveLocal が投げたら
+      // ここには来ない（保存できていないのに公開を促さない）
+      publishUI?.markDirty();
       safeDraw("予定の保存");
     },
     fallbackFocus: els.evAdd,
@@ -314,6 +329,27 @@ async function main() {
 
   buildCategoryFilters();
   buildEditorToolbar(editor);
+
+  // 公開の導線。source（use-remote / remote-is-newer / offline …）に応じた
+  // 案内はここが出す。取り込みは画面のデータごと差し替わるので、
+  // setData と再描画をこちらから渡す。
+  publishUI = createPublishUI({
+    els: {
+      controls: els.pubControls,
+      panel: els.pubPanel,
+      status: els.pubStatus,
+      bar: els.syncbar,
+    },
+    store,
+    sync,
+    getData: () => state.data,
+    onAdopt: (data) => {
+      setData(data);
+      safeDraw("リモートの取り込み");
+    },
+  });
+  publishUI.start(loaded.source);
+
   draw();
 }
 

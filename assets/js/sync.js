@@ -21,9 +21,14 @@ const DRAFT_KEY = "events";
 /**
  * 最後に「リモートと揃えた」時刻。未公開の変更があるかの基準になる。
  *
- * 時刻はすべて公開した端末の時計で押される。端末間で時計が大きくずれていると
- * 判断もずれるが、比較するのは「同じ 1 つのリモート値」と「それを取り込んだ控え」
- * なので、ずれても順序関係は保たれる（設計どおり）。
+ * 時刻は公開した端末の時計で押される。押す端末が複数あるので、順序関係は
+ * 保たれない ── A の時計が 10 分遅れていれば、A があとから公開した版の
+ * updatedAt は B の版より古くなり、こちらの base（B の版を取り込んだ時刻）を
+ * 下回る。突き合わせは「進んでいない」と判断し、A の公開を黙って上書きする。
+ *
+ * 免疫を付けるには内容のハッシュか sha が要るが、読み込みはトークン無しの
+ * 素の fetch なので sha が手に入らない（設計書 §13 の残存リスク）。
+ * 上書きしてもコミットは git 履歴に残るので、復旧はできる。
  */
 const BASE_KEY = "events-base";
 
@@ -231,9 +236,13 @@ export function createSync({
    * PUT は 201 で通ってしまう ── 相手の作業が黙って消える。
    *
    * decideSync の remote-is-newer は起動時にしか働かないので、ここで見るしかない。
+   *
+   * @returns {boolean} 突き合わせができたか。false は「見張りを外して公開した」
+   *   という意味で、呼び出し側はそれを利用者に伝えること（console.warn だけだと、
+   *   唯一ガードが効いていない場面を誰も知らないまま公開が済んでしまう）。
    */
   function assertRemoteNotAhead(current) {
-    if (current === null) return; // ファイルがまだ無い。競合のしようがない
+    if (current === null) return true; // ファイルがまだ無い。競合のしようがない
 
     let remoteStamp = null;
     try {
@@ -247,7 +256,7 @@ export function createSync({
       // 比べようがない。ここで止めると、リモートが壊れているときに
       // ブラウザから直せなくなる（公開こそが復旧手段になる）ので通す
       console.warn("sync: リモートの updatedAt が読めないため、公開前の突き合わせを省略します");
-      return;
+      return false;
     }
 
     // base が無い ＝ このリモートを取り込んだ証拠がない。上書きしてよい根拠もない
@@ -255,6 +264,7 @@ export function createSync({
     if (baseMs === null || remoteMs > baseMs) {
       throw new GitHubError(409, CONFLICT_MESSAGE);
     }
+    return true;
   }
 
   /**
@@ -268,6 +278,10 @@ export function createSync({
    * 競合（別端末が先に公開した）は握りつぶさない。突き合わせで見つけた場合も
    * サーバーが 409 を返した場合も、呼び出し側が「取り込んでから公開し直す」導線を
    * 出せるよう status 409 の GitHubError として投げ、下書きも base もそのまま残す。
+   *
+   * @returns {Promise<{commitUrl: string, conflictChecked: boolean}>}
+   *   conflictChecked が false なら、突き合わせを省いて公開している
+   *   （assertRemoteNotAhead を参照）。画面に出すこと。
    */
   async function publish(data) {
     validateEvents(data);
@@ -282,7 +296,7 @@ export function createSync({
 
     const current = await gh.getFile(config.path);
     // 送る前に突き合わせる。ここで投げれば PUT は一度も飛ばない
-    assertRemoteNotAhead(current);
+    const conflictChecked = assertRemoteNotAhead(current);
 
     // ファイルがまだ無ければ sha なしで作成する（getFile は 404 で null を返す）
     const { commitUrl } = await gh.putFile({
@@ -292,9 +306,12 @@ export function createSync({
       message,
     });
 
-    // PUT が通ってから手元を揃える
+    // PUT が通ってから手元を揃える。ここで投げる（保存領域に書けない端末）と
+    // 「公開は済んでいるのに失敗として返る」ことになるが、握ると base が
+    // 無いまま同期済みに見えてしまう。呼び出し側が StoreWriteError を
+    // 「公開はできた／記録は残せなかった」と読み替える（publish-ui.js）。
     storeAdopted(stamped);
-    return { commitUrl };
+    return { commitUrl, conflictChecked };
   }
 
   return { load, saveLocal, adoptRemote, publish };

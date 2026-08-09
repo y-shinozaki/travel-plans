@@ -437,6 +437,7 @@ test("publish() は GET で sha を取り、PUT で送り、base を更新する
   const out = await sync.publish(data);
 
   assert.equal(out.commitUrl, "https://github.com/acme/trip/commit/abc");
+  assert.equal(out.conflictChecked, true, "突き合わせをした事実が返っていません");
   // 順序: GET が先、PUT が後
   assert.equal(fetchImpl.calls.length, 2);
   assert.equal(fetchImpl.calls[0].method, "GET");
@@ -537,10 +538,13 @@ test("リモートの updatedAt が読めないときは突き合わせを省い
   });
   writeToken(store, "ghp_secret");
 
-  const { seen } = await captureConsole(() => sync.publish(data));
+  const { result, seen } = await captureConsole(() => sync.publish(data));
   assert.equal(fetchImpl.calls.length, 2);
   assert.equal(fetchImpl.calls[1].method, "PUT");
   assert.equal(seen.length, 1);
+  // console.warn だけでは、唯一ガードが効いていない場面を誰も知らないまま
+  // 公開が済んでしまう。画面に出せるよう戻り値でも伝えること
+  assert.equal(result.conflictChecked, false, "省略した事実が返っていません");
 });
 
 test("409 は握りつぶさず、下書きも base も残す", async () => {

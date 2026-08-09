@@ -453,6 +453,139 @@
   pointer-events: none;
 }
 
+/* 公開ボタン。未公開の変更があるときだけ輪郭を濃くする（文言でも示す）。 */
+.tbtn--pub[disabled] {
+  opacity: 0.45;
+}
+.tbtn--dirty {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+/* 2 度押しの 1 度目を押したあと。次の一押しが取り返しのつかない操作
+   （取り込み＝手元の変更の破棄、トークンの削除）であることを色で示す。
+   .btn--danger と同じ役割の .tbtn 版。 */
+.tbtn--armed {
+  background: var(--c-food);
+  border-color: var(--c-food);
+  color: var(--sand-lt);
+}
+.tbtn--armed:hover {
+  background: var(--c-food-tx);
+  border-color: var(--c-food-tx);
+  color: var(--sand-lt);
+}
+
+/* ══════════════════════════════════════════════════════════
+   PUBLISH — 公開の導線（publish-ui.js）
+   ══════════════════════════════════════════════════════════ */
+
+/* 画面上部の案内バー。display: flex は [hidden] の UA 規則
+   （display: none）に勝ってしまうので、必ず打ち消す
+   （.is-hidden と同じ罠。空のバーの隙間だけが残る） */
+.syncbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s2);
+  padding: 12px var(--gut);
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 13px;
+  letter-spacing: 0.4px;
+  background: var(--sand-lt);
+  color: var(--ink);
+}
+.syncbar[hidden] {
+  display: none;
+}
+.syncbar__msg {
+  flex: 1 1 260px;
+  line-height: 1.6;
+  margin: 0;
+}
+.syncbar--warn {
+  background: var(--c-sight-bg);
+  color: var(--c-sight-tx);
+}
+.syncbar--info {
+  background: var(--c-hotel-bg);
+  color: var(--c-hotel-tx);
+}
+
+/* ツールバー直下。パネルと結果表示の縦の並び。
+   余白は器ではなく中身に持たせる ── 器に margin を置くと、両方とも
+   隠れているとき（大半の時間）にも 28px の隙間だけが残る。 */
+.pub {
+  display: grid;
+}
+
+.pubpanel {
+  display: grid;
+  gap: var(--s2);
+  max-width: 560px;
+  margin-top: var(--s3);
+  padding: var(--s3);
+  background: var(--sand-lt);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-lg);
+}
+.pubpanel[hidden] {
+  display: none;
+}
+.pubpanel__acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.pubpanel__state {
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  margin: 0;
+}
+
+/* 公開・取り込みの結果。tone で地色だけ変える */
+.pubstat {
+  display: grid;
+  gap: 8px;
+  margin-top: var(--s3);
+  padding: 13px 16px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line-soft);
+  background: var(--sand-lt);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.6;
+  letter-spacing: 0.3px;
+}
+.pubstat[hidden] {
+  display: none;
+}
+.pubstat p {
+  margin: 0;
+}
+.pubstat--ok {
+  background: var(--c-move-bg);
+  color: var(--c-move-tx);
+  border-color: var(--c-move-bg);
+}
+.pubstat--warn {
+  background: var(--c-sight-bg);
+  color: var(--c-sight-tx);
+  border-color: var(--c-sight-bg);
+}
+.pubstat--error {
+  background: var(--c-food-bg);
+  color: var(--c-food-tx);
+  border-color: var(--c-food-bg);
+}
+.pubstat__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
 /* ── 行アクションボタン ── */
 .rowbtn {
   display: grid;
