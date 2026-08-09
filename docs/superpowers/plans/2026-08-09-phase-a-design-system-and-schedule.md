@@ -2572,6 +2572,37 @@ EOF
 - Modify: `README.md`
 - Delete: 旧 `index.html` の残骸（Task 8 で差し替え済みなら不要）
 
+- [ ] **Step 0: 残りのレスポンシブ指定を `base.css` に写す**
+
+Task 6 は BASE / MOTION / CONTROLS を、Task 9 はカレンダーと地図の指定を写した。
+モックの RESPONSIVE ブロック（`docs/design-reference/mock-aman.html` 2072〜2163 行）の
+うち、**それ以外がまだどのタスクにも入っていない**。ここで `base.css` の末尾に写す。
+
+対象:
+
+```css
+@media (max-width: 1180px) {
+  /* .menu__grid を 1 カラムへ、.shead を 1 カラムへ、
+     .shead__idx の番号をインライン配置に */
+}
+@media (max-width: 760px) {
+  :root { --s8: 96px; }   /* tokens.css のコメントが約束している値。
+                             これがないとモバイルでもセクション間が 154px のまま */
+  /* .scale__row を 1 カラムへ（該当があれば） */
+}
+```
+
+`.login` `.paneldemo` `.mapsec` `.pack__*` `.hit` `.cal__*` に関する指定は、
+それぞれの担当タスクで済んでいるか Phase B/C のものなので、ここでは写さない。
+`.mapsec` と `.cal__*` は Task 9 が入れているはずなので、重複させないこと。
+
+写したあと、`--s8` が 760px 以下で実際に 96px になることを確認する:
+
+```js
+getComputedStyle(document.documentElement).getPropertyValue("--s8").trim()
+// 1440px → "154px" / 390px → "96px"
+```
+
 - [ ] **Step 1: 390px で横溢れを確認する**
 
 DevTools を 390 × 844 にして各ページを開き、コンソールに貼る:
