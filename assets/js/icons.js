@@ -83,12 +83,15 @@ export const SPRITE = `
     <path d="M7.6 15V4.8a2.2 2.2 0 0 1 4.4 0M16.4 14.2V4.8a2.2 2.2 0 0 0-4.4 0"/>
     <path d="M8 8.6h8"/>
   </symbol>
+  <symbol id="i-x" viewBox="0 0 24 24">
+    <path d="M6 6l12 12M18 6 6 18"/>
+  </symbol>
 </svg>`.trim();
 
 export const ICON_IDS = [
   "i-flight", "i-camera", "i-food", "i-hotel", "i-shop", "i-car", "i-boat",
   "i-arrow-right", "i-calendar", "i-clock", "i-pin", "i-external",
-  "i-chat", "i-search", "i-luggage", "i-lock", "i-note", "i-pool",
+  "i-chat", "i-search", "i-luggage", "i-lock", "i-note", "i-pool", "i-x",
 ];
 
 export const CATEGORY_ICON = {

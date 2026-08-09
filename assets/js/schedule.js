@@ -3,6 +3,7 @@ import { initReveal } from "./reveal.js";
 import { renderNav } from "./nav.js";
 import { renderCalendar, CAT_META } from "./calendar.js";
 import { createMap } from "./map.js";
+import { createSheet, renderEventDetail } from "./sheet.js";
 
 const state = {
   days: [],
@@ -10,6 +11,7 @@ const state = {
   viewStart: 6,
   viewEnd: 22,
   catFilter: null,
+  onSelect: null,
 };
 
 let mapView = null;
@@ -29,7 +31,7 @@ function draw() {
     viewStart: state.viewStart,
     viewEnd: state.viewEnd,
     catFilter: state.catFilter,
-    onSelect: (ev) => console.log("選択:", ev.title),
+    onSelect: state.onSelect,
   });
   mapView?.update(state.events, state.catFilter);
 }
@@ -72,6 +74,20 @@ function buildCategoryFilters() {
 
 async function main() {
   injectSprite();
+
+  const sheet = createSheet({
+    root: document.getElementById("sheet"),
+    overlay: document.getElementById("sheet-overlay"),
+    titleEl: document.getElementById("sheet-title"),
+    bodyEl: document.getElementById("sheet-body"),
+    footEl: document.getElementById("sheet-foot"),
+    closeBtn: document.getElementById("sheet-close"),
+  });
+
+  // Phase B でここに編集ボタンが増える
+  const openDetail = (ev) => sheet.open("予定の詳細", renderEventDetail(ev, state.days));
+  state.onSelect = openDetail;
+
   renderNav(document.getElementById("nav"), "schedule");
 
   const response = await fetch("assets/data/events.json");
@@ -100,7 +116,7 @@ async function main() {
     mapMount: document.getElementById("leaflet-map"),
     listMount: document.getElementById("loclist"),
     days: state.days,
-    onSelect: (ev) => console.log("選択:", ev.title),
+    onSelect: state.onSelect,
   });
 
   buildCategoryFilters();

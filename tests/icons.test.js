@@ -13,7 +13,7 @@ test("Phase A で使うアイコンがすべて含まれている", () => {
     "i-car", "i-boat", "i-pool", "i-luggage",
     // UI 部品
     "i-arrow-right", "i-calendar", "i-clock", "i-pin", "i-external",
-    "i-chat", "i-search", "i-lock", "i-note",
+    "i-chat", "i-search", "i-lock", "i-note", "i-x",
   ];
   for (const id of required) {
     assert.ok(ICON_IDS.includes(id), `${id} が ICON_IDS にありません`);
