@@ -15,18 +15,19 @@ python3 -m http.server 8000
 
 ## アーキテクチャ概要
 
-### ファイル構成（Phase A 時点）
+### ファイル構成（Phase B1 時点）
 
 ```
 travel-plans/
-├── index.html / schedule.html   実装済み（メニュー／旅程カレンダー・地図）
-├── packing.html / archive.html  Phase B/C の仮ページ（リンクのみ、中身は未実装）
+├── index.html / schedule.html   実装済み（メニュー／旅程カレンダー・地図・編集・公開）
+├── packing.html / archive.html  Phase B2/C の仮ページ（リンクのみ、中身は未実装）
 ├── assets/
 │   ├── css/
 │   │   ├── tokens.css      色・余白・角丸・モーションの唯一の定義場所
 │   │   ├── base.css        リセット、タイポグラフィ、共通レイアウト、reveal 演出、
 │   │   │                   メニューとセクション見出しのレスポンシブ
-│   │   ├── controls.css    ボタン・チップ・チェックボックス・入力欄・詳細シート
+│   │   ├── controls.css    ボタン・チップ・チェックボックス・入力欄・詳細シート・
+│   │   │                   編集フォーム・公開まわり（パネル／状態表示／同期バー）
 │   │   └── calendar.css    schedule.html 専用（カレンダー・地図・レスポンシブ）
 │   ├── js/
 │   │   ├── time.js         10進時間 ⇔ HH:MM 変換、timeLabel()
@@ -36,16 +37,29 @@ travel-plans/
 │   │   ├── categories.js   CAT_META（ラベル・既定アイコン）、catMeta() / iconOf() /
 │   │   │                   accentToken() / accentColor()。カテゴリの JS 側の定義
 │   │   │                   （色の実体は tokens.css と calendar.css。後述の3ファイル）
-│   │   ├── validate.js     validateEvents()。events.json を描画前に一度だけ検査する
+│   │   ├── validate.js     validateEvent()（1件）と validateEvents()（全体）。
+│   │   │                   イベント1件の規則の置き場所はここ1か所だけ
 │   │   ├── countdown.js    index.html の「出発まで あと N 日」（DOM に触らない）
 │   │   ├── dom.js          el() / makeSelectable() / escapeHtml() / safeHttpUrl()
 │   │   ├── calendar.js     renderCalendar()、HOUR_H
 │   │   ├── map.js          Leaflet 初期化、位置情報リスト、popupHtml() / locationRowHtml()
-│   │   ├── sheet.js        詳細シート（読み取り専用）、renderEventDetail()
+│   │   ├── sheet.js        詳細シートの器、renderEventDetail()
 │   │   ├── nav.js          ページ間ナビ
 │   │   ├── reveal.js       IntersectionObserver によるスクロール出現演出
+│   │   │  ── ここから下が Phase B1 で追加した保存・公開・編集の層 ──
+│   │   ├── store.js        localStorage の薄いラッパ（createStore / StoreWriteError）
+│   │   ├── base64.js       UTF-8 対応の base64 変換（btoa は日本語で例外になる）
+│   │   ├── sync-decide.js  decideSync()。ローカルとリモートのどちらを採るかの純粋関数
+│   │   ├── github.js       GitHub Contents API の呼び出し（createGitHub / GitHubError）
+│   │   ├── token.js        公開用トークンの置き場所（tp:gh-token の唯一の出入口）
+│   │   ├── sync.js         下書きとリモートを束ねる層（load / saveLocal /
+│   │   │                   adoptRemote / publish / hasUnpublishedChanges）
+│   │   ├── event-form.js   編集フォームの HTML・入力の読み取り・formProblems()
+│   │   ├── event-editor.js 採番・併合・保存・削除。シートにフォームを載せる
+│   │   ├── publish-ui.js   トークン設定・公開ボタン・起動時の案内バー
 │   │   ├── menu.js         index.html のエントリポイント
-│   │   └── schedule.js     schedule.html のエントリポイント
+│   │   ├── schedule.js     schedule.html のエントリポイント
+│   │   └── stub-page.js    packing.html / archive.html の共通エントリポイント
 │   ├── data/
 │   │   └── events.json     旅程データの唯一のソース（表示用文字列は持たない）
 │   └── vendor/
@@ -56,11 +70,10 @@ travel-plans/
 ```
 
 設計書（`docs/superpowers/specs/2026-08-09-travel-plans-redesign-design.md` §2.3）によると、
-今後 2 フェーズで以下が追加される予定:
+残りのフェーズで以下が追加される予定:
 
-- **Phase B**（保存・公開フロー、予定エディタ、持ち物リストとエディタ、コメント機能）:
-  `assets/js/store.js` `sync.js` `comments.js`、`assets/css/packing.css`、
-  `assets/data/packing.json` `comments.json` など
+- **Phase B2**（持ち物リストとエディタ）: `assets/css/packing.css`、`assets/data/packing.json` など
+- **Phase B3**（コメント機能）: `assets/js/comments.js`、`assets/data/comments.json` など
 - **Phase C**（変換スクリプト、暗号化、認証、検索アーカイブ）:
   `assets/js/auth.js` `crypto.js`、`assets/css/archive.css`、`assets/data/archive.enc`、
   `tools/build-archive.mjs`、`private/`（.gitignore 対象）など
@@ -104,9 +117,11 @@ travel-plans/
 ### データフロー
 
 ```
-assets/data/events.json（fetch）
-  ↓
-validateEvents() → 描画前に一度だけ形を検査（後述）。通らなければここで止める
+sync.load()（assets/js/sync.js）
+  ├ assets/data/events.json を素の fetch（トークン不要）
+  ├ localStorage の下書き（tp:events）と突き合わせる
+  └ validateEvents() → リモートも下書きも、見せる前に形を検査する。
+    通らなければ（リモート側なら）ここで止める
   ↓
 expandEvents() → 複数日イベントを日単位のセグメントに変換
 assignLanes()  → 同じ日・重なる時間帯のセグメントにレーンを割り当てる
@@ -114,8 +129,132 @@ assignLanes()  → 同じ日・重なる時間帯のセグメントにレーン�
 renderCalendar() → 時間スロットグリッドを描画（viewStart/viewEnd を尊重）
 map.js の createMap() → 座標を持つイベントからマーカーと位置情報リストを構築
   ↓
-カテゴリフィルター変更時に再描画
+カテゴリフィルター変更時・予定の保存時・取り込み時に再描画（schedule.js の safeDraw）
 ```
+
+## 保存と公開（Phase B1）
+
+設計書 §5 に対応する。**この節の記述と設計書が食い違ったら設計書を正とする。**
+
+### 下書きと正
+
+- **正はリポジトリの `assets/data/events.json`。** 同行者はページを開くだけで最新を受け取る
+- **編集は即座に `localStorage` へ入る（下書き）。** ブラウザを閉じても残る。
+  リポジトリには入らない
+- **「公開」を押した端末だけが**、GitHub Contents API 経由でリポジトリへコミットする。
+  トークンを持たない端末は閲覧と下書き編集のみ（公開ボタン自体が置かれない）
+
+`localStorage` のキーは `store.js` が `tp:` を前置する。B1 で使うのは 3 つ:
+
+| キー | 中身 | 書く場所 |
+|---|---|---|
+| `tp:events` | 下書き（`events.json` と同じ形＋`updatedAt`） | `sync.js` の `DRAFT_KEY` |
+| `tp:events-base` | 最後にリモートと揃えた時点の `updatedAt` 文字列 | `sync.js` の `BASE_KEY` |
+| `tp:gh-token` | 公開用トークン（平文） | `token.js` |
+
+キー名を他のファイルに書き写さないこと。`sync.js` と `token.js` だけが知っている。
+（この 3 つのほかに `publish-ui.js` が `tp:write-probe` を一瞬だけ書いて消す。
+保存領域に書けるかを実際に試すためで、残さない。）
+
+### `updatedAt` がすべての比較の軸
+
+各 JSON はトップレベルに `updatedAt`（ISO8601）を持つ。`saveLocal()` と `publish()` が
+現在時刻に進める。判断は 2 か所で行う:
+
+1. **起動時** — `sync-decide.js` の `decideSync()` が
+   `remote.updatedAt` / 下書きの `updatedAt` / `tp:events-base` を突き合わせ、
+   `use-remote` / `use-local` / `remote-is-newer` / `offline` のいずれかを返す。
+   `remote-is-newer` のときは画面上部にバーを出し、「取り込む」か「自分の変更を残す」かを
+   人に選ばせる。**黙ってリモートで上書きしない**（同行者の手元の変更を消さないため）。
+   `offline` のときは「最新の確認ができなかった」ことだけを伝えるバーを出し、機能は落とさない
+2. **公開時** — `sync.js` の `assertRemoteNotAhead()` が、GET した本文の `updatedAt` を
+   `tp:events-base` と比べる。進んでいれば PUT を飛ばさずに 409 で止める
+
+「未公開の変更があるか」は `sync.hasUnpublishedChanges()` が
+**下書きの `updatedAt` と `tp:events-base` の一致**で判定する（大小ではない）。
+`decideSync` の戻り値から導かないこと — `use-local` は「リモートが進んでいない」であって
+「編集がある」ではなく、一度も編集していない端末も 2 回目の読み込みから `use-local` になる。
+
+### 競合検出は sha ではなく `updatedAt`（設計書 §5.3）
+
+GET の直後に PUT するので **sha はほぼ常に最新**であり、409 が返るのは GET と PUT の間の
+数十ミリ秒に別の公開が挟まった場合だけ。現実の競合は「B がページを開いて 30 分編集する間に
+A が公開する」という形で起きる。この場合 PUT の直前に取り直した sha は新しいので
+**PUT は成功し、A の作業が黙って消える**。だから公開前に GET の本文の `updatedAt` を見る。
+`sha` は `putFile` に渡すが、409 は最後の保険であって主たる検出手段ではない。
+
+（設計書 §5.3 は当初 sha を主たる検出手段と書いていた。Task 7 のレビューで訂正済み。）
+
+### 公開の順序（`sync.js` の `publish()`）
+
+```
+validateEvents → GET で sha と本文 → updatedAt の突き合わせ → PUT → tp:events-base を更新
+```
+
+順序に意味がある。検証を後ろへ回すと壊れたデータがリポジトリに入り、同行者のページが
+起動しなくなる。base を PUT より前に進めると、失敗した公開が「同期済み」に見える。
+
+`publish()` は `{ commitUrl, conflictChecked }` を返す。`conflictChecked` が `false` なら
+リモートの `updatedAt` が読めず**突き合わせを省いて公開している** — `publish-ui.js` が
+その旨を画面に出す（唯一ガードが効いていない場面を黙って通さない）。
+
+### トークンの作り方（設計書 §5.4）
+
+1. GitHub → Settings → Developer settings → Personal access tokens → **Fine-grained tokens**
+2. Repository access: **このリポジトリ（`y-shinozaki/travel-plans`）だけ**
+3. Permissions: **Contents = Read and write のみ**。他の権限は与えない
+4. **有効期限を設定する**（旅行終了後まで）
+5. ページの「公開用トークンを設定」→ 貼り付け → 保存
+
+**トークンをコードにもリポジトリにも書かないこと。** コミットしない、ドキュメントに貼らない、
+テストのフィクスチャにも入れない。保存先は入力した端末のブラウザの
+`localStorage["tp:gh-token"]` だけで、**平文**で入る（`store.js` の `readText` / `writeText`
+を使うのは JSON パス経由で断片がログへ出るのを断つためで、暗号化はしていない）。
+共用端末では使い終わったら設定画面の「削除」で消すこと。漏れた疑いがあれば GitHub 側で失効させる。
+
+画面はトークンを一切表示し直さない（入力欄は `type="password"`、保存後に必ず空にし、
+状態は「設定済み／未設定」だけを出す）。この規約を破らないこと。
+
+### 予定エディタ
+
+- 入口は `event-editor.js`。カレンダー／地図の選択で読み取り専用の詳細、
+  「この予定を編集」または「予定を編集」トグルでフォームに切り替わる
+- **`validateEvent` と `formProblems` の関係** — `event-form.js` の `formProblems()` は
+  検査規則を書き写さず、`validate.js` の `validateEvent()` を呼ぶ。足すのは
+  **より厳しい側の**フォーム固有の規則だけ（タイトル必須、同じ日の中では終了が開始より後、
+  URL は http/https）。逆向きの規則を足すと「フォームは通すが読み込みで弾かれる」値ができ、
+  利用者から見ると「保存したら旅程が真っ白になり、画面から戻す手段が無い」状態になる。
+  メッセージはキー名（`lat`、`endDay` …）を画面の項目名へ言い換えるだけで、
+  言い換えるのは言葉であって規則ではない
+- **保存は「併合」であって「置き換え」ではない** — フォームには `image` / `imagePos` /
+  `icon` の入力欄が無い。`readEventForm()` の戻り値でそのまま置き換えると、タイトルを
+  1 文字直しただけでこれらのキーが消える。3 つとも省略できる項目なので
+  `validateEvents()` は通ってしまい、消えたことは画像が出なくなるまで誰も気付かない。
+  既存イベントの保存は必ず `mergeEvent(original, input)` を通すこと
+- **保存の直前に必ず配列全体を `validateEvents()` に通す**（`event-editor.js` の
+  `applyChange()`）。`formProblems()` は 1 件しか見ないので id の重複を検出できず、
+  渡された `dayCount` をそのまま信じる。`validateEvents()` は `data.days` を自分で数えるため、
+  ここが最後の砦になる
+- `alert()` / `confirm()` は使わない。削除も取り込みも**1 度目で身構え、2 度目で実行**する
+  ボタンで確認を取る
+
+## Content-Security-Policy
+
+4 ページすべての `<head>` に `<meta http-equiv="Content-Security-Policy">` を置いている
+（内容は 4 ページで同一）。要点:
+
+- **`script-src 'self'`** — `'unsafe-inline'` を入れていないので、インライン `<script>` も
+  `javascript:` URL も実行されない。**インライン script を書かないこと**
+  （`packing.html` / `archive.html` のエントリポイントを `stub-page.js` に出したのはこのため）
+- `connect-src 'self' https://api.github.com` — 公開フローが叩く先だけを許可
+- `style-src` に `'unsafe-inline'` が要る（Leaflet と自前コードが `style` 属性を使うため）。
+  狙いはスクリプト実行の遮断であって、スタイルではない
+- `img-src` が `https:` のワイルドカードなのは、旅程データが複数の外部ホストから画像を
+  直リンクしているため（設計書 §13 の負債）
+
+`tests/csp.test.js` が「4 ページに CSP がある」「`script-src` が `'self'` のみ」
+「インライン script も `on*` 属性も 1 つも無い」「`connect-src` に GitHub API がある」を
+機械的に検査している。
 
 ## デザインシステム
 
@@ -127,13 +266,20 @@ map.js の createMap() → 座標を持つイベントからマーカーと位�
 
 ### 新しいイベントを追加
 
+**通常は画面から追加する** — 旅程ページの「予定を追加」。下書きは `localStorage` に入り、
+「公開」を押すとリポジトリの `events.json` にコミットされる（前述「保存と公開」）。
+
+`events.json` を手で編集する場合（初期データの投入、まとめての書き換えなど）:
+
 1. `assets/data/events.json` の `events` 配列にオブジェクトを追加する
-   （Phase A では手編集。Phase B で UI から編集・保存できるようになる予定）
 2. `id` は一意な文字列、`cat` は `cat-move` / `cat-sight` / `cat-food` / `cat-hotel` / `cat-shop` のいずれか
 3. 単日・時間指定なら `startDay` と `endDay` を同じ値にし、`start` / `end` を10進時間で設定
 4. 複数日にまたがる場合は `endDay` を `startDay` より後ろにする
 5. 終日イベント（ホテルなど）は `allDay: true` にする。地図に出さない場合は `lat` / `lng` を `null` にする
-6. 保存後、ブラウザをリロードすれば反映される（ビルドステップなし）
+6. トップレベルの `updatedAt` も新しくすること。ここを進めないと、既に下書きを持っている
+   端末は「リモートは進んでいない」と判断して手元の下書きを見せ続ける
+7. 保存後、ブラウザをリロードすれば反映される（ビルドステップなし）。
+   ただし**未公開の変更を持つ端末**では黙って置き換えず、取り込むかどうかを聞くバーが出る
 
 ### 新しいカテゴリを追加
 
@@ -154,8 +300,13 @@ map.js の createMap() → 座標を持つイベントからマーカーと位�
 
 ### データの検査（`assets/js/validate.js`）
 
-`schedule.js` は `events.json` を fetch したあと、描画に入る前に `validateEvents(data)` を
-一度だけ通す。ここを通過したコードは「`days` の添字は有効」「座標は有限」を前提にしてよい。
+`sync.load()` は、リモートから取った `events.json` も `localStorage` の下書きも、
+画面に出す前に `validateEvents(data)` へ通す。ここを通過したコードは
+「`days` の添字は有効」「座標は有限」を前提にしてよい。
+
+`validateEvent(ev, dayCount, seenIds, where)`（イベント 1 件）も公開している。
+**イベント 1 件に対する規則の置き場所はここ 1 か所だけ**で、編集フォームの
+`formProblems()` もこれを呼ぶ（前述「予定エディタ」を参照）。
 
 検査するのは、破ると**静かに壊れる**前提:
 
@@ -216,8 +367,8 @@ map.js の createMap() → 座標を持つイベントからマーカーと位�
 <script src="assets/vendor/leaflet/leaflet.js"></script>
 ```
 
-**Leaflet を CDN からセルフホストへ変更した理由**: Phase B でこのリポジトリへの書き込み権限を持つ
-GitHub トークンをブラウザに保存する予定がある。CDN 経由のスクリプトが差し替えられた場合、
+**Leaflet を CDN からセルフホストへ変更した理由**: このリポジトリへの書き込み権限を持つ
+GitHub トークンをブラウザに保存している（Phase B1 で実装済み）。CDN 経由のスクリプトが差し替えられた場合、
 そのトークンを盗み出されたり、リポジトリへ任意の内容を push されたりする恐れがあるため、
 サードパーティの JS を一切 CDN から読み込まない方針にした。トークンの具体的な保存先・扱いは
 `docs/superpowers/specs/2026-08-09-travel-plans-redesign-design.md` §5.4・§6.4 を参照
@@ -246,6 +397,22 @@ node --test
   意図した変更なら期待値を更新すること
 - `renderers.test.js` — エスケープ、URL スキームの許可リスト、カテゴリ絞り込み、`renderNav`
 - `tokens.test.js` — 色のコントラストと、下記の CSS 側の約束
+
+Phase B1 で追加したもの:
+
+- `csp.test.js` — 4 ページの CSP（前述「Content-Security-Policy」）
+- `store.test.js` — 読みは既定値へ落とし、書きは必ず `StoreWriteError` で知らせること
+- `base64.test.js` — 日本語・絵文字・長い入力の往復
+- `sync-decide.test.js` — `decideSync()` の全分岐
+- `github.test.js` — Contents API の応答（404 / 409 / 401 / 403 / 通信断・想定外の本文）
+- `sync.test.js` — `load` / `saveLocal` / `adoptRemote` / `publish` /
+  `hasUnpublishedChanges`、および `token.js`。`fetchImpl`・`store`・`now` を
+  差し替えて通信なしで回す
+- `event-form.test.js` — フォームの組み立てと読み取りの往復、`formProblems()` が
+  `validateEvent()` を通していること
+- `event-editor.test.js` — 採番・併合（`image` を落とさない）・配列の差し替え・配線
+- `publish-ui.test.js` — トークンが DOM に出ないこと、公開ボタンの出し分け、
+  失敗の見せ分け、2 度押しの確認
 
 `tokens.test.js` は色そのものに加えて次の約束も機械的に守らせている:
 
@@ -306,8 +473,9 @@ Safari 15.5 で対応したため、これがサポート下限を決めてい�
   そのまま流し込まないこと。** 平文なら `el()`（`textContent`）を使い、どうしても
   `innerHTML` に載せる必要があるときは `dom.js` の `escapeHtml()` を必ず通す。
   `tests/renderers.test.js` が 3 つの描画経路すべてについてこれを検証している。
-  Phase B ではブラウザで入力した文字列を、リポジトリ書き込み権限を持つトークンを
-  抱えたページ自身で描画することになるため、この規約は必須
+  Phase B1 以降、ブラウザで入力した文字列を、リポジトリ書き込み権限を持つトークンを
+  抱えたページ自身が描画している。この規約は必須（CSP の `script-src 'self'` は
+  二重の防御であって、これの代わりにはならない）
 - **`href` に載せる URL は `escapeHtml()` では守れない。** `escapeHtml()` が変換するのは
   `& < > " '` の 5 文字だけで、`javascript:…` にはそのどれも含まれない。
   URL は必ず `dom.js` の `safeHttpUrl()`（http / https の許可リスト）を通し、
@@ -317,6 +485,14 @@ Safari 15.5 で対応したため、これがサポート下限を決めてい�
   で囲み、失敗しても `initReveal()` は必ず走らせる（`.reveal` は `opacity: 0` で待機しているため、
   飛ばすとページが真っ白になる）。初回描画のあとの再描画（`schedule.js` の `safeDraw()`）も
   同様に守ること
+- **`localStorage` のキー名を書き写さないこと。** `tp:events` / `tp:events-base` は
+  `sync.js`、`tp:gh-token` は `token.js` だけが知っている。別のファイルに書き写すと、
+  キーを変えたときに片方だけが古い名前を読み、「変更が無い」と黙って答え続ける
+- **トークンを画面にも例外文にも出さないこと。** `store.read` は壊れた値を `JSON.parse` に
+  掛けるので、`SyntaxError` の文言に中身の先頭が埋め込まれて `console.warn` に出る。
+  トークンは `readText` / `writeText`（JSON を通さない）で扱う
 - Leaflet MarkerCluster は未実装。イベント密度が大幅に増加した場合に追加検討
 - Dancing Script（旧デザインの筆記体タイトル）は Aman 由来のデザインへの刷新に伴い廃止した。
   現在の見出しフォントは `--serif`（Newsreader / Noto Serif JP）
+- 残っている課題（時計ずれによる上書きの残存リスクなど）は設計書 §13 にまとめてある。
+  保存・公開まわりに手を入れる前に読むこと

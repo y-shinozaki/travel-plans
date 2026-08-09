@@ -10,11 +10,14 @@
 - Leaflet と CartoDB Positron タイルを使用したインタラクティブマップ
 - カテゴリによるイベントフィルタリング
 - 詳細シートでのイベント情報表示
+- **ブラウザ上での予定の追加・編集・削除**（下書きは端末の `localStorage` に保存）
+- **「公開」でリポジトリへ反映**（GitHub Contents API 経由。トークンを設定した端末のみ）
 - モバイル、タブレット、デスクトップに対応
 - ビルドプロセス不要 — ローカルサーバーを起動するだけ
 
-現在実装済みなのはメニュー（`index.html`）と旅程カレンダー（`schedule.html`）。
-持ち物リスト（`packing.html`）と検索アーカイブ（`archive.html`）は Phase B/C 向けの仮ページで、
+現在実装済みなのはメニュー（`index.html`）と旅程カレンダー（`schedule.html`）で、
+旅程は画面から編集・公開できる。
+持ち物リスト（`packing.html`）と検索アーカイブ（`archive.html`）は Phase B2/C 向けの仮ページで、
 「メニューへ戻る」リンクのみ用意されている（`archive.html` は合言葉によるログインを予定しているが未実装）。
 
 ## 技術スタック
@@ -46,7 +49,10 @@ node --test
 ```
 
 `package.json` は `"type": "module"` を宣言するためだけに存在し、依存パッケージはゼロ。
-`tests/` は時刻変換・イベント展開・レーン配置・アイコン・トークンの純粋関数と静的な値を検証する。
+`tests/` は時刻変換・イベント展開・レーン配置・アイコン・デザイントークンの純粋関数と
+静的な値に加えて、保存と公開の層（`store` / `base64` / `sync-decide` / `github` / `sync`）、
+編集フォームとエディタ、公開画面、4 ページの CSP を検証する。通信・`localStorage`・時刻は
+すべて差し替え可能にしてあるので、テストは外部と通信しない。
 カレンダー描画やレスポンシブ崩れなど、DOM に依存する部分はブラウザで目視・実測して確認する。
 
 ## プロジェクト構成
@@ -54,19 +60,23 @@ node --test
 ```
 travel-plans/
 ├── index.html            メニュー
-├── schedule.html          旅程カレンダーと地図
-├── packing.html           持ち物リスト（Phase B の仮ページ）
+├── schedule.html          旅程カレンダーと地図（編集・公開もここ）
+├── packing.html           持ち物リスト（Phase B2 の仮ページ）
 ├── archive.html           検索アーカイブ（Phase C の仮ページ）
 ├── assets/
 │   ├── css/
 │   │   ├── tokens.css     色・余白・角丸・モーションの唯一の定義場所
 │   │   ├── base.css       リセット、タイポグラフィ、共通レイアウト、reveal 演出
-│   │   ├── controls.css   ボタン・チップ・入力欄・詳細シート
+│   │   ├── controls.css   ボタン・チップ・入力欄・詳細シート・編集フォーム・公開まわり
 │   │   └── calendar.css   schedule.html 専用（カレンダー・地図・レスポンシブ）
-│   ├── js/                menu.js / schedule.js（各ページのエントリポイント）、
+│   ├── js/                menu.js / schedule.js / stub-page.js（各ページのエントリポイント）、
+│   │                      countdown.js（メニューの出発カウントダウン）、
 │   │                      calendar.js / map.js / sheet.js / nav.js / reveal.js / icons.js、
-│   │                      categories.js / dom.js（ページをまたいで使う共通部品）、
-│   │                      time.js / events.js / lanes.js（node --test が対象にする純粋関数）
+│   │                      categories.js / dom.js / validate.js（共通部品）、
+│   │                      time.js / events.js / lanes.js（node --test が対象にする純粋関数）、
+│   │                      store.js / base64.js / sync-decide.js / github.js / token.js /
+│   │                      sync.js（下書きの保存とリポジトリへの公開）、
+│   │                      event-form.js / event-editor.js / publish-ui.js（編集と公開の画面）
 │   ├── data/
 │   │   └── events.json    旅程データ（唯一のソース。表示用文字列は持たない）
 │   └── vendor/
@@ -111,17 +121,51 @@ travel-plans/
 - 座標を持つイベントに位置情報マーカーを表示
 - カテゴリでフィルタリングすると、マップと位置情報リストが連動して更新
 
+### 予定の編集
+
+- 「予定を追加」で新規作成、イベントを選んで「この予定を編集」で既存の編集。削除は 2 度押し
+- 保存すると `localStorage` の下書きに入り、リロードしても残る。この時点ではリポジトリは変わらない
+- ダイアログ（`alert` / `confirm`）は使わない。入力の不備はシートの中に一覧で出る
+
 ### レスポンシブデザイン
 
 - 1180px 以下: メニューの3カラムグリッド、セクション見出し、地図とサイドリストが1カラムに変わる
 - 760px 以下: セクション間の余白が縮み、カレンダーは横スクロール（時間列は左に固定）に切り替わる
+
+## 保存と公開
+
+- **正はリポジトリの `assets/data/events.json`。** 同行者はページを開くだけで最新を受け取る
+- **編集は端末の `localStorage` に下書きとして入る**（キーは `tp:events`、
+  最後にリモートと揃えた時刻が `tp:events-base`）
+- **「公開」を押した端末だけ**が GitHub Contents API でリポジトリへコミットする。
+  トークンを設定していない端末には公開ボタン自体が出ない（閲覧と下書き編集はできる）
+- 新旧の判定はどちらも JSON トップレベルの `updatedAt`。公開の直前にもリモートを取り直して
+  突き合わせ、別の端末が先に公開していれば送信せずに中断する
+  （sha だけでは「相手が編集中に公開した」形の競合を捕まえられないため）
+- 公開後、GitHub Pages への反映には 1 分ほどかかる
+
+### 公開用トークンの作り方
+
+1. GitHub → Settings → Developer settings → Personal access tokens → **Fine-grained tokens**
+2. Repository access: **このリポジトリだけ**（`y-shinozaki/travel-plans`）
+3. Permissions: **Contents = Read and write のみ**
+4. **有効期限を設定する**（旅行終了後まで）
+5. 旅程ページの「公開用トークンを設定」に貼り付けて保存
+
+**トークンをコミットしないこと。** リポジトリにもコードにも書かない。保存先は入力した端末の
+ブラウザの `localStorage["tp:gh-token"]` だけで、**平文**で入る（暗号化はしていない）。
+画面はトークンを一切表示し直さず、「設定済み／未設定」だけを出す。
+共用端末では使い終わったら設定画面の「削除」で消すこと。
 
 ## アーキテクチャ
 
 ### データフロー
 
 ```
-assets/data/events.json（fetch）
+sync.load()（assets/js/sync.js）
+  ├ assets/data/events.json を素の fetch（トークン不要）
+  ├ localStorage の下書きと突き合わせ、どちらを見せるかを決める
+  └ validateEvents() で形を検査してから渡す
   ↓
 expandEvents() → 複数日イベントを日単位セグメントに変換
 assignLanes()  → 重なるイベントにレーンを割り当てる
@@ -191,10 +235,12 @@ map.js の createMap() → 座標を持つイベントからマーカーと位�
 
 ## Leaflet をセルフホストする理由
 
-Phase B でこのリポジトリへの書き込み権限を持つ GitHub トークンをブラウザに保存する予定がある。
+このリポジトリへの書き込み権限を持つ GitHub トークンをブラウザに保存している。
 CDN 経由で読み込むスクリプトが差し替えられた場合、そのトークンを盗み出されたり、
 リポジトリへ任意の内容を push されたりする恐れがあるため、サードパーティの JS は CDN から
-読み込まず `assets/vendor/leaflet/` に自前で配置している。トークンの具体的な保存先・扱いは
+読み込まず `assets/vendor/leaflet/` に自前で配置している。同じ理由で、4 ページすべてに
+`script-src 'self'` の Content-Security-Policy を置き、インライン script を排除している。
+トークンの具体的な保存先・扱いは
 `docs/superpowers/specs/2026-08-09-travel-plans-redesign-design.md` §5.4・§6.4 を参照。
 
 ## デプロイメント
