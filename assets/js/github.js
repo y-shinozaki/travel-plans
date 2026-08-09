@@ -1,0 +1,90 @@
+/**
+ * GitHub Contents API の呼び出しだけを担う層。
+ *
+ * fetchImpl を差し替えられるようにしてあるのは、応答パターン
+ * （404 / 409 / 401 / 403 / 通信断）を Node で全部通すため。
+ *
+ * エラーは status と「人が読んで次に何をすればいいか分かる文言」を持たせて投げる。
+ * 画面にそのまま出す前提なので、英語の生メッセージを素通しさせない。
+ */
+import { toBase64Utf8, fromBase64Utf8 } from "./base64.js";
+
+const API = "https://api.github.com";
+const API_VERSION = "2022-11-28";
+
+export class GitHubError extends Error {
+  constructor(status, message, cause) {
+    super(message);
+    this.name = "GitHubError";
+    this.status = status;
+    this.cause = cause;
+  }
+}
+
+function explain(status, body) {
+  const detail = body?.message ? `（${body.message}）` : "";
+  switch (status) {
+    case 401:
+      return `トークンが無効です。設定し直してください${detail}`;
+    case 403:
+      return `権限が足りません。トークンに Contents の書き込み権限があるか確認してください${detail}`;
+    case 409:
+      return `リモートが更新されています。取り込んでから公開し直してください${detail}`;
+    case 422:
+      return `内容を受け付けてもらえませんでした${detail}`;
+    default:
+      return `GitHub への通信に失敗しました（HTTP ${status}）${detail}`;
+  }
+}
+
+export function createGitHub({ owner, repo, branch, token, fetchImpl = fetch }) {
+  if (!token) throw new Error("createGitHub: トークンがありません");
+
+  const base = `${API}/repos/${owner}/${repo}/contents/`;
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": API_VERSION,
+  };
+
+  async function call(url, init) {
+    let response;
+    try {
+      response = await fetchImpl(url, init);
+    } catch (error) {
+      throw new GitHubError(0, "GitHub に接続できませんでした。通信状況を確認してください", error);
+    }
+    let body = null;
+    try {
+      body = await response.json();
+    } catch {
+      // 本文が JSON でないことがある。status だけで判断する
+    }
+    return { response, body };
+  }
+
+  async function getFile(path) {
+    const url = `${base}${path}?ref=${encodeURIComponent(branch)}`;
+    const { response, body } = await call(url, { method: "GET", headers });
+    if (response.status === 404) return null;
+    if (!response.ok) throw new GitHubError(response.status, explain(response.status, body));
+    // Contents API は base64 に 60 文字ごとの改行を挟むことがあるが、
+    // atob は仕様上 ASCII 空白を読み飛ばすので、ここで除去する必要はない。
+    return { sha: body.sha, text: fromBase64Utf8(String(body.content)) };
+  }
+
+  async function putFile({ path, text, sha, message }) {
+    const payload = { message, content: toBase64Utf8(text), branch };
+    if (sha) payload.sha = sha;
+
+    const { response, body } = await call(`${base}${path}`, {
+      method: "PUT",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) throw new GitHubError(response.status, explain(response.status, body));
+    return { sha: body.content.sha, commitUrl: body.commit.html_url };
+  }
+
+  return { getFile, putFile };
+}
