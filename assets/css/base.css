@@ -250,3 +250,117 @@ button {
   background: var(--line-soft);
   margin: var(--s5) 0;
 }
+
+/* ページ間ナビ */
+.nav {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  flex-wrap: wrap;
+  padding: var(--s2) var(--gut);
+  border-bottom: 1px solid var(--line-soft);
+}
+.nav__home {
+  font-family: var(--serif);
+  font-size: 17px;
+  font-weight: 300;
+  letter-spacing: 0.5px;
+}
+.nav__links {
+  display: flex;
+  gap: var(--s2);
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+.nav__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  font-size: 11px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  transition: color var(--t-fast) var(--e-out),
+    border-color var(--t-fast) var(--e-out);
+}
+.nav__link:hover {
+  color: var(--ink);
+  border-color: var(--line-soft);
+}
+.nav__link.is-current {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+
+/* ══════════════════════════════════════════════════════════
+   MENU
+   ══════════════════════════════════════════════════════════ */
+.menu__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: var(--s5);
+  flex-wrap: wrap;
+  padding-bottom: var(--s6);
+}
+.menu__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--line-faint);
+  border: 1px solid var(--line-faint);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+.card {
+  position: relative;
+  background: var(--sand-lt);
+  display: block;
+  overflow: hidden;
+  transition: background var(--t-mid) var(--e-out);
+}
+.card:hover {
+  background: var(--paper);
+}
+.card__img {
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  position: relative;
+}
+.card__img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 1.1s var(--e-out), filter 1.1s var(--e-out);
+  filter: saturate(0.82);
+}
+.card:hover .card__img img {
+  transform: scale(1.06);
+  filter: saturate(1);
+}
+.card__num {
+  position: absolute;
+  top: var(--s3);
+  left: var(--s3);
+  z-index: 2;
+  color: var(--sand);
+  font-family: var(--serif);
+  font-size: 15px;
+  letter-spacing: 2px;
+  mix-blend-mode: difference;
+}
+.card__body {
+  padding: var(--s4) var(--s3) var(--s5);
+}
+.card__body .h3 {
+  margin: var(--s2) 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.card__arrow {
+  margin-top: var(--s4);
+}
