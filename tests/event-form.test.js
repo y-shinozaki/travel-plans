@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { emptyEvent, eventFormHtml, readEventForm, formProblems } from "../assets/js/event-form.js";
-import { validateEvents } from "../assets/js/validate.js";
+import { validateEvents, validateEvent } from "../assets/js/validate.js";
 
 const DAYS = [
   { dow: "水", date: "8/12" }, { dow: "木", date: "8/13" }, { dow: "金", date: "8/14" },
@@ -139,4 +139,150 @@ test("フォームの HTML に全カテゴリの選択肢がある", () => {
 test("フォームの HTML に日数ぶんの選択肢がある", () => {
   const html = eventFormHtml(emptyEvent(3), DAYS);
   for (const d of DAYS) assert.ok(html.includes(d.date), `${d.date} の選択肢がありません`);
+});
+
+/* ── 描画した HTML を読み戻す ──────────────────────────
+ *
+ * 上の 3 件（エスケープ・カテゴリ・日）は部分文字列しか見ていないので、
+ * selected / checked / 時刻の value を全部落としても緑のままだった。
+ * それは「既存の予定を開いて保存すると、日・カテゴリ・終日・時刻が
+ * 既定値に戻る」という壊れ方そのもの。ブラウザが読むのと同じ値を
+ * HTML から取り出し、readEventForm に通して元のイベントに戻ることを見る。
+ */
+
+const unescapeHtml = (s) =>
+  s
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&");
+
+/** その id の入力欄について、ブラウザの .value に相当する文字列を取り出す。 */
+function fieldValue(html, id) {
+  const textarea = new RegExp(`<textarea id="${id}"[^>]*>([\\s\\S]*?)</textarea>`).exec(html);
+  if (textarea) return unescapeHtml(textarea[1]);
+
+  const select = new RegExp(`<select id="${id}">([\\s\\S]*?)</select>`).exec(html);
+  if (select) {
+    const picked = /<option value="([^"]*)" selected>/.exec(select[1]);
+    return picked ? unescapeHtml(picked[1]) : "";
+  }
+
+  const input = new RegExp(`<input([^>]*id="${id}"[^>]*)>`).exec(html);
+  assert.ok(input, `${id} の入力欄が HTML にありません`);
+  const attrs = input[1];
+  // チェックが外れているとき "" を返すのは、DOM の getValue に課している約束と同じ
+  if (/type="checkbox"/.test(attrs)) return /\schecked/.test(attrs) ? "on" : "";
+  const value = /value="([^"]*)"/.exec(attrs);
+  return value ? unescapeHtml(value[1]) : "";
+}
+
+const readBack = (ev, days = DAYS) => {
+  const html = eventFormHtml(ev, days);
+  return readEventForm((id) => fieldValue(html, id));
+};
+
+test("HTML に描いた値を読み戻すと元のイベントに戻る", () => {
+  const ev = {
+    cat: "cat-hotel",
+    title: 'ホテル "A" & <b>',
+    allDay: false,
+    startDay: 1,
+    endDay: 2,
+    location: "Bangkok & Co. <'>",
+    lat: 13.7278,
+    lng: 100.5601,
+    url: "https://example.com/?a=1&b=2",
+    notes: "メモ\n2 行目 & <tag>",
+    start: 15,
+    end: 11.5,
+  };
+  assert.deepEqual(readBack(ev), ev);
+});
+
+test("終日のイベントも HTML から読み戻せる", () => {
+  const ev = {
+    cat: "cat-hotel",
+    title: "バンコクホテル",
+    allDay: true,
+    startDay: 0,
+    endDay: 2,
+    location: "",
+    lat: null,
+    lng: null,
+    url: "",
+    notes: "",
+  };
+  assert.deepEqual(readBack(ev), ev);
+});
+
+test("フォームの HTML が場所・リンク・メモをエスケープする", () => {
+  // renderers.test.js と同じ、レビューで実際に到達したペイロード
+  const PAYLOAD = '<img src=x onerror="window.__pwned=1">';
+  const ATTR_PAYLOAD = 'x" onerror="window.__pwned=1';
+  const html = eventFormHtml(
+    { ...emptyEvent(3), location: ATTR_PAYLOAD, url: ATTR_PAYLOAD, notes: PAYLOAD },
+    DAYS
+  );
+  assert.doesNotMatch(html, /onerror="window/);
+  assert.doesNotMatch(html, /<img\s+src=x/);
+});
+
+/* ── 引数と壊れた入力 ─────────────────────────────── */
+
+test("dayCount が無い・数でないなら投げる", () => {
+  // checkDayIndex は value >= dayCount で範囲を見るので、dayCount が NaN や
+  // undefined だと比較が両方 false になり、日の検査だけが黙って無効になる
+  const ev = { ...emptyEvent(3), startDay: 99, endDay: 99 };
+  assert.match(formProblems(ev, 3).join(), /範囲外/);
+  for (const bad of [undefined, NaN, 0, -1, 2.5, "3", null]) {
+    assert.throws(() => formProblems(ev, bad), RangeError, `dayCount=${bad} で投げません`);
+    assert.throws(() => emptyEvent(bad), RangeError, `dayCount=${bad} で投げません`);
+  }
+});
+
+test("イベントがオブジェクトでなくても投げずに問題として返す", () => {
+  for (const bad of [null, undefined, "ev", 3, []]) {
+    const problems = formProblems(bad, 3);
+    assert.ok(problems.length > 0, `${JSON.stringify(bad)} が問題なしになりました`);
+  }
+});
+
+/* ── validate.js との文字列の約束 ───────────────────── */
+
+test("値に「: 」が入っていても文言が欠けない", () => {
+  // 名指しを「最後の ': ' で切る」当て推量にすると、ここで本文の頭が消える
+  const problems = formProblems({ ...emptyEvent(3), cat: "a: b" }, 3);
+  assert.equal(problems.length, 1);
+  assert.match(problems[0], /^未知のカテゴリです/);
+});
+
+test("validate.js の名指しは「id: 本文」の形", () => {
+  // event-form.js の inFormWords がこの形を前提に名指しだけを落としている。
+  // validate.js が継ぎ方を変えたらここで落ちる
+  const base = { id: "ev-x", title: "", cat: "cat-food", allDay: false, startDay: 0, endDay: 0, start: 12, end: 13, lat: null, lng: null };
+  const broken = [
+    { cat: "cat-x" },
+    { startDay: 9, endDay: 9 },
+    { startDay: 1, endDay: 0 },
+    { startDay: 0.5 },
+    { title: 1 },
+    { start: NaN },
+    { end: 25 },
+    { lat: 13.7 },
+    { lat: NaN, lng: 100 },
+    { lat: 91, lng: 181 },
+    { allDay: false, start: undefined, end: undefined },
+  ];
+  let seen = 0;
+  for (const over of broken) {
+    const problems = validateEvent({ ...base, ...over }, 3);
+    assert.ok(problems.length > 0, `不備が出ません: ${JSON.stringify(over)}`);
+    for (const message of problems) {
+      seen++;
+      assert.ok(message.startsWith("ev-x: "), `名指しの形が違います: ${message}`);
+    }
+  }
+  assert.ok(seen >= broken.length);
 });

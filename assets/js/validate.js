@@ -34,6 +34,12 @@ export class EventDataError extends Error {
  * エラー文でイベントを名指しするためのラベル。
  * id が無いイベントは where（配列上の位置など、呼び出し側が知っている
  * 「どこの話か」）で代用する。
+ *
+ * ラベルと本文は必ず `${label}: 本文` の形で継ぐこと。event-form.js の
+ * inFormWords がこの形を前提に、名指しだけを落として本文をフォームの
+ * 利用者に見せている。継ぎ方（ラベルの組み立て方・区切り）を変えるなら
+ * あちらも直すこと。tests/event-form.test.js の
+ * 「validate.js の名指しは『id: 本文』の形」がこの約束を見張っている。
  */
 function labelOf(ev, where) {
   const id = ev && typeof ev.id === "string" && ev.id ? ev.id : where;

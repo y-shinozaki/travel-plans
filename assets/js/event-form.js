@@ -24,15 +24,28 @@ import { validateEvent } from "./validate.js";
 const DRAFT_ID = "(新規)";
 
 /**
+ * dayCount を受け取る関数はすべてこれを最初に通す。
+ *
+ * 検査を素通りさせないための番人。validate.js の checkDayIndex は
+ * `value < 0 || value >= dayCount` で日の範囲を見るので、dayCount が
+ * undefined や NaN だと**比較が両方 false になり、どんな startDay も通る**。
+ * つまり日付の検査だけが黙って全部無効になる ── その状態で保存されたデータは
+ * 次の読み込みで validateEvents に弾かれ、ページが起動しなくなる。
+ * 入力からは起こらないが、呼び出し側が引数を落とせば起こる。
+ */
+function requireDayCount(fname, dayCount) {
+  if (!Number.isInteger(dayCount) || dayCount < 1) {
+    throw new RangeError(`${fname}: dayCount は 1 以上の整数が必要です（${dayCount}）`);
+  }
+}
+
+/**
  * 新規作成の初期値。id は保存時に採番するので持たせない。
  * 時刻の既定は 9:00 → 10:00（mock-aman.html の #evSheet と同じ）。
  */
 export function emptyEvent(dayCount) {
-  // 1 日も無いデータでは、どの日にも置けない予定ができてしまう。
-  // validateEvents は days が空の時点で弾くので、ここへ来るのは呼び出し側の間違い
-  if (!Number.isInteger(dayCount) || dayCount < 1) {
-    throw new RangeError(`emptyEvent: 日が 1 つ以上必要です（${dayCount}）`);
-  }
+  // 1 日も無いデータでは、どの日にも置けない予定ができてしまう
+  requireDayCount("emptyEvent", dayCount);
   return {
     cat: "cat-sight",
     title: "新しい予定",
@@ -270,14 +283,25 @@ const FIELD_RE = new RegExp(
   "g"
 );
 
+/**
+ * validate.js が本文の前に付ける名指し。フォームは 1 件しか扱わないので落とす。
+ *
+ * 検査に渡す写しは id が DRAFT_ID・title が空（下の formProblems を参照）なので、
+ * validate.js の labelOf が付ける名指しはこの 1 通りに固定される。
+ * 「最後の ": " で切る」ような当て推量にしないのは、タイトルや cat に ": " が
+ * 入っているだけで本文の頭が削れてしまうため（cat: "a: b" で実際に起きた）。
+ */
+const LABEL_PREFIX = `${DRAFT_ID}: `;
+
 function inFormWords(message) {
-  // validate.js のメッセージは「どのイベントか: 本文」の形。フォームは
-  // 1 件しか扱わないので名指しの部分は落とす。本文に ": " は現れないため、
-  // 最後の ": " が境目になる（タイトルに ": " が入っていても取り違えない）
-  const cut = message.startsWith(DRAFT_ID) ? message.lastIndexOf(": ") : -1;
-  const body = cut === -1 ? message : message.slice(cut + 2);
+  const body = message.startsWith(LABEL_PREFIX)
+    ? message.slice(LABEL_PREFIX.length)
+    : message;
   return body.replace(FIELD_RE, (name) => FIELD_WORDS[name]);
 }
+
+/** イベントとして扱える形か（validate.js の isPlainObject と同じ判定）。 */
+const isEventObject = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
 
 /**
  * 保存してよいかを調べ、直すべき点の一覧を返す（空配列なら保存してよい）。
@@ -290,6 +314,13 @@ function inFormWords(message) {
  * 採番と重複の回避は保存側の責任。
  */
 export function formProblems(ev, dayCount) {
+  requireDayCount("formProblems", dayCount);
+
+  // オブジェクトでなければフォームの規則を当てても意味がない。展開する前に
+  // validateEvent へ渡して言わせる（公開関数なので、素の TypeError ではなく
+  // 問題の一覧で返す）
+  if (!isEventObject(ev)) return validateEvent(ev, dayCount).map(inFormWords);
+
   const problems = [];
 
   // 空のタイトルは validateEvent を通る（型としては文字列なので）。
@@ -298,9 +329,13 @@ export function formProblems(ev, dayCount) {
     problems.push("タイトルを入力してください。");
   }
 
-  // 検査のあいだだけ仮 id を被せる。id はまだ振られていないが、
-  // それ以外の規則は保存後とまったく同じものを通す
-  problems.push(...validateEvent({ ...ev, id: DRAFT_ID }, dayCount).map(inFormWords));
+  // 検査には仮 id を被せた写しを渡す。title を空にするのは、validate.js が
+  // 付ける名指しを DRAFT_ID 1 つに固定して、メッセージの切り出し（inFormWords）が
+  // 入力値に左右されないようにするため。title の型と中身は直前の必須チェックが
+  // 見ているので、validateEvent 側の「title が文字列か」を外しても抜けはない
+  // （必須チェックのほうが厳しい）
+  const draft = { ...ev, id: DRAFT_ID, title: "" };
+  problems.push(...validateEvent(draft, dayCount).map(inFormWords));
 
   // 同じ日の中でだけ「終了は開始より後」を求める。日をまたぐ滞在では
   // 15:00 → 翌々日 11:00 のような指定が正しく、validateEvent もそれを通す
