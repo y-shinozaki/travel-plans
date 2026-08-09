@@ -2034,20 +2034,26 @@ EOF
 
 - [ ] **Step 1: Leaflet を取得して配置する**
 
+`curl` には `-f` を付けて、404 のときに終了コードで落とす。付けないとエラーページの HTML が
+`leaflet.js` として保存され、ブラウザで初めて気づくことになる。
+
 ```bash
-mkdir -p assets/vendor/leaflet
-curl -fsSL -o /tmp/leaflet.zip https://unpkg.com/leaflet@1.9.4/dist/leaflet.zip 2>/dev/null || {
-  curl -fsSL -o assets/vendor/leaflet/leaflet.js  https://unpkg.com/leaflet@1.9.4/dist/leaflet.js
-  curl -fsSL -o assets/vendor/leaflet/leaflet.css https://unpkg.com/leaflet@1.9.4/dist/leaflet.css
-  mkdir -p assets/vendor/leaflet/images
-  for f in marker-icon.png marker-icon-2x.png marker-shadow.png layers.png layers-2x.png; do
-    curl -fsSL -o "assets/vendor/leaflet/images/$f" "https://unpkg.com/leaflet@1.9.4/dist/images/$f"
-  done
-}
-ls -la assets/vendor/leaflet assets/vendor/leaflet/images
+set -e
+BASE=https://unpkg.com/leaflet@1.9.4/dist
+mkdir -p assets/vendor/leaflet/images
+
+curl -fsSL -o assets/vendor/leaflet/leaflet.js  "$BASE/leaflet.js"
+curl -fsSL -o assets/vendor/leaflet/leaflet.css "$BASE/leaflet.css"
+
+for f in marker-icon.png marker-icon-2x.png marker-shadow.png layers.png layers-2x.png; do
+  curl -fsSL -o "assets/vendor/leaflet/images/$f" "$BASE/images/$f"
+done
+
+ls -l assets/vendor/leaflet assets/vendor/leaflet/images
 ```
 
 Expected: `leaflet.js`（約 147KB）、`leaflet.css`（約 15KB）、`images/` に 5 ファイル。
+いずれかの `curl` が落ちたらそこで止まる（`set -e`）。
 
 - [ ] **Step 2: 取得したファイルを検証する**
 
