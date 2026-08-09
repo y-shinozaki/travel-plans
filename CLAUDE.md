@@ -51,10 +51,17 @@ travel-plans/
 └── docs/design-reference/mock-aman.html   検証済みの参照実装（実装対象ではなく、値を写す元）
 ```
 
-Phase B（持ち物リスト・保存・公開・認証）と Phase C（検索アーカイブ）で
-`assets/css/packing.css` `archive.css`、`assets/js/store.js` `sync.js` `auth.js` `crypto.js` `comments.js`、
-`assets/data/packing.json` `comments.json` `archive.enc` などが追加される予定。
-詳細は `docs/superpowers/specs/2026-08-09-travel-plans-redesign-design.md` を参照。
+設計書（`docs/superpowers/specs/2026-08-09-travel-plans-redesign-design.md` §2.3）によると、
+今後 2 フェーズで以下が追加される予定:
+
+- **Phase B**（保存・公開フロー、予定エディタ、持ち物リストとエディタ、コメント機能）:
+  `assets/js/store.js` `sync.js` `comments.js`、`assets/css/packing.css`、
+  `assets/data/packing.json` `comments.json` など
+- **Phase C**（変換スクリプト、暗号化、認証、検索アーカイブ）:
+  `assets/js/auth.js` `crypto.js`、`assets/css/archive.css`、`assets/data/archive.enc`、
+  `tools/build-archive.mjs`、`private/`（.gitignore 対象）など
+
+いずれもこの CLAUDE.md ではなく設計書を正とする。
 
 ### イベントのデータ構造
 
@@ -66,7 +73,7 @@ Phase B（持ち物リスト・保存・公開・認証）と Phase C（検索�
   id: "ev-006",
   cat: "cat-move",              // cat-move / cat-sight / cat-food / cat-hotel / cat-shop
   title: "出国フライト（依田家）",
-  allDay: false,                 // true ならホテル欄などの終日表示（start/end は無視）
+  allDay: false,                 // true ならホテル欄などの終日表示。true のときは start/end キー自体を持たない
   startDay: 0,                   // 日インデックス（0 始まり）
   endDay: 0,                     // 複数日にまたがる場合はここが startDay より後ろになる
   start: 10.58,                  // 10進時間。10.58 ≈ 10:35
@@ -134,8 +141,9 @@ map.js の createMap() → 座標を持つイベントからマーカーと位�
 
 ### マップタイルを更新
 
-`assets/js/map.js` 内の `L.tileLayer()` 呼び出しの URL を置換する。現在は CartoDB Voyager を使用。
-代替案: Stamen Watercolor、Esri World Imagery、OpenStreetMap デフォルト。
+`assets/js/map.js` 内の `L.tileLayer()` 呼び出しの URL を置換する。現在は CartoDB Positron
+（`rastertiles/light_all`）を使用。Voyager は彩度が高く、無彩色基調のページから浮くため採用していない
+（`map.js` 冒頭のコメント参照）。代替案: Stamen Watercolor、Esri World Imagery、OpenStreetMap デフォルト。
 
 ### カラーを変更
 
@@ -159,9 +167,12 @@ map.js の createMap() → 座標を持つイベントからマーカーと位�
 <script src="assets/vendor/leaflet/leaflet.js"></script>
 ```
 
-**Leaflet を CDN からセルフホストへ変更した理由**: Phase B で GitHub トークンをブラウザに保存する
-（合言葉から導出した鍵で暗号化して sessionStorage に置く設計）。CDN 経由のスクリプトが差し替えられた場合、
-そのトークンを盗み出せてしまうため、サードパーティの JS を一切 CDN から読み込まない方針にした。
+**Leaflet を CDN からセルフホストへ変更した理由**: Phase B でこのリポジトリへの書き込み権限を持つ
+GitHub トークンをブラウザに保存する予定がある。CDN 経由のスクリプトが差し替えられた場合、
+そのトークンを盗み出されたり、リポジトリへ任意の内容を push されたりする恐れがあるため、
+サードパーティの JS を一切 CDN から読み込まない方針にした。トークンの具体的な保存先・扱いは
+`docs/superpowers/specs/2026-08-09-travel-plans-redesign-design.md` §5.4・§6.4 を参照
+（この CLAUDE.md では詳細を重複させない — 設計変更のたびにここが古くなるのを避けるため）。
 Leaflet を更新する際は `assets/vendor/leaflet/` 配下のファイルを手動で差し替える。
 
 アイコンは Material Symbols フォントではなく、`assets/js/icons.js` が注入するインライン SVG スプライト

@@ -7,15 +7,15 @@
 ## 機能
 
 - 時間別スケジュール表示（表示時間帯はカスタマイズ可能）
-- Leaflet と CartoDB Voyager タイルを使用したインタラクティブマップ
+- Leaflet と CartoDB Positron タイルを使用したインタラクティブマップ
 - カテゴリによるイベントフィルタリング
 - 詳細シートでのイベント情報表示
 - モバイル、タブレット、デスクトップに対応
 - ビルドプロセス不要 — ローカルサーバーを起動するだけ
 
 現在実装済みなのはメニュー（`index.html`）と旅程カレンダー（`schedule.html`）。
-持ち物リスト（`packing.html`）とログイン式アーカイブ（`archive.html`）は Phase B/C 向けの
-仮ページで、リンクのみ用意されている。
+持ち物リスト（`packing.html`）と検索アーカイブ（`archive.html`）は Phase B/C 向けの仮ページで、
+「メニューへ戻る」リンクのみ用意されている（`archive.html` は合言葉によるログインを予定しているが未実装）。
 
 ## 技術スタック
 
@@ -64,8 +64,8 @@ travel-plans/
 │   │   ├── controls.css   ボタン・チップ・入力欄・詳細シート
 │   │   └── calendar.css   schedule.html 専用（カレンダー・地図・レスポンシブ）
 │   ├── js/                menu.js / schedule.js（各ページのエントリポイント）、
-│   │                      calendar.js / map.js / sheet.js / nav.js / reveal.js、
-│   │                      time.js / events.js / lanes.js / icons.js（純粋関数群）
+│   │                      calendar.js / map.js / sheet.js / nav.js / reveal.js / icons.js、
+│   │                      time.js / events.js / lanes.js（node --test が対象にする純粋関数）
 │   ├── data/
 │   │   └── events.json    旅程データ（唯一のソース。表示用文字列は持たない）
 │   └── vendor/
@@ -185,15 +185,18 @@ map.js の createMap() → 座標を持つイベントからマーカーと位�
 
 ### マップタイルを変更
 
-`assets/js/map.js` 内の `L.tileLayer()` URL を置換する。現在は CartoDB Voyager を使用。
+`assets/js/map.js` 内の `L.tileLayer()` URL を置換する。現在は CartoDB Positron
+（`rastertiles/light_all`）を使用。低彩度で無彩色基調のページに馴染むための選択で、
+彩度の高い Voyager はあえて採用していない（`map.js` 冒頭のコメント参照）。
 代替案: Stamen Watercolor、Esri World Imagery、OpenStreetMap。
 
 ## Leaflet をセルフホストする理由
 
-Phase B で GitHub トークンをブラウザ内（sessionStorage、合言葉から導出した鍵で暗号化）に
-保存する設計を予定している。CDN 経由で読み込むスクリプトが差し替えられた場合、そのトークンを
-盗み出されるおそれがあるため、サードパーティの JS は CDN から読み込まず `assets/vendor/leaflet/`
-に自前で配置している。
+Phase B でこのリポジトリへの書き込み権限を持つ GitHub トークンをブラウザに保存する予定がある。
+CDN 経由で読み込むスクリプトが差し替えられた場合、そのトークンを盗み出されたり、
+リポジトリへ任意の内容を push されたりする恐れがあるため、サードパーティの JS は CDN から
+読み込まず `assets/vendor/leaflet/` に自前で配置している。トークンの具体的な保存先・扱いは
+`docs/superpowers/specs/2026-08-09-travel-plans-redesign-design.md` §5.4・§6.4 を参照。
 
 ## デプロイメント
 
