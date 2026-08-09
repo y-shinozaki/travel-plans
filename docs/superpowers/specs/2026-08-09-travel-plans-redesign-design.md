@@ -39,39 +39,74 @@ archive.html     Gmail / LINE 横断検索（復号が必要）
 
 ### 2.2 ファイル構成
 
+**印の読み方**: 印の無い行は Phase A / B1 で実在するファイル。`[B2]` `[B3]` `[C]` は
+そのフェーズで追加する予定のもので、まだリポジトリに無い。
+
 ```
 travel-plans/
 ├── index.html / schedule.html / packing.html / archive.html
+│                           （packing / archive はリンクだけの仮ページ）
 ├── assets/
 │   ├── css/
 │   │   ├── tokens.css      CSS 変数（唯一の色・余白・角丸・モーションの定義場所）
 │   │   ├── base.css        リセット、タイポグラフィ、共通レイアウト、reveal 演出
-│   │   ├── controls.css    ボタン／チップ／チェックボックス／入力欄／シート
-│   │   ├── calendar.css    schedule.html 専用
-│   │   ├── packing.css     packing.html 専用
-│   │   └── archive.css     archive.html 専用
+│   │   ├── controls.css    ボタン／チップ／チェックボックス／入力欄／シート／
+│   │   │                   編集フォーム／公開まわり（パネル・状態表示・同期バー）
+│   │   ├── calendar.css    schedule.html 専用（カレンダー・地図）
+│   │   ├── packing.css     packing.html 専用                            [B2]
+│   │   └── archive.css     archive.html 専用                            [C]
 │   ├── js/
-│   │   ├── store.js        localStorage ラッパ（名前空間・JSON 入出力・変更検知）
-│   │   ├── sync.js         リモート JSON の取得、版の比較、GitHub への公開
-│   │   ├── auth.js         合言葉入力、鍵導出、sessionStorage への保持、遷移ガード
-│   │   ├── crypto.js       PBKDF2 / AES-GCM の復号（archive 専用）
+│   │   │  ── 表示（Phase A）──
+│   │   ├── time.js         10 進時間 ⇄ HH:MM、timeLabel()
+│   │   ├── events.js       expandEvents()（複数日 → 日単位セグメント）
+│   │   ├── lanes.js        assignLanes()（重なりのレーン配置）
+│   │   ├── categories.js   CAT_META とカテゴリの参照関数
+│   │   ├── validate.js     validateEvent()（1 件）/ validateEvents()（全体）
+│   │   ├── dom.js          el() / escapeHtml() / safeHttpUrl() / makeSelectable()
 │   │   ├── icons.js        インライン SVG スプライトの注入
-│   │   ├── comments.js     汎用コメント（対象キー → 本文）
-│   │   ├── sheet.js        右から出る詳細／編集シートの共通実装
-│   │   ├── calendar.js / packing.js / archive.js / menu.js
+│   │   ├── calendar.js     renderCalendar() と HOUR_H
+│   │   ├── map.js          Leaflet 初期化、マーカーと位置情報リスト
+│   │   ├── sheet.js        右から出る詳細／編集シートの器
+│   │   ├── nav.js / reveal.js / countdown.js
+│   │   │  ── 保存と公開（Phase B1、§5）──
+│   │   ├── store.js        localStorage ラッパ（名前空間・JSON / 生文字列）
+│   │   ├── base64.js       UTF-8 対応の base64（btoa は日本語で落ちる）
+│   │   ├── sync-decide.js  decideSync()。ローカルとリモートの選択（純粋関数）
+│   │   ├── github.js       Contents API の呼び出し
+│   │   ├── token.js        公開用トークンの置き場所（tp:gh-token の唯一の出入口）
+│   │   ├── sync.js         リモート JSON の取得、版の比較、GitHub への公開
+│   │   ├── event-form.js   編集フォームの HTML・読み取り・formProblems()
+│   │   ├── event-editor.js 採番・併合・保存・削除
+│   │   ├── publish-ui.js   トークン設定・公開ボタン・起動時の案内バー
+│   │   │  ── エントリポイント ──
+│   │   ├── menu.js         index.html
+│   │   ├── schedule.js     schedule.html
+│   │   ├── stub-page.js    packing.html / archive.html（CSP のため外部ファイル）
+│   │   ├── packing.js      packing.html のエントリポイント               [B2]
+│   │   ├── comments.js     汎用コメント（対象キー → 本文）               [B3]
+│   │   ├── auth.js         合言葉入力、鍵導出、sessionStorage、遷移ガード [C]
+│   │   ├── crypto.js       PBKDF2 / AES-GCM の復号（archive 専用）        [C]
+│   │   └── archive.js      archive.html のエントリポイント               [C]
 │   ├── data/
 │   │   ├── events.json     旅程（公開対象・リモートが正）
-│   │   ├── packing.json    持ち物（公開対象・リモートが正）
-│   │   ├── comments.json   コメント（公開対象・リモートが正）
-│   │   └── archive.enc     Gmail / LINE を暗号化したバイナリ
+│   │   ├── packing.json    持ち物（公開対象・リモートが正）              [B2]
+│   │   ├── comments.json   コメント（公開対象・リモートが正）            [B3]
+│   │   └── archive.enc     Gmail / LINE を暗号化したバイナリ             [C]
 │   └── vendor/
 │       └── leaflet/        Leaflet 1.9.4 を自前で配置（後述のセキュリティ理由）
+├── tests/                  node --test（依存ゼロ・ビルドなし）
 ├── tools/
-│   └── build-archive.mjs   private/ の生データ → 正規化 → 暗号化 → archive.enc
-├── private/                .gitignore 対象。Gmail 抽出結果と LINE エクスポート
+│   └── build-archive.mjs   private/ の生データ → 正規化 → 暗号化 → archive.enc [C]
+├── private/                .gitignore 対象。Gmail 抽出結果と LINE エクスポート  [C]
 ├── DESIGN.md               新デザイン仕様（Aman 由来）
 ├── CLAUDE.md / README.md
 ```
+
+B1 で `store.js` / `sync.js` の 2 本という当初の想定を 6 本
+（`store` / `base64` / `sync-decide` / `github` / `token` / `sync`）に割った。
+通信・保存・判断を別々に差し替えられないと、公開フローを `node --test` で
+回せないため。B2 で `sync.js` を 2 つ目の JSON に使う前に §13 の
+「`createSync()` は 1 ファイル分の下書き枠しか持てない」を読むこと。
 
 JS は `<script type="module">` で読み込む。`file://` 直開きでは CORS により動作しないため、
 ローカル開発は `python3 -m http.server 8000` を必須とする。CLAUDE.md と README.md を更新する。
@@ -719,10 +754,21 @@ assets/data/archive.enc
   `.rowbtn--del` / `.rowbtn--confirm` / `.inp--note` / `.inp--group` は持ち物リスト待ち
 - `createMap()` と `createSheet()` の本体は `node --test` の対象外。ブラウザ実測でのみ検証
 
----
-
 ### Phase B1 からの繰り越し（保存と公開）
 
+- **`createSync()` は 1 ファイル分の下書き枠しか持てない。B2 が最初に踏む。**
+  `sync.js` の `DRAFT_KEY = "events"` と `BASE_KEY = "events-base"` はモジュール定数で、
+  注入できる `config`（`owner` / `repo` / `branch` / `path`）に入っていない。
+  §5.2・§5.3 は同期する JSON を 3 つ（`events` / `packing` / `comments`）想定しているが、
+  **`createSync({ config: { …, path: "assets/data/packing.json" } })` を作っても
+  読み書きするキーは `tp:events` / `tp:events-base` のまま**で、持ち物リストの下書きが
+  旅程の下書きを上書きし、`tp:events-base` も持ち物側の時刻で塗り替わる。
+  `validateEvents()` を通らない下書きは `load()` が警告して捨てるので、
+  症状は「旅程の編集が消える」という形で出る。
+  直し方は `config` にキーの接頭辞（`packing` / `packing-base` 等）を足し、
+  既定を今の値にすること。**B2 で 2 つ目の `createSync` を作る前に必ず直す。**
+  ついでに `publish()` の `stamped.events.length`（コミットメッセージの件数）も
+  `events` 固定なので、ファイルごとに変える必要がある
 - **時計ずれで他端末の公開を黙って上書きしうる（残存リスク）。**
   `tp:events-base` に入る `updatedAt` は公開した端末の時計で押される。押す端末が
   複数あるので順序関係は保たれない ── A の時計が遅れていれば、A があとから公開した版の
@@ -769,6 +815,10 @@ assets/data/archive.enc
   呼び出し側の誤用だが「書けたつもり」の系統ではある
 - **`decideSync()` は `hasLocal: false` なのに `localUpdatedAt` が渡された呼び出しを
   検知せず `use-remote` を返す。** この関数で唯一「迷ったら人に聞く」に倒れない経路
+- **`decideSync()` の先頭 2 つのガード（`remoteUpdatedAt == null` → `offline`、
+  `!hasLocal` → `use-remote`）だけ理由のコメントが無い。** 以降のガードには
+  「なぜその判断に倒すのか」が書いてあるので、この 2 行だけ根拠が読み取れない
+  （上の項目もこの 2 行目に関わる）
 
 ### Phase B1 からの繰り越し（テストの穴）
 

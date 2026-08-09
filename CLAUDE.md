@@ -129,7 +129,8 @@ assignLanes()  → 同じ日・重なる時間帯のセグメントにレーン�
 renderCalendar() → 時間スロットグリッドを描画（viewStart/viewEnd を尊重）
 map.js の createMap() → 座標を持つイベントからマーカーと位置情報リストを構築
   ↓
-カテゴリフィルター変更時・予定の保存時・取り込み時に再描画（schedule.js の safeDraw）
+表示時間帯の変更時・カテゴリフィルター変更時・予定の保存時・取り込み時に再描画
+（すべて schedule.js の safeDraw を通す）
 ```
 
 ## 保存と公開（Phase B1）
@@ -155,6 +156,10 @@ map.js の createMap() → 座標を持つイベントからマーカーと位�
 キー名を他のファイルに書き写さないこと。`sync.js` と `token.js` だけが知っている。
 （この 3 つのほかに `publish-ui.js` が `tp:write-probe` を一瞬だけ書いて消す。
 保存領域に書けるかを実際に試すためで、残さない。）
+
+**`DRAFT_KEY` / `BASE_KEY` は `config` に入っていないモジュール定数。** 2 つ目の JSON
+（B2 の `packing.json`）を同期させる前に、設計書 §13 の
+「`createSync()` は 1 ファイル分の下書き枠しか持てない」を読むこと。
 
 ### `updatedAt` がすべての比較の軸
 
@@ -249,12 +254,14 @@ validateEvents → GET で sha と本文 → updatedAt の突き合わせ → PU
 - `connect-src 'self' https://api.github.com` — 公開フローが叩く先だけを許可
 - `style-src` に `'unsafe-inline'` が要る（Leaflet と自前コードが `style` 属性を使うため）。
   狙いはスクリプト実行の遮断であって、スタイルではない
-- `img-src` が `https:` のワイルドカードなのは、旅程データが複数の外部ホストから画像を
-  直リンクしているため（設計書 §13 の負債）
+- `img-src` が `https:` のワイルドカードなのは、`events.json` と `menu.js` が
+  複数の外部ホストから画像を直リンクしているため（設計書 §13 の負債）
 
-`tests/csp.test.js` が「4 ページに CSP がある」「`script-src` が `'self'` のみ」
-「インライン script も `on*` 属性も 1 つも無い」「`connect-src` に GitHub API がある」を
-機械的に検査している。
+`tests/csp.test.js` の 6 件が機械的に検査している。4 ページすべてを見るのが
+「CSP がある」「`script-src` が `'self'` のみ」「インライン script が 1 つも無い」
+「`on*` 属性が 1 つも無い」「`connect-src` に GitHub API がある」の 5 件で、
+6 件目（`img-src` に地図タイル、`font-src` にフォント）だけは `schedule.html` しか
+見ていない（設計書 §13 のテストの穴）。
 
 ## デザインシステム
 
