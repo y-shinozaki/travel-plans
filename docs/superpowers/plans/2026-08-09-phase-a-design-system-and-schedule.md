@@ -1283,6 +1283,8 @@ test("events.json が参照するアイコンがすべて存在する", () => {
   const data = JSON.parse(
     readFileSync(new URL("../assets/data/events.json", import.meta.url), "utf8")
   );
+  // 空配列だとループが 0 回で素通りするので、件数そのものを先に確かめる
+  assert.equal(data.events.length, 40, "events.json の件数が想定と違います");
   for (const ev of data.events) {
     const id = ev.icon ?? CATEGORY_ICON[ev.cat];
     assert.ok(id, `${ev.title}: カテゴリ ${ev.cat} に既定アイコンがありません`);
