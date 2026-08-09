@@ -48,7 +48,7 @@ test("実データの全イベントがカレンダーのセグメントにな�
 });
 
 test("日付をまたぐフライトは 2 日ぶんに割れる（start > end を壊さない）", () => {
-  // ev-010 は 22:10 発 → 翌 06:20 着。start > end は「間違い」ではないので、
+  // ev-010 は 21:55 発 → 翌 06:20 着。start > end は「間違い」ではないので、
   // 正規化や入れ替えで直そうとしないこと
   const flight = data.events.find((e) => e.id === "ev-010");
   assert.ok(flight, "ev-010 がありません");
@@ -58,11 +58,11 @@ test("日付をまたぐフライトは 2 日ぶんに割れる（start > end �
   assert.deepEqual(
     segs.map((s) => [s.day, s.start, s.end]),
     [
-      [4, 22.17, 24],
+      [4, 21.92, 24],
       [5, 0, 6.33],
     ]
   );
-  assert.equal(timeLabel(flight), "22:10 → 06:20");
+  assert.equal(timeLabel(flight), "21:55 → 06:20");
 });
 
 test("座標を持つイベントは同一地点にまとめられる", () => {
