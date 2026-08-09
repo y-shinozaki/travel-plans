@@ -39,6 +39,14 @@ function labelOf(ev, index) {
 
 const isPlainObject = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
 const isFiniteNumber = (v) => typeof v === "number" && Number.isFinite(v);
+
+/**
+ * エラー文に値を埋め込む。
+ * JSON.stringify(Infinity) は "null" になるため、そのまま使うと
+ * 「lat が有限の数値ではありません（null）」という嘘の説明になる。
+ * 数値だけは String() で出す。
+ */
+const show = (v) => (typeof v === "number" ? String(v) : JSON.stringify(v));
 /** null と undefined の両方を「値なし」として扱う（JSON では null が使われる）。 */
 const isAbsent = (v) => v === null || v === undefined;
 
@@ -69,7 +77,7 @@ function checkDays(days, problems) {
 
 function checkDayIndex(value, name, dayCount, label, problems) {
   if (!Number.isInteger(value)) {
-    problems.push(`${label}: ${name} が整数ではありません（${JSON.stringify(value)}）`);
+    problems.push(`${label}: ${name} が整数ではありません（${show(value)}）`);
     return false;
   }
   if (value < 0 || value >= dayCount) {
@@ -90,7 +98,7 @@ function checkCoords(ev, label, problems) {
     // 意図的に地図へ出さないイベントと見分けが付かないので、書き間違いとして弾く
     problems.push(
       `${label}: lat / lng は両方書くか両方 null にしてください` +
-        `（lat=${JSON.stringify(ev.lat)}, lng=${JSON.stringify(ev.lng)}）`
+        `（lat=${show(ev.lat)}, lng=${show(ev.lng)}）`
     );
     return;
   }
@@ -99,7 +107,7 @@ function checkCoords(ev, label, problems) {
     ["lng", ev.lng, 180],
   ]) {
     if (!isFiniteNumber(value)) {
-      problems.push(`${label}: ${name} が有限の数値ではありません（${JSON.stringify(value)}）`);
+      problems.push(`${label}: ${name} が有限の数値ではありません（${show(value)}）`);
     } else if (value < -limit || value > limit) {
       problems.push(`${label}: ${name} が範囲外です（${value} / ±${limit}）`);
     }
@@ -130,7 +138,7 @@ function checkEvent(ev, index, dayCount, seenIds, problems) {
 
   if (!Object.hasOwn(CAT_META, ev.cat)) {
     problems.push(
-      `${label}: 未知のカテゴリです（${JSON.stringify(ev.cat)} / ` +
+      `${label}: 未知のカテゴリです（${show(ev.cat)} / ` +
         `有効な値は ${Object.keys(CAT_META).join(", ")}）`
     );
   }
@@ -147,7 +155,7 @@ function checkEvent(ev, index, dayCount, seenIds, problems) {
       if (!isFiniteNumber(value)) {
         problems.push(
           `${label}: 終日でないイベントの ${name} が有限の数値ではありません` +
-            `（${JSON.stringify(value)}）`
+            `（${show(value)}）`
         );
       } else if (value < 0 || value > 24) {
         problems.push(`${label}: ${name} が 0〜24 の範囲外です（${value}）`);

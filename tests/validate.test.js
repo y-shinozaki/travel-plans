@@ -129,6 +129,14 @@ test("終日イベントは start / end を持たなくてよい", () => {
   assert.doesNotThrow(() => validateEvents(data([allDay])));
 });
 
+test("Infinity / NaN はエラー文でもそのまま Infinity / NaN と出る", () => {
+  // JSON.stringify(Infinity) は "null" になるため、素で埋め込むと
+  // 「有限の数値ではありません（null）」という嘘の説明になる
+  assertRejects(data([ev({ id: "ev-inf", lat: Infinity, lng: 100.5 })]), "（Infinity）");
+  assertRejects(data([ev({ id: "ev-nan2", lat: 13.7, lng: NaN })]), "（NaN）");
+  assertRejects(data([ev({ id: "ev-nan3", start: NaN })]), "（NaN）");
+});
+
 test("id の重複を弾く", () => {
   assertRejects(data([ev(), ev()]), "重複");
 });
