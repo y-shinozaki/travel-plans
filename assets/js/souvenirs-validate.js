@@ -68,17 +68,16 @@ export function validateSouvenir(item, seenIds = new Set(), where = "お土産")
     seenIds.add(item.id);
   }
 
-  // name は必須、recipient / shop は省略できる。指定されているときだけ型を見る
-  if (typeof item.name !== "string") {
-    problems.push(`${label}: name が文字列ではありません（${show(item.name)}）`);
-  }
-
-  // recipient / shop は省略できる。指定されているときだけ型を見る
+  // 空文字は許す。型だけを見る（設計書 §4.5）
+  // 空文字が許される一方、キーそのものが無い行は弾く── packing-validate と同じ理由で、
+  // 編集で誤ってこのキーを消すと、次の読み込みで弾かれずに黙って消えた状態になる
+  // （CLAUDE.md に precedent がある: image / imagePos が非表示のまま読み込まれたことがあった）
   for (const [field, jp] of [
+    ["name", "name"],
     ["recipient", "recipient"],
     ["shop", "shop"],
   ]) {
-    if (item[field] !== undefined && typeof item[field] !== "string") {
+    if (typeof item[field] !== "string") {
       problems.push(`${label}: ${jp} が文字列ではありません（${show(item[field])}）`);
     }
   }

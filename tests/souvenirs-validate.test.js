@@ -70,19 +70,19 @@ test("name / recipient / shop は空文字を許す", () => {
   assert.doesNotThrow(() => validateSouvenirs(data));
 });
 
-test("name が文字列でなければ弧く", () => {
+test("name が文字列でなければ弾く", () => {
   const data = clone();
   data.items[0].name = 123;
   assert.throws(() => validateSouvenirs(data), /name が文字列ではありません/);
 });
 
-test("recipient が文字列でなければ弧く", () => {
+test("recipient が文字列でなければ弾く", () => {
   const data = clone();
   data.items[0].recipient = null;
   assert.throws(() => validateSouvenirs(data), /recipient が文字列ではありません/);
 });
 
-test("shop が文字列でなければ弧く", () => {
+test("shop が文字列でなければ弾く", () => {
   const data = clone();
   data.items[0].shop = {};
   assert.throws(() => validateSouvenirs(data), /shop が文字列ではありません/);
@@ -94,7 +94,7 @@ test("note は省略できる", () => {
   assert.doesNotThrow(() => validateSouvenirs(data));
 });
 
-test("note が文字列でなければ弧く", () => {
+test("note が文字列でなければ弾く", () => {
   const data = clone();
   data.items[0].note = 5;
   assert.throws(() => validateSouvenirs(data), /note が文字列ではありません/);
@@ -106,17 +106,17 @@ test("不備は 1 件目で止めずにまとめて報告する", () => {
     validateSouvenirs(data);
     assert.fail("投げませんでした");
   } catch (error) {
-    assert.match(error.message, /3 件の不備/);
+    assert.match(error.message, /5 件の不備/);
   }
 });
 
 test("不備が多いときは先頭だけ出して残りは件数で示す", () => {
-  const items = Array.from({ length: 20 }, (_, n) => ({ id: `x-${n}`, name: 1, bought: false }));
+  const items = Array.from({ length: 7 }, (_, n) => ({ id: `x-${n}`, name: 1, bought: false }));
   try {
     validateSouvenirs({ items });
     assert.fail("投げませんでした");
   } catch (error) {
-    assert.match(error.message, /…ほか 10 件/);
+    assert.match(error.message, /…ほか 11 件/);
   }
 });
 
@@ -130,13 +130,23 @@ test("id を持たない行は配列上の位置で名指しする", () => {
 });
 
 test("validateSouvenir: 1 件だけを検査して不備の配列を返す", () => {
-  const problems = validateSouvenir({ id: "a", name: "x", bought: false });
+  const problems = validateSouvenir({ id: "a", name: "x", recipient: "", shop: "", bought: false });
   assert.deepEqual(problems, []);
 });
 
 test("validateSouvenir: 渡した Set に id を足していく", () => {
   const seen = new Set();
-  validateSouvenir({ id: "a", name: "x", bought: false }, seen);
-  const problems = validateSouvenir({ id: "a", name: "y", bought: false }, seen);
+  validateSouvenir({ id: "a", name: "x", recipient: "", shop: "", bought: false }, seen);
+  const problems = validateSouvenir({ id: "a", name: "y", recipient: "", shop: "", bought: false }, seen);
   assert.match(problems.join("\n"), /id が重複しています/);
+});
+
+test("recipient / shop はキーごと無いと弾く（空文字とは別）", () => {
+  // 編集で誤ってキーを削除すると、次の読み込みで黙って消える（CLAUDE.md の precedent）。
+  // 空文字は許すが、キーそのものが無いのは不備
+  const withoutRecipient = { id: "sv-001", name: "x", shop: "", bought: false };
+  assert.throws(() => validateSouvenirs({ items: [withoutRecipient] }), /recipient が文字列ではありません/);
+
+  const withoutShop = { id: "sv-002", name: "x", recipient: "", bought: false };
+  assert.throws(() => validateSouvenirs({ items: [withoutShop] }), /shop が文字列ではありません/);
 });
