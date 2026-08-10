@@ -196,7 +196,7 @@ test("tokens.css 以外の CSS に色リテラルを書かない", () => {
   // 「色は tokens.css だけ」は 4 つのドキュメントが宣言している約束。
   // スプライト側には icons.test.js の同種のガードがあるが、
   // CSS 側には無かったので 4 箇所すり抜けていた。
-  const files = ["base.css", "controls.css", "calendar.css"];
+  const files = ["base.css", "controls.css", "calendar.css", "packing.css"];
   for (const name of files) {
     // コメント中の例示や出典メモは対象外
     const src = readCss(name).replace(/\/\*[\s\S]*?\*\//g, "");
@@ -208,6 +208,22 @@ test("tokens.css 以外の CSS に色リテラルを書かない", () => {
       `${name}: 数値を直接書いた色関数があります`
     );
   }
+});
+
+test("packing.css の .pkdrag に touch-action: none がある", () => {
+  // ドラッグハンドルが touch-action: none を失うと、スマートフォンでは
+  // スクロールのジェスチャが pointermove を奪い、ドラッグの代わりにページが
+  // スクロールしてしまう（設計書 §7.3 が明示的に要求している宣言）。
+  // node --test では実機のジェスチャそのものは再現できないので、
+  // せめて宣言が消えていないことだけを機械的に押さえる（Final review の Fix 5）。
+  const src = readCss("packing.css").replace(/\/\*[\s\S]*?\*\//g, "");
+  const block = src.match(/\.pkdrag\s*\{([^}]*)\}/);
+  assert.ok(block, "packing.css に .pkdrag ブロックが見つかりません");
+  assert.match(
+    block[1],
+    /touch-action\s*:\s*none\s*;/,
+    ".pkdrag に touch-action: none がありません"
+  );
 });
 
 test("角丸トークンが5段階そろっている", () => {

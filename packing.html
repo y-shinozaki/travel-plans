@@ -29,15 +29,43 @@
     <link rel="stylesheet" href="assets/css/tokens.css" />
     <link rel="stylesheet" href="assets/css/base.css" />
     <link rel="stylesheet" href="assets/css/controls.css" />
+    <link rel="stylesheet" href="assets/css/packing.css" />
   </head>
   <body data-page="packing">
     <nav class="nav" id="nav"></nav>
+    <!-- role / aria-label は schedule.html と揃える。同じ役割の領域なので -->
+    <div class="syncbar" id="syncbar" role="region" aria-label="同期の状態" hidden></div>
+
     <main class="wrap sec">
       <p class="eyebrow">Packing</p>
       <h1 class="display" style="font-size: clamp(32px, 4.2vw, 50px)">持ち物リスト</h1>
-      <p class="body" style="margin-top: var(--s3)">Phase B で作ります。</p>
-      <a class="btn" href="index.html" style="margin-top: var(--s4)">メニューへ戻る</a>
+
+      <div class="pkprog reveal" id="pk-progress"></div>
+
+      <div class="toolbar reveal">
+        <!-- ラベルとアイコンは JS が入れる。HTML に <use href="#i-..."> を
+             直書きすると injectSprite() より前にパースされ、WebKit が参照を
+             解決し直さないことがある（schedule.html と同じ理由）。
+             データが読めていない状態で押されないよう disabled で置く。 -->
+        <div class="toolbar__group toolbar__group--end">
+          <button class="tbtn" id="pk-edit-toggle" type="button" aria-pressed="false" disabled></button>
+          <button class="tbtn" id="pk-add-group" type="button" disabled></button>
+          <!-- 公開ボタンとトークン設定の置き場。トークンが無いときに
+               公開ボタンを置かないので、中身は publish-ui.js が入れる。 -->
+          <span class="toolbar__group" id="pub-controls"></span>
+        </div>
+      </div>
+
+      <!-- トークン設定（開閉）と、公開・取り込みの結果。
+           結果は押した直後に出るが、割り込みたいほどではないので polite。 -->
+      <div class="pub">
+        <div class="pubpanel" id="pub-panel" hidden></div>
+        <div class="pubstat" id="pub-status" role="status" aria-live="polite" hidden></div>
+      </div>
+
+      <div id="pk-table"></div>
     </main>
-    <script type="module" src="assets/js/stub-page.js"></script>
+
+    <script type="module" src="assets/js/packing.js"></script>
   </body>
 </html>

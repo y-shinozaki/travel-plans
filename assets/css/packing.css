@@ -1,0 +1,141 @@
+/* 持ち物リスト（packing.html）専用。
+   色・余白・角丸・モーションの値は tokens.css の変数だけを使う。
+   行アクションと入力欄は controls.css の .rowbtn / .inp を流用する
+   （持ち物リスト待ちで置いてあったもの: .rowbtn--del / .rowbtn--confirm /
+   .inp--note / .inp--group）。 */
+
+/* ── 進捗 ── */
+.pkprog {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s3);
+  margin-top: var(--s3);
+}
+.pkprog__one {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.pkprog__name {
+  font-size: 11px;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.pkprog__count {
+  font-family: var(--serif);
+  font-size: 22px;
+  font-weight: 300;
+  color: var(--ink);
+}
+.pkprog__bar {
+  height: 2px;
+  margin-top: 6px;
+  background: var(--line-soft);
+  border-radius: var(--r-pill);
+  overflow: hidden;
+}
+.pkprog__fill {
+  height: 100%;
+  background: var(--ink);
+  transition: width var(--t-mid) var(--e-out);
+}
+
+/* ── 表 ── */
+.pkgroup {
+  margin-top: var(--s5);
+  border-top: 1px solid var(--line-soft);
+}
+.pkgroup__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: var(--s2) 0;
+}
+.pkgroup__ico {
+  display: grid;
+  place-items: center;
+  color: var(--ink-2);
+}
+.pkgroup__name {
+  font-family: var(--serif);
+  font-size: 19px;
+  font-weight: 300;
+  color: var(--ink);
+}
+.pkgroup__count {
+  margin-left: auto;
+  font-size: 11px;
+  letter-spacing: 1.4px;
+  color: var(--ink-2);
+}
+.pkgroup__acts {
+  display: flex;
+  gap: 2px;
+  margin-left: 10px;
+}
+
+.pkitems {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.pkitem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  border-top: 1px solid rgb(var(--ink-rgb) / 0.06);
+}
+.pkitem__body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.pkitem__name {
+  font-size: 14px;
+  color: var(--ink);
+}
+.pkitem__note {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.pkitem__checks {
+  display: flex;
+  gap: 14px;
+  flex: 0 0 auto;
+}
+.pkitem__acts {
+  display: flex;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+
+/* ドラッグハンドル。touch-action: none を付けないと、
+   スクロールのジェスチャが pointermove を奪う（設計書 §7.3）。 */
+.pkdrag {
+  flex: 0 0 auto;
+  touch-action: none;
+  cursor: grab;
+}
+.pkdrag:active {
+  cursor: grabbing;
+}
+.pkitem.is-dragging {
+  opacity: 0.5;
+  background: var(--sand);
+}
+
+/* 編集モードの出し分けは CSS で隠すのではなく、packing-render.js が
+   要素を組み立てないことで行う（.pkedit-only のようなクラスを作らないこと）。
+   隠すだけだと、読み取りモードでもボタンがタブ移動で到達でき、
+   支援技術からも見える ── 押せてしまえば編集モードでないのに保存が走る。 */
+
+@media (max-width: 760px) {
+  .pkitem {
+    flex-wrap: wrap;
+  }
+  .pkitem__checks {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}

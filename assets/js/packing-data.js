@@ -1,0 +1,181 @@
+/**
+ * 持ち物リストの純粋なデータ操作。DOM も store も知らない。
+ *
+ * event-editor.js の nextEventId / withEvent / withoutEvent と同じ考え方で、
+ * 「壊れたときの失われ方が静かな部分」をここへ集めてある ──
+ * 「移動したら項目が消えていた」は、次にそのリストを見るまで誰も気付かない。
+ *
+ * すべての関数は新しいオブジェクトを返し、渡されたデータを変更しない。
+ * 描画の途中で配列を書き換えると、保存されるものと画面に出ているものが
+ * 食い違う（schedule.js の setData と同じ理由）。
+ *
+ * 設計書 §4.2 / §7.3 に対応。
+ */
+
+/** 何も無い状態の持ち物リスト。members の既定は篠崎家の 2 人。 */
+export function emptyPacking() {
+  return {
+    members: { a: "雄一", b: "朱汰" },
+    groups: [],
+  };
+}
+
+/**
+ * 既存と衝突しない id を採番する。
+ *
+ * 件数から作った候補が埋まっていれば次を試す。途中を削除したデータでは
+ * 件数と最大値がずれるので、「使われていないこと」を必ず確かめる
+ * （event-editor.js の nextEventId と同じ理由 ── id が重複すると、
+ * チェックの切り替えが別の項目に飛ぶ）。
+ */
+function nextId(prefix, used) {
+  for (let n = used.size + 1; ; n++) {
+    const id = `${prefix}-${String(n).padStart(3, "0")}`;
+    if (!used.has(id)) return id;
+  }
+}
+
+export function nextGroupId(groups) {
+  return nextId("g", new Set(groups.map((g) => g?.id)));
+}
+
+export function nextItemId(groups) {
+  // 項目 id は区分をまたいで一意（packing-validate.js の validateItem 参照）
+  return nextId("it", new Set(groups.flatMap((g) => (g?.items ?? []).map((i) => i?.id))));
+}
+
+/** 区分を差し替えた（同じ id が無ければ末尾に足した）新しいデータを返す。 */
+export function withGroup(data, group) {
+  const index = data.groups.findIndex((g) => g?.id === group.id);
+  const groups =
+    index === -1
+      ? [...data.groups, group]
+      : data.groups.map((g, i) => (i === index ? group : g));
+  return { ...data, groups };
+}
+
+/** 区分を中身ごと取り除いた新しいデータを返す。 */
+export function withoutGroup(data, groupId) {
+  return { ...data, groups: data.groups.filter((g) => g?.id !== groupId) };
+}
+
+/**
+ * 項目を差し替えた（同じ id が無ければ指定の区分の末尾に足した）新しいデータを返す。
+ *
+ * 差し替えは**元あった区分の中で**行う。groupId は新規追加の行き先としてだけ使う ──
+ * 既存の項目を編集するたびに区分が移動したら、並べ替えた意味が消える。
+ */
+export function withItem(data, groupId, item) {
+  const exists = data.groups.some((g) => g.items.some((i) => i?.id === item.id));
+  if (exists) {
+    return {
+      ...data,
+      groups: data.groups.map((g) => ({
+        ...g,
+        items: g.items.map((i) => (i?.id === item.id ? item : i)),
+      })),
+    };
+  }
+  return {
+    ...data,
+    groups: data.groups.map((g) =>
+      g.id === groupId ? { ...g, items: [...g.items, item] } : g
+    ),
+  };
+}
+
+/** 項目を取り除いた新しいデータを返す（どの区分にあっても効く）。 */
+export function withoutItem(data, itemId) {
+  return {
+    ...data,
+    groups: data.groups.map((g) => ({
+      ...g,
+      items: g.items.filter((i) => i?.id !== itemId),
+    })),
+  };
+}
+
+/** 項目の居場所を探す。見つからなければ null。 */
+function locate(groups, itemId) {
+  for (let gi = 0; gi < groups.length; gi++) {
+    const ii = groups[gi].items.findIndex((i) => i?.id === itemId);
+    if (ii !== -1) return { gi, ii };
+  }
+  return null;
+}
+
+/**
+ * 項目を 1 つ上（delta = -1）または下（delta = +1）へ動かす。
+ *
+ * 区分の端に達したら隣の区分へ送る（設計書 §7.3）。全体の先頭より上、
+ * 全体の末尾より下へは動かさない ── そこで「動かない」ことは、
+ * ボタンを押しても何も起きないという形で利用者に伝わる。
+ *
+ * 隣の区分が空でも送れる。空の区分を素通りさせると、押した回数と
+ * 動いた距離が合わなくなり、どこへ行ったのかが分からなくなる。
+ */
+export function moveItem(data, itemId, delta) {
+  const groups = data.groups;
+  const at = locate(groups, itemId);
+  if (at === null || (delta !== -1 && delta !== 1)) return data;
+
+  const { gi, ii } = at;
+  const item = groups[gi].items[ii];
+  const target = ii + delta;
+
+  // 同じ区分の中で収まる場合
+  if (target >= 0 && target < groups[gi].items.length) {
+    const items = [...groups[gi].items];
+    items.splice(ii, 1);
+    items.splice(target, 0, item);
+    return { ...data, groups: groups.map((g, i) => (i === gi ? { ...g, items } : g)) };
+  }
+
+  // 端に達した。隣の区分へ送る
+  const gTarget = gi + delta;
+  if (gTarget < 0 || gTarget >= groups.length) return data; // 全体の端。動かさない
+
+  return {
+    ...data,
+    groups: groups.map((g, i) => {
+      if (i === gi) return { ...g, items: g.items.filter((x) => x?.id !== itemId) };
+      if (i !== gTarget) return g;
+      // 上へ送るなら受け入れ先の末尾、下へ送るなら先頭。
+      // 「押した向きに 1 つ進む」が見た目と一致する置き方
+      return { ...g, items: delta === -1 ? [...g.items, item] : [item, ...g.items] };
+    }),
+  };
+}
+
+/** 区分を 1 つ上（delta = -1）または下（delta = +1）へ動かす。 */
+export function moveGroup(data, groupId, delta) {
+  const index = data.groups.findIndex((g) => g?.id === groupId);
+  if (index === -1 || (delta !== -1 && delta !== 1)) return data;
+
+  const target = index + delta;
+  if (target < 0 || target >= data.groups.length) return data;
+
+  const groups = [...data.groups];
+  const [group] = groups.splice(index, 1);
+  groups.splice(target, 0, group);
+  return { ...data, groups };
+}
+
+/**
+ * 1 人分の進捗。
+ *
+ * total を分母に使う側（進捗バー）がゼロ除算にならないよう、件数をそのまま返して
+ * 割り算は呼び出し側に任せる。項目が 1 つも無い状態は実際に起こる
+ * （まだ何も足していないリスト）。
+ */
+export function progressOf(data, member) {
+  let done = 0;
+  let total = 0;
+  for (const group of data.groups) {
+    for (const item of group.items) {
+      total++;
+      if (item[member] === true) done++;
+    }
+  }
+  return { done, total };
+}

@@ -24,67 +24,76 @@ import { icon } from "./icons.js";
 import { hasToken, writeToken, clearToken } from "./token.js";
 import { StoreWriteError } from "./store.js";
 import { GitHubError } from "./github.js";
-import { validateEvents, EventDataError } from "./validate.js";
+import { DataError } from "./data-error.js";
 
 /**
  * 画面に出す文言。テストから参照できるよう外に出してある
  * （「この文字列が出ること」を実装の写経ではなく定数で確かめるため）。
+ *
+ * noun を取るのは、この UI が旅程と持ち物の両方から使われるため。
+ * 「最新の旅程を確認できませんでした」を持ち物ページで出すと、
+ * 利用者は開いてもいないページの話をされることになる。
  */
-export const MESSAGES = {
-  published: "公開しました。反映まで 1 分ほどかかります",
-  /**
-   * リモートの updatedAt が読めず、突き合わせを省いて公開したとき。
-   * ガードが効いていない唯一の場面なので、成功の陰に隠さない。
-   */
-  conflictCheckSkipped:
-    "リモートの更新時刻を確認できなかったため、確認せずに公開しました。" +
-    "別の端末の未公開の変更を上書きした可能性があります",
-  /**
-   * PUT は通ったが、そのあとの控えを保存できなかったとき。
-   * sync.publish() は PUT の成功後にしか store へ書かないので、
-   * StoreWriteError が来た時点で公開自体は済んでいる。
-   */
-  publishedNotRecorded:
-    "公開はできましたが、この端末に「どこまで公開したか」を記録できませんでした",
-  /**
-   * 保存領域に書けない端末。409 の定型文（取り込んでから公開し直す）は
-   * この端末では成立しない ── 取り込みも同じ理由で失敗するため。
-   */
-  cannotPersist:
-    "このブラウザは保存領域に書き込めないため、どの版を取り込んだかを記録できません。" +
-    "取り込みを試しても同じ理由で失敗します。" +
-    "プライベートブラウジングを解除する、保存領域の空きを作る、" +
-    "または別の端末から公開してください",
-  /**
-   * 保存領域に書けない端末の 409。GitHubError の文言（取り込んでから公開し直す）は
-   * ここでは出さない ── できない手順を案内することになる。
-   * 生の文言は console に残す。
-   */
-  conflictUnverifiable:
-    "公開できませんでした。リモートとの突き合わせができません" +
-    "（この端末には「どこまで公開したか」の記録が残らないため）",
-  offline: "最新の旅程を確認できませんでした。手元のデータをそのまま表示しています",
-  remoteIsNewer:
-    "別の端末で新しい旅程が公開されています。" +
-    "取り込むと、この端末の未公開の変更は失われます",
-  keptLocal:
-    "手元の変更を残しました。このまま公開すると" +
-    "「リモートが更新されています」と表示されます（先に取り込みが必要です）",
-  /**
-   * 「表示も更新しました」とは言わない。描き直しに失敗した場合は
-   * schedule.js の safeDraw が自分の文言で伝えるので、ここで先に
-   * 「更新しました」と言うと画面上で 2 つの文言が矛盾する。
-   */
-  adopted: "リモートの内容を取り込みました",
-  adoptFailed: "取り込めませんでした。",
-  publishFailed: "公開できませんでした。",
-  tokenSaved: "トークンを保存しました",
-  tokenCleared: "トークンを削除しました",
-  tokenEmpty: "トークンを入力してください",
-  tokenHint:
-    "GitHub の fine-grained personal access token（このリポジトリの Contents 書き込み権限）。" +
-    "この端末のブラウザにだけ保存され、画面に表示し直すことはありません",
-};
+export function messagesFor(noun) {
+  return {
+    published: "公開しました。反映まで 1 分ほどかかります",
+    /**
+     * リモートの updatedAt が読めず、突き合わせを省いて公開したとき。
+     * ガードが効いていない唯一の場面なので、成功の陰に隠さない。
+     */
+    conflictCheckSkipped:
+      "リモートの更新時刻を確認できなかったため、確認せずに公開しました。" +
+      "別の端末の未公開の変更を上書きした可能性があります",
+    /**
+     * PUT は通ったが、そのあとの控えを保存できなかったとき。
+     * sync.publish() は PUT の成功後にしか store へ書かないので、
+     * StoreWriteError が来た時点で公開自体は済んでいる。
+     */
+    publishedNotRecorded:
+      "公開はできましたが、この端末に「どこまで公開したか」を記録できませんでした",
+    /**
+     * 保存領域に書けない端末。409 の定型文（取り込んでから公開し直す）は
+     * この端末では成立しない ── 取り込みも同じ理由で失敗するため。
+     */
+    cannotPersist:
+      "このブラウザは保存領域に書き込めないため、どの版を取り込んだかを記録できません。" +
+      "取り込みを試しても同じ理由で失敗します。" +
+      "プライベートブラウジングを解除する、保存領域の空きを作る、" +
+      "または別の端末から公開してください",
+    /**
+     * 保存領域に書けない端末の 409。GitHubError の文言（取り込んでから公開し直す）は
+     * ここでは出さない ── できない手順を案内することになる。
+     * 生の文言は console に残す。
+     */
+    conflictUnverifiable:
+      "公開できませんでした。リモートとの突き合わせができません" +
+      "（この端末には「どこまで公開したか」の記録が残らないため）",
+    offline: `最新の${noun}を確認できませんでした。手元のデータをそのまま表示しています`,
+    remoteIsNewer:
+      `別の端末で新しい${noun}が公開されています。` +
+      "取り込むと、この端末の未公開の変更は失われます",
+    keptLocal:
+      "手元の変更を残しました。このまま公開すると" +
+      "「リモートが更新されています」と表示されます（先に取り込みが必要です）",
+    /**
+     * 「表示も更新しました」とは言わない。描き直しに失敗した場合は
+     * schedule.js の safeDraw が自分の文言で伝えるので、ここで先に
+     * 「更新しました」と言うと画面上で 2 つの文言が矛盾する。
+     */
+    adopted: "リモートの内容を取り込みました",
+    adoptFailed: "取り込めませんでした。",
+    publishFailed: "公開できませんでした。",
+    tokenSaved: "トークンを保存しました",
+    tokenCleared: "トークンを削除しました",
+    tokenEmpty: "トークンを入力してください",
+    tokenHint:
+      "GitHub の fine-grained personal access token（このリポジトリの Contents 書き込み権限）。" +
+      "この端末のブラウザにだけ保存され、画面に表示し直すことはありません",
+  };
+}
+
+/** 既存のテストと呼び出し側のための、旅程版の定数。 */
+export const MESSAGES = messagesFor("旅程");
 
 const PUBLISH_LABEL = "公開";
 const PUBLISH_DIRTY_LABEL = "公開（未公開の変更あり）";
@@ -154,10 +163,30 @@ function armedButton({ cls, armedCls, iconId, label, armedLabel, onConfirm }) {
  * @param {{controls:HTMLElement, panel:HTMLElement, status:HTMLElement, bar:HTMLElement}} deps.els
  * @param {object} deps.store store.js の createStore
  * @param {object} deps.sync sync.js の createSync
- * @param {() => object} deps.getData 公開する旅程データ全体
+ * @param {() => object} deps.getData 公開するデータ全体
  * @param {(data:object) => void} deps.onAdopt 取り込んだデータで画面を描き直す
+ * @param {{validate:(data:object)=>void, noun:string}} deps.content
+ *   **2 つで 1 組。既定値を持たせない。** 片方だけ渡せるようにすると、
+ *   sync.js の注入口と同じ「部分的に直したときが一番危ない」状態になる ──
+ *   validate だけ持ち物用に差し替えて noun を旅程のままにすると、
+ *   持ち物ページが「最新の旅程を確認できませんでした」と言い出す。
+ *   noun だけ差し替えて validate を忘れると、持ち物データが validateEvents に
+ *   落ちて公開ボタンが必ず失敗する（こちらは静かではなく必ず投げるので、
+ *   sync.js のデータ消失ほど危険ではないが、直せないことに変わりはない）。
  */
-export function createPublishUI({ els, store, sync, getData, onAdopt }) {
+export function createPublishUI({ els, store, sync, getData, onAdopt, content }) {
+  if (!content) {
+    throw new Error("publish-ui: content（validate と noun）が必要です");
+  }
+  if (typeof content.validate !== "function") {
+    throw new Error("publish-ui: content.validate に検証関数が必要です");
+  }
+  if (typeof content.noun !== "string" || !content.noun) {
+    throw new Error("publish-ui: content.noun に空でない文字列が必要です");
+  }
+  const { validate, noun } = content;
+  const MSG = messagesFor(noun);
+
   /**
    * 未公開の変更があるか。持っているのは表示用の控えで、正は常にストア
    * （sync.hasUnpublishedChanges）。source から導かないこと ── use-local は
@@ -282,7 +311,7 @@ export function createPublishUI({ els, store, sync, getData, onAdopt }) {
     // writeToken は空文字を削除として扱うので、ここで止めないと
     // 「保存を押したら設定済みが消えた」が起こる
     if (!tokenInput.value.trim()) {
-      setPanelNote(MESSAGES.tokenEmpty);
+      setPanelNote(MSG.tokenEmpty);
       return;
     }
     try {
@@ -296,7 +325,7 @@ export function createPublishUI({ els, store, sync, getData, onAdopt }) {
       // 成否に関わらず打った値を残さない
       tokenInput.value = "";
     }
-    setPanelNote(MESSAGES.tokenSaved);
+    setPanelNote(MSG.tokenSaved);
     updatePanel();
     renderControls();
   }
@@ -313,7 +342,7 @@ export function createPublishUI({ els, store, sync, getData, onAdopt }) {
     onConfirm: () => {
       clearToken(store);
       tokenInput.value = "";
-      setPanelNote(MESSAGES.tokenCleared);
+      setPanelNote(MSG.tokenCleared);
       updatePanel();
       renderControls();
     },
@@ -331,7 +360,7 @@ export function createPublishUI({ els, store, sync, getData, onAdopt }) {
     const label = el("label", null, "公開用トークン");
     label.htmlFor = tokenInput.id;
 
-    const hint = el("p", "fhint", MESSAGES.tokenHint);
+    const hint = el("p", "fhint", MSG.tokenHint);
     hint.id = "pub-token-hint";
 
     const field = el("div", "field2");
@@ -379,13 +408,13 @@ export function createPublishUI({ els, store, sync, getData, onAdopt }) {
       // PUT は通っている。ただし控えを書けていないので、ストアから見れば
       // まだ「未公開の変更あり」のまま ── dirty は勝手に下ろさず聞き直す。
       // 状況は文言で説明する
-      setStatus([line(MESSAGES.publishedNotRecorded), line(MESSAGES.cannotPersist)], "warn");
+      setStatus([line(MSG.publishedNotRecorded), line(MSG.cannotPersist)], "warn");
       return;
     }
 
     if (error instanceof GitHubError && error.status === 409) {
       if (!canPersist(store)) {
-        setStatus([line(MESSAGES.conflictUnverifiable), line(MESSAGES.cannotPersist)], "error");
+        setStatus([line(MSG.conflictUnverifiable), line(MSG.cannotPersist)], "error");
         return;
       }
       // 起動時のバーが出たまま公開して 409 になると、取り込みボタンが
@@ -397,7 +426,7 @@ export function createPublishUI({ els, store, sync, getData, onAdopt }) {
     }
 
     const text = error?.message ?? String(error);
-    setStatus([line(MESSAGES.publishFailed), line(text, error instanceof EventDataError)], "error");
+    setStatus([line(MSG.publishFailed), line(text, error instanceof DataError)], "error");
   }
 
   async function doPublish() {
@@ -408,7 +437,7 @@ export function createPublishUI({ els, store, sync, getData, onAdopt }) {
     // 「データが直っていない」と「GitHub が受け付けなかった」を別の文言で
     // 出したいため（前者は再試行しても直らない）
     try {
-      validateEvents(data);
+      validate(data);
     } catch (error) {
       console.error("publish-ui: 検証に通らないため公開しません", error);
       setStatus(
@@ -425,8 +454,8 @@ export function createPublishUI({ els, store, sync, getData, onAdopt }) {
       // === false ではなく !== true。将来この項目が返らなくなったときに
       // 警告が黙って消えるより、余分に出るほうがまだよい
       const skipped = conflictChecked !== true;
-      const nodes = [line(MESSAGES.published)];
-      if (skipped) nodes.push(line(MESSAGES.conflictCheckSkipped));
+      const nodes = [line(MSG.published)];
+      if (skipped) nodes.push(line(MSG.conflictCheckSkipped));
       const link = commitLink(commitUrl);
       if (link) nodes.push(link);
       setStatus(nodes, skipped ? "warn" : "ok");
@@ -471,7 +500,7 @@ export function createPublishUI({ els, store, sync, getData, onAdopt }) {
     } catch (error) {
       console.error("publish-ui: 取り込みに失敗しました", error);
       setStatus(
-        [line(MESSAGES.adoptFailed), line(error?.message ?? String(error), true)],
+        [line(MSG.adoptFailed), line(error?.message ?? String(error), true)],
         "error"
       );
       return;
@@ -484,7 +513,7 @@ export function createPublishUI({ els, store, sync, getData, onAdopt }) {
     // 言わない（下書きはもう入れ替わっているので、それは嘘になる）。
     // 画面の更新の成否は schedule.js の safeDraw が自分の文言で伝える
     hideBar();
-    setStatus([line(MESSAGES.adopted)], "ok");
+    setStatus([line(MSG.adopted)], "ok");
     // 押したボタンは hideBar / setStatus で文書から消えている。
     // 戻し先を用意しないとフォーカスが <body> へ落ちる
     focusFallback();
@@ -548,16 +577,16 @@ export function createPublishUI({ els, store, sync, getData, onAdopt }) {
       const keep = labelledButton("tbtn", "i-x", "自分の変更を残す").button;
       keep.addEventListener("click", () => {
         hideBar();
-        setStatus([line(MESSAGES.keptLocal)], "warn");
+        setStatus([line(MSG.keptLocal)], "warn");
       });
-      showBar(MESSAGES.remoteIsNewer, "warn", [adopt, keep]);
+      showBar(MSG.remoteIsNewer, "warn", [adopt, keep]);
       return;
     }
 
     if (source === "offline") {
       const close = labelledButton("tbtn", "i-x", "閉じる").button;
       close.addEventListener("click", hideBar);
-      showBar(MESSAGES.offline, "info", [close]);
+      showBar(MSG.offline, "info", [close]);
       return;
     }
 

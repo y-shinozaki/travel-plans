@@ -21,9 +21,14 @@
  */
 
 import { CAT_META } from "./categories.js";
+import { DataError } from "./data-error.js";
 
-/** データ内容の不備。通信・パース失敗とは呼び出し側で区別する。 */
-export class EventDataError extends Error {
+/**
+ * 旅程データ内容の不備。通信・パース失敗とは呼び出し側で区別する。
+ * DataError を継承するのは、load-error.js が持ち物側の不備と同じ分類に
+ * 落とせるようにするため（直し方が同じなので、文言も同じ枠でよい）。
+ */
+export class EventDataError extends DataError {
   constructor(message) {
     super(message);
     this.name = "EventDataError";

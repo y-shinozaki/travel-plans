@@ -14,11 +14,12 @@
  */
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createPublishUI, MESSAGES } from "../assets/js/publish-ui.js";
+import { createPublishUI, MESSAGES, messagesFor } from "../assets/js/publish-ui.js";
 import { createStore } from "../assets/js/store.js";
 import { createSync } from "../assets/js/sync.js";
 import { writeToken, hasToken } from "../assets/js/token.js";
 import { toBase64Utf8 } from "../assets/js/base64.js";
+import { validateEvents } from "../assets/js/validate.js";
 
 /* ── 最小の DOM ──────────────────────────────────────────
    publish-ui が実際に触る操作だけを持つ。node --test はファイルごとに
@@ -227,6 +228,7 @@ function mount({
     store,
     sync,
     getData: () => current,
+    content: { validate: validateEvents, noun: "旅程" },
     onAdopt: (next) => {
       current = next;
       adopted.push(next);
@@ -280,6 +282,7 @@ test("start() を呼ぶ前に、公開の導線が DOM に入っている", () =
     store,
     sync,
     getData: () => plan(REMOTE_STAMP),
+    content: { validate: validateEvents, noun: "旅程" },
     onAdopt: () => {},
   });
   // ui.start(source) を意図的に呼んでいない
@@ -567,6 +570,7 @@ test("取り込んだあと画面の更新に失敗しても「取り込めな�
       now,
     }),
     getData: () => plan(REMOTE_STAMP),
+    content: { validate: validateEvents, noun: "旅程" },
     onAdopt: () => {
       throw new Error("描き直せません");
     },
@@ -658,6 +662,7 @@ test("conflictChecked が返らなくなったら、警告は消えるのでは�
       hasUnpublishedChanges: () => false,
     },
     getData: () => plan(REMOTE_STAMP),
+    content: { validate: validateEvents, noun: "旅程" },
     onAdopt: () => {},
   });
   ui.start("use-remote");
@@ -957,4 +962,92 @@ test("書き込み可否の判定は保存領域にゴミを残さない", async
 
   assert.equal(h.statusText().includes("取り込んでから公開し直してください"), true);
   assert.equal(h.raw("tp:write-probe"), undefined, "判定用のキーが残っています");
+});
+
+/* ══════════════════════════════════════════════════════════
+   content の注入（Task 3: 旅程専用の依存を注入口へ出す）
+   ══════════════════════════════════════════════════════════ */
+
+/** ネットワークにも store の実装にも踏み込まない、最小の偽 sync。 */
+function fakeSync() {
+  return {
+    publish: async () => ({ commitUrl: null, conflictChecked: true }),
+    adoptRemote: async () => ({}),
+    hasUnpublishedChanges: () => false,
+  };
+}
+
+function dom() {
+  const els = {
+    controls: makeNode("div"),
+    panel: makeNode("div"),
+    status: makeNode("div"),
+    bar: makeNode("div"),
+  };
+  els.panel.id = "pub-panel";
+  return els;
+}
+
+function fakeStore() {
+  return createStore(memoryBackend());
+}
+
+test("content を欠いた呼び出しは、その場で名指しして投げる", () => {
+  // 片方だけ渡せるようにすると、createSync と同じ「部分的に直したときが一番危ない」
+  // 状態を作ることになる。組で受け取り、欠けていたら組み立てさせない
+  const base = { els: dom(), store: fakeStore(), sync: fakeSync(), getData: () => ({}), onAdopt: () => {} };
+
+  assert.throws(() => createPublishUI({ ...base }), /content/);
+  // /validate/ / /noun/ だけだと、content 自体が無いときの文言
+  // 「content（validate と noun）が必要です」にも両方マッチしてしまい、
+  // どの分岐が投げたのかをこのアサーションが区別できない。フィールド名まで絞る
+  assert.throws(() => createPublishUI({ ...base, content: { noun: "持ち物" } }), /content\.validate/);
+  assert.throws(() => createPublishUI({ ...base, content: { validate: () => {} } }), /content\.noun/);
+});
+
+test("公開前の検証は注入された validate を使う（validateEvents を呼ばない）", async () => {
+  let seen = null;
+  const els = dom();
+  // トークンを持たせないと公開ボタンが DOM に置かれず、クリックできない
+  // （renderControls が hasToken(store) で出し分ける。:579 と同じ形）
+  const store = createStore(memoryBackend({ "tp:gh-token": TOKEN }));
+  const ui = createPublishUI({
+    els,
+    store,
+    sync: fakeSync(),
+    // 旅程としては不正（days も events も無い）だが、持ち物としては正しい形
+    getData: () => ({ members: { a: "雄一", b: "朱汰" }, groups: [] }),
+    onAdopt: () => {},
+    content: {
+      validate: (data) => {
+        seen = data;
+      },
+      noun: "持ち物",
+    },
+  });
+  assert.ok(ui);
+  assert.equal(seen, null, "組み立てただけで検証を走らせないこと");
+
+  // ここで実際に検証が走る。validateEvents が呼ばれていたら
+  // { members, groups } は旅程として弾かれ、「この内容では公開できません」が
+  // 状態欄に残る ── つまりこのクリックは「注入された validate が呼ばれる」と
+  // 「validateEvents は呼ばれない」の両方を同時に確かめる
+  await click(findButton(els.controls, "公開"));
+
+  assert.deepEqual(seen, { members: { a: "雄一", b: "朱汰" }, groups: [] });
+  assert.equal(
+    textOf(els.status).includes("この内容では公開できません"),
+    false,
+    "validateEvents に落ちて公開が止まっています"
+  );
+});
+
+test("messagesFor は noun を文言に通す", () => {
+  const m = messagesFor("持ち物");
+  assert.match(m.offline, /持ち物/);
+  assert.doesNotMatch(m.offline, /旅程/);
+  assert.match(m.remoteIsNewer, /持ち物/);
+  assert.doesNotMatch(m.remoteIsNewer, /旅程/);
+  // noun に依存しない文言は据え置き
+  assert.equal(m.tokenSaved, "トークンを保存しました");
 });

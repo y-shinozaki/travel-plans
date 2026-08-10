@@ -20,17 +20,22 @@ import { readToken } from "./token.js";
 import { passthroughCodec, DecryptError } from "./crypto.js";
 
 /**
- * 公開先と、ファイルごとに違う 5 つ。ここ以外に owner / repo / branch / path を書かないこと。
+ * 公開先と、ファイルごとに違う 6 つ。ここ以外に owner / repo / branch / path を書かないこと。
  *
  * path は 2 つの意味を兼ねている: 読み込みでは「ページからの相対 URL」、
  * Contents API では「リポジトリのルートからのパス」。今はページがリポジトリ直下に
  * 置かれているので一致している。ページをサブディレクトリへ移すなら分けること。
  *
- * draftKey / baseKey / validate / commitMessage / codec は 2 つ目の JSON
- * （packing.json、comments.json）のために外へ出してある。**5 つは必ず揃えて渡すこと。**
+ * draftKey / baseKey / validate / commitMessage / codec / noun は 2 つ目の JSON
+ * （packing.json、comments.json）のために外へ出してある。**6 つは必ず揃えて渡すこと。**
  * 一部だけを差し替えると、その JSON が自分の検証を通ったうえで
  * store.write(draftKey, …) が旅程の既定キーへ書き、旅程の未公開の編集が
  * その瞬間に消える（設計書 §13）。
+ *
+ * noun だけは表示用で、取り違えてもデータは壊れない（「最新の旅程を確認できません」と
+ * 持ち物ページで言うだけ）。それでも同じ組に入れてあるのは、
+ * **揃えて渡す対象を「危険なものだけ」に絞ると、どれが危険かを毎回思い出す必要が
+ * 生じるため** ── 全部まとめて渡す規則のほうが破りにくい。
  *
  * draftKey は下書き本体（events.json と同じ形の JSON）を書く localStorage のキー。
  * baseKey は最後に「リモートと揃えた」時刻を書くキーで、未公開の変更があるかの
@@ -57,6 +62,7 @@ export const DEFAULT_CONFIG = {
     return `Update itinerary from the browser (${count} event${count === 1 ? "" : "s"})`;
   },
   codec: passthroughCodec,
+  noun: "旅程",
 };
 
 /**
@@ -82,7 +88,7 @@ export function createSync({
 }) {
   // 部分的な config でも owner / repo などの既定が落ちないよう、必ずスプレッドで重ねる。
   const cfg = { ...DEFAULT_CONFIG, ...config };
-  const { draftKey, baseKey, validate, commitMessage, codec } = cfg;
+  const { draftKey, baseKey, validate, commitMessage, codec, noun } = cfg;
   const nowIso = () => new Date(now()).toISOString();
 
   /**
@@ -90,6 +96,13 @@ export function createSync({
    *
    * 失敗は握らずに投げる。オフラインとして扱うかどうかは呼び出し側が決める
    * （load() は落とす、adoptRemote() は利用者に見せる）。
+   *
+   * HTTP の失敗には status を付ける。**404 は「取れなかった」ではなく
+   * 「まだ作られていない」**で、持ち物リストのように最初の公開までファイルが
+   * 存在しないページでは、それを空のリストとして扱う必要がある
+   * （私は合言葉を入力できないので、暗号化した初期ファイルを用意できない）。
+   * 通信断とパース失敗には status を付けない ── 付けると
+   * 「404 かどうか」の判定が undefined との比較に化けて、静かに崩れる。
    */
   async function fetchRemote() {
     let response;
@@ -97,17 +110,21 @@ export function createSync({
       // 公開直後に古い応答を掴むと「公開したのに反映されない」に見えるため no-store
       response = await fetchImpl(cfg.path, { cache: "no-store" });
     } catch (error) {
-      throw new Error("最新の旅程データを取得できませんでした（通信に失敗しました）", {
+      throw new Error(`最新の${noun}データを取得できませんでした（通信に失敗しました）`, {
         cause: error,
       });
     }
     if (!response.ok) {
-      throw new Error(`最新の旅程データを取得できませんでした（HTTP ${response.status}）`);
+      const error = new Error(
+        `最新の${noun}データを取得できませんでした（HTTP ${response.status}）`
+      );
+      error.status = response.status;
+      throw error;
     }
     try {
       return await response.json();
     } catch (error) {
-      throw new Error("最新の旅程データを JSON として読めませんでした", { cause: error });
+      throw new Error(`最新の${noun}データを JSON として読めませんでした`, { cause: error });
     }
   }
 
@@ -155,7 +172,7 @@ export function createSync({
       validate(stored);
       return { draft: stored, rejected: false };
     } catch (error) {
-      console.warn("sync: 手元の下書きが旅程の形になっていないため使いません", error);
+      console.warn(`sync: 手元の下書きが${noun}の形になっていないため使いません`, error);
       return { draft: null, rejected: true };
     }
   }
@@ -213,7 +230,7 @@ export function createSync({
       // 「オフラインです」と言うのは嘘になる。そのまま投げて呼び出し側に見せる
       if (error instanceof DecryptError) throw error;
       fetchError = error;
-      console.warn("sync: 最新の旅程データを確認できませんでした", error);
+      console.warn(`sync: 最新の${noun}データを確認できませんでした`, error);
     }
 
     // 検証は「見せるより前」。壊れたリモートを黙って画面に出さない。
