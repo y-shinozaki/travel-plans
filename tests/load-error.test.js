@@ -2,8 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { EventDataError } from "../assets/js/validate.js";
 import { DecryptError } from "../assets/js/crypto.js";
-import { DataFetchError, DataParseError, classifyLoadError } from "../assets/js/load-error.js";
+import {
+  DataFetchError,
+  DataParseError,
+  classifyLoadError,
+  toLoadError,
+} from "../assets/js/load-error.js";
 import { DataError } from "../assets/js/data-error.js";
+import { PackingDataError } from "../assets/js/packing-validate.js";
 
 test("データ内容の不備は再読み込みを勧めない", () => {
   const { kind, message } = classifyLoadError(new EventDataError("ev-1 の startDay が範囲外です"));
@@ -106,4 +112,43 @@ test("取得失敗の文言も noun / path に従う", () => {
   assert.equal(kind, "fetch");
   assert.match(message, /持ち物リスト/);
   assert.doesNotMatch(message, /旅程/);
+});
+
+/* ── toLoadError（sync.load() の失敗に種別を付け直す） ── */
+
+test("toLoadError: DataError はそのまま返す", () => {
+  const error = new EventDataError("旅程が壊れています");
+  assert.equal(toLoadError(error), error);
+});
+
+test("toLoadError: DecryptError はそのまま返す", () => {
+  // 引数は (reason, message)。既存の load-error.test.js と同じ並び
+  const error = new DecryptError("wrong-key", "別の合言葉で暗号化されています");
+  assert.equal(toLoadError(error), error);
+});
+
+test("toLoadError: cause が SyntaxError なら DataParseError にする", () => {
+  const error = new Error("読めません", { cause: new SyntaxError("Unexpected token") });
+  const out = toLoadError(error);
+  assert.ok(out instanceof DataParseError);
+  assert.equal(out.cause.name, "SyntaxError");
+});
+
+test("toLoadError: それ以外は DataFetchError にする", () => {
+  const out = toLoadError(new Error("Failed to fetch"));
+  assert.ok(out instanceof DataFetchError);
+  assert.match(out.message, /Failed to fetch/);
+});
+
+test("toLoadError: Error でないものを渡しても文字列化して DataFetchError にする", () => {
+  const out = toLoadError("こわれた");
+  assert.ok(out instanceof DataFetchError);
+  assert.match(out.message, /こわれた/);
+});
+
+test("toLoadError: 持ち物の PackingDataError も DataError として素通しする", () => {
+  // schedule.js は EventDataError、packing.js は DataError で分岐していた。
+  // 共通化で DataError 1 本にしたので、両方が素通しされることを固定する
+  const error = new PackingDataError("持ち物が壊れています");
+  assert.equal(toLoadError(error), error);
 });

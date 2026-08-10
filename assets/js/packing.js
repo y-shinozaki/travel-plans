@@ -17,10 +17,10 @@ import { el, escapeHtml } from "./dom.js";
 import { createStore } from "./store.js";
 import { createSync, DEFAULT_CONFIG } from "./sync.js";
 import { createPublishUI } from "./publish-ui.js";
-import { classifyLoadError, DataFetchError, DataParseError } from "./load-error.js";
+import { classifyLoadError, toLoadError } from "./load-error.js";
 import { hasKey, loadCodec, clearKey } from "./auth.js";
-import { DecryptError } from "./crypto.js";
 import { DataError } from "./data-error.js";
+import { createNotices, createDrawLoop } from "./page-notice.js";
 import { validatePacking } from "./packing-validate.js";
 import {
   emptyPacking,
@@ -123,108 +123,19 @@ function draw(focusKeyOverride) {
   restoreFocus(focusKey);
 }
 
-/* ── 再描画の予約 ────────────────────────────────────────
- *
- * 入力欄の change は blur の最中に発火する ── つまり、利用者がボタンを押した
- * mousedown の処理の**途中**で起きる。そこで表を replaceChildren すると:
- *
- * 1. 押しかけていたボタンが mouseup より前に文書から消え、click が発火しない。
- *    名前を打ってすぐ「項目を追加」を押しても項目は増えず、画面には何も出ない
- *    （2 度押せば動くので、余計に原因が分かりにくい）
- * 2. ブラウザが移そうとしていたフォーカス先も一緒に消えるので、
- *    document.activeElement は <body> になる。draw() がキーを拾えず、
- *    フォーカスは落ちたままになる
- *
- * どちらも「今のイベントの処理中に DOM を作り直している」ことが原因なので、
- * 描画を 1 tick 送って、click まで済んでから行う。そのとき activeElement は
- * 利用者が実際に移った先を指しているので、キーもそこから正しく拾える。
- *
- * microtask（queueMicrotask）では足りない ── blur → change は mousedown の
- * 既定動作の中で起きるため、microtask は mouseup より前に走ってしまう。
- *
- * 連続した変更（rename の直後に項目追加、など）は 1 回の描画にまとめる。
- * まとめないと、先に予約した描画が新しいフォーカス指定を上書きしてしまう。
+/**
+ * 通知は 2 つとも page-notice.js が作る（設計書 §13 の重複の抽出）。
+ * 表本体（els.table）の直前に差し込む。
  */
-let drawTimer = null;
-let drawContext = "";
-let drawOverride = null;
-
-function scheduleDraw(context, focusKeyOverride) {
-  drawContext = context;
-  // あとから来た指定を優先する。undefined で上書きして消さないこと
-  if (focusKeyOverride) drawOverride = focusKeyOverride;
-  if (drawTimer !== null) return;
-  drawTimer = setTimeout(() => {
-    drawTimer = null;
-    const override = drawOverride;
-    drawOverride = null;
-    safeDraw(drawContext, override);
-  }, 0);
-}
+const { setNotice, setStampNotice } = createNotices(els.table);
 
 /**
- * 再描画の失敗を画面に出す（schedule.js の safeDraw と同じ役割）。
- * ここで落ちると、表が半分だけ描かれた状態で止まり、利用者には何も伝わらない。
- *
- * 予約済みの描画があれば取り消してから描く。残すと、この呼び出しのあとに
- * 予約分が走り、成功時の setNotice(null) が直前に出した文言を消してしまう
- * （ドラッグの onError がまさにそれを出している）。
+ * 即時（safeDraw）と予約（scheduleDraw）の 2 つの口。予約が要る理由と、
+ * 予約の取り消しが safeDraw の内側にある理由は page-notice.js を参照
+ * （設計書 §13。node --test では捕まえられない不具合の修正なので、
+ * あの記述を消さないこと）。
  */
-function safeDraw(context, focusKeyOverride) {
-  if (drawTimer !== null) {
-    clearTimeout(drawTimer);
-    drawTimer = null;
-    drawOverride = null;
-  }
-  try {
-    draw(focusKeyOverride);
-    setNotice(null);
-  } catch (error) {
-    console.error(`packing: 再描画に失敗しました（${context}）`, error);
-    setNotice(
-      `表示の更新に失敗しました（${context}）。` +
-        "直前の表示のまま止まっています。原因はブラウザのコンソールを確認してください。"
-    );
-  }
-}
-
-let noticeEl = null;
-function setNotice(message) {
-  if (!message && !noticeEl) return;
-  if (!noticeEl) {
-    noticeEl = document.createElement("p");
-    noticeEl.className = "ferror";
-    noticeEl.setAttribute("role", "alert");
-    els.table.parentNode.insertBefore(noticeEl, els.table);
-  }
-  noticeEl.textContent = message ?? "";
-  noticeEl.hidden = !message;
-}
-
-/**
- * 封筒の外側の updatedAt と中身が食い違っていたときの警告（outerStampMismatch）。
- * schedule.js の setStampNotice と同じ役割・同じ理由で別要素にする。
- *
- * setNotice とは別の要素にする。safeDraw は再描画に成功するたびに
- * setNotice(null) を呼ぶので、同じ要素を使うと編集モードの切り替えや
- * 最初の保存といった操作でこの警告が黙って消える。GCM の認証タグの外に
- * ある値の食い違いは操作の成否とは無関係な事実なので、次に公開して
- * 外側が正しい値に上書きされるまで出続けるべきもの ── ここでは message に
- * null 以外を渡す呼び出しが 1 か所（load 直後）しかなく、setStampNotice(null)
- * を呼ぶ場所を作っていないのはそのため（消す理由がまだ無い）。
- */
-let stampNoticeEl = null;
-function setStampNotice(message) {
-  if (!message && !stampNoticeEl) return;
-  if (!stampNoticeEl) {
-    stampNoticeEl = document.createElement("p");
-    stampNoticeEl.className = "ferror";
-    stampNoticeEl.setAttribute("role", "status");
-    els.table.parentNode.insertBefore(stampNoticeEl, els.table);
-  }
-  stampNoticeEl.textContent = message ?? "";
-  stampNoticeEl.hidden = !message;
-}
+const { safeDraw, scheduleDraw } = createDrawLoop({ page: "packing", draw, setNotice });
 
 /**
  * 変更を保存して描き直す。
@@ -430,10 +341,7 @@ async function main() {
       publishUI.refreshDirty();
     }
 
-    if (error instanceof DataError) throw error;
-    if (error instanceof DecryptError) throw error;
-    if (error?.cause instanceof SyntaxError) throw new DataParseError(error.message, error.cause);
-    throw new DataFetchError(error?.message ?? String(error));
+    throw toLoadError(error);
   }
 
   state.data = loaded.data;

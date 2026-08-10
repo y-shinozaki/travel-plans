@@ -103,3 +103,26 @@ export function classifyLoadError(
       `${error?.name ?? "Error"}: ${error?.message ?? String(error)}`,
   };
 }
+
+/**
+ * `sync.load()` が投げたものに種別を付け直す。**投げずに返す** ──
+ * 呼び出し側が `throw toLoadError(error)` と書けば、この関数自体は
+ * 純粋関数のまま node --test から呼べる。
+ *
+ * 失敗は「取りに行けなかった」「JSON として読めなかった」「中身がその
+ * データの形になっていない」「復号できなかった」の 4 種類で、直し方が
+ * それぞれ違う。classifyLoadError() が案内を出し分けられるよう、ここで
+ * 種別を確定させる（JSON の解釈失敗だけは cause が SyntaxError になる）。
+ *
+ * **DataError で見ること。** schedule.js は EventDataError、packing.js は
+ * DataError で分岐していたが、EventDataError も PackingDataError も
+ * DataError を継承しているので、基底 1 本で両方を拾える（設計書 §13）。
+ */
+export function toLoadError(error) {
+  if (error instanceof DataError) return error;
+  if (error instanceof DecryptError) return error;
+  if (error?.cause instanceof SyntaxError) {
+    return new DataParseError(error.message, error.cause);
+  }
+  return new DataFetchError(error?.message ?? String(error));
+}
