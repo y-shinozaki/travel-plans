@@ -38,7 +38,9 @@
 | [`phase-b2-packing.md`](plans/phase-b2-packing.md) | 持ち物リストとそのエディタ | 完了 |
 | [`phase-b4-passphrase-and-encryption.md`](plans/phase-b4-passphrase-and-encryption.md) | 合言葉、PBKDF2 + AES-GCM による暗号化 | 完了 |
 
-Phase B3（コメント機能）は未着手で、計画もまだ無い。仕様は `spec/` の §4.3 / §7.5。
+**次は Phase B5**（ページ共通部品の抽出＋お土産リスト）。仕様は `spec/` の
+§4.5 / §7.6 に書いてあり、実装計画はこれから作る。
+Phase B3（コメント機能）はその次で、仕様は `spec/` の §4.3 / §7.5。
 旧 Phase C（Gmail / LINE の検索アーカイブ）は 2026-08-09 に取りやめた。
 
 ### `design/` — デザイン仕様と参照モック
