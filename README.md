@@ -10,19 +10,20 @@
 - Leaflet と CartoDB Positron タイルを使用したインタラクティブマップ
 - カテゴリによるイベントフィルタリング
 - 詳細シートでのイベント情報表示
-- **ブラウザ上での予定の追加・編集・削除**（下書きは端末の `localStorage` に保存）
+- **合言葉で旅程データを暗号化**（PBKDF2 + AES-GCM）。リポジトリに置く `events.json` は
+  暗号文で、初回に合言葉を決めて以降はその合言葉で開く
+- **ブラウザ上での予定の追加・編集・削除**（下書きは端末の `localStorage` に平文で保存）
 - **「公開」でリポジトリへ反映**（GitHub Contents API 経由。トークンを設定した端末のみ）
 - モバイル、タブレット、デスクトップに対応
 - ビルドプロセス不要 — ローカルサーバーを起動するだけ
 
-現在実装済みなのはメニュー（`index.html`）と旅程カレンダー（`schedule.html`）で、
-旅程は画面から編集・公開できる。
+現在実装済みなのはメニュー（`index.html`。合言葉の入力もここ）と
+旅程カレンダー（`schedule.html`）で、旅程は画面から編集・公開できる。
 持ち物リスト（`packing.html`）は Phase B2 向けの仮ページで、「メニューへ戻る」リンクのみ用意されている。
-`archive.html` は取りやめた検索アーカイブの仮ページで、Phase B4 で削除する。
 
 ## 技術スタック
 
-- **HTML5、CSS3**: 4 ページ構成。色・余白・角丸・モーションは `assets/css/tokens.css` の
+- **HTML5、CSS3**: 3 ページ構成。色・余白・角丸・モーションは `assets/css/tokens.css` の
   CSS カスタムプロパティに集約
 - **JavaScript**: フレームワークを使用しないバニラ JavaScript（ES モジュール）
 - **Leaflet.js**: インタラクティブマップライブラリ。CDN ではなく `assets/vendor/leaflet/` に
@@ -51,7 +52,8 @@ node --test
 `package.json` は `"type": "module"` を宣言するためだけに存在し、依存パッケージはゼロ。
 `tests/` は時刻変換・イベント展開・レーン配置・アイコン・デザイントークンの純粋関数と
 静的な値に加えて、保存と公開の層（`store` / `base64` / `sync-decide` / `github` / `sync`）、
-編集フォームとエディタ、公開画面、4 ページの CSP を検証する。通信・`localStorage`・時刻は
+合言葉と暗号化の層（`crypto` / `auth` / `auth-form` / `load-error`）、
+編集フォームとエディタ、公開画面、3 ページの CSP を検証する。通信・`localStorage`・時刻は
 すべて差し替え可能にしてあるので、テストは外部と通信しない。
 カレンダー描画やレスポンシブ崩れなど、DOM に依存する部分はブラウザで目視・実測して確認する。
 
@@ -59,10 +61,9 @@ node --test
 
 ```
 travel-plans/
-├── index.html            メニュー
+├── index.html            メニュー（合言葉の入力もここ）
 ├── schedule.html          旅程カレンダーと地図（編集・公開もここ）
 ├── packing.html           持ち物リスト（Phase B2 の仮ページ）
-├── archive.html           取りやめた検索アーカイブの仮ページ（B4 で削除）
 ├── assets/
 │   ├── css/
 │   │   ├── tokens.css     色・余白・角丸・モーションの唯一の定義場所
@@ -76,7 +77,9 @@ travel-plans/
 │   │                      time.js / events.js / lanes.js（node --test が対象にする純粋関数）、
 │   │                      store.js / base64.js / sync-decide.js / github.js / token.js /
 │   │                      sync.js（下書きの保存とリポジトリへの公開）、
-│   │                      event-form.js / event-editor.js / publish-ui.js（編集と公開の画面）
+│   │                      event-form.js / event-editor.js / publish-ui.js（編集と公開の画面）、
+│   │                      crypto.js / auth.js / auth-form.js（合言葉と暗号化）、
+│   │                      load-error.js（読み込み失敗の分類）
 │   ├── data/
 │   │   └── events.json    旅程データ（唯一のソース。表示用文字列は持たない）
 │   └── vendor/
@@ -134,8 +137,9 @@ travel-plans/
 
 ## 保存と公開
 
-- **正はリポジトリの `assets/data/events.json`。** 同行者はページを開くだけで最新を受け取る
-- **編集は端末の `localStorage` に下書きとして入る**（キーは `tp:events`、
+- **正はリポジトリの `assets/data/events.json`。** ただしリポジトリ上は暗号文（封筒 JSON）で、
+  合言葉が要る。同行者は合言葉を入れてページを開けば最新を受け取る
+- **編集は端末の `localStorage` に下書きとして入る**（平文。キーは `tp:events`、
   最後にリモートと揃えた時刻が `tp:events-base`）
 - **「公開」を押した端末だけ**が GitHub Contents API でリポジトリへコミットする。
   トークンを設定していない端末には公開ボタン自体が出ない（閲覧と下書き編集はできる）
@@ -238,7 +242,7 @@ map.js の createMap() → 座標を持つイベントからマーカーと位�
 このリポジトリへの書き込み権限を持つ GitHub トークンをブラウザに保存している。
 CDN 経由で読み込むスクリプトが差し替えられた場合、そのトークンを盗み出されたり、
 リポジトリへ任意の内容を push されたりする恐れがあるため、サードパーティの JS は CDN から
-読み込まず `assets/vendor/leaflet/` に自前で配置している。同じ理由で、4 ページすべてに
+読み込まず `assets/vendor/leaflet/` に自前で配置している。同じ理由で、3 ページすべてに
 `script-src 'self'` の Content-Security-Policy を置き、インライン script を排除している。
 トークンの具体的な保存先・扱いは
 `docs/superpowers/specs/2026-08-09-travel-plans-redesign-design.md` §5.4・§5.5 を参照。
