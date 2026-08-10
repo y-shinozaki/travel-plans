@@ -6,7 +6,7 @@ import { CAT_META } from "./categories.js";
 import { createMap } from "./map.js";
 import { createSheet } from "./sheet.js";
 import { el, escapeHtml } from "./dom.js";
-import { EventDataError } from "./validate.js";
+import { validateEvents, EventDataError } from "./validate.js";
 import { createStore } from "./store.js";
 import { createSync, DEFAULT_CONFIG } from "./sync.js";
 import { createEventEditor } from "./event-editor.js";
@@ -312,6 +312,8 @@ async function main() {
     store,
     sync,
     getData: () => state.data,
+    // 旅程であることをここで明示する。publish-ui は既定値を持たない
+    content: { validate: validateEvents, noun: "旅程" },
     onAdopt: (data) => {
       setData(data);
       safeDraw("リモートの取り込み");
