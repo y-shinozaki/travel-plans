@@ -1,8 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 
-const PAGES = ["index.html", "schedule.html", "packing.html", "archive.html"];
+// archive.html は取りやめた検索アーカイブの仮ページで、B4 で削除した（設計書 §2.1）
+const PAGES = ["index.html", "schedule.html", "packing.html"];
 
 const read = (name) => readFileSync(new URL(`../${name}`, import.meta.url), "utf8");
 
@@ -55,6 +56,10 @@ test("connect-src が GitHub API を許可している", () => {
     const c = directive(cspOf(read(page)), "connect-src");
     assert.ok(c?.includes("https://api.github.com"), `${page} の connect-src に api.github.com がありません`);
   }
+});
+
+test("archive.html は残っていない", () => {
+  assert.equal(existsSync(new URL("../archive.html", import.meta.url)), false);
 });
 
 test("地図タイルとフォントの取得元が許可されている", () => {

@@ -1,7 +1,7 @@
 /**
- * packing.html と archive.html の共通エントリポイント。
+ * packing.html 専用のエントリポイント（archive.html は B4 で取りやめて削除した）。
  * CSP で script-src 'self' にしたため、インライン module は使えない。
- * どちらのページかは <body data-page="..."> から取る。
+ * どのページかは <body data-page="..."> から取る。
  */
 import { injectSprite } from "./icons.js";
 import { renderNav } from "./nav.js";

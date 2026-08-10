@@ -334,13 +334,19 @@ const navHtml = (current) => {
   return mount.innerHTML;
 };
 
-test("renderNav: 3 ページ分のリンクとホームを出す", () => {
+test("renderNav: 2 ページ分のリンクとホームを出す", () => {
   const html = navHtml(null);
-  for (const href of ["index.html", "schedule.html", "archive.html", "packing.html"]) {
+  for (const href of ["index.html", "schedule.html", "packing.html"]) {
     assert.ok(html.includes(`href="${href}"`), `${href} へのリンクがありません`);
   }
   // nav__links（囲みの div）に釣られないよう、直後の文字まで見る
-  assert.equal(html.match(/class="nav__link[" ]/g).length, 3);
+  assert.equal(html.match(/class="nav__link[" ]/g).length, 2);
+});
+
+test("renderNav: 取りやめたデータ検索を出さない", () => {
+  const html = navHtml(null);
+  assert.ok(!html.includes("archive.html"));
+  assert.ok(!html.includes("データ検索"));
 });
 
 test("renderNav: current のページだけに is-current と aria-current が付く", () => {
@@ -362,7 +368,6 @@ test("renderNav: current を変えると付く位置も変わる", () => {
   // is-current が常に同じリンクへ付く（＝比較が死んでいる）実装を弾く
   for (const [key, href] of [
     ["schedule", "schedule.html"],
-    ["archive", "archive.html"],
     ["packing", "packing.html"],
   ]) {
     const html = navHtml(key);
