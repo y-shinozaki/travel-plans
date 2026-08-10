@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
 
 // archive.html は取りやめた検索アーカイブの仮ページで、B4 で削除した（設計書 §2.1）
-const PAGES = ["index.html", "schedule.html", "packing.html"];
+const PAGES = ["index.html", "schedule.html", "packing.html", "souvenirs.html"];
 
 const read = (name) => readFileSync(new URL(`../${name}`, import.meta.url), "utf8");
 

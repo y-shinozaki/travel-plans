@@ -196,7 +196,7 @@ test("tokens.css 以外の CSS に色リテラルを書かない", () => {
   // 「色は tokens.css だけ」は 4 つのドキュメントが宣言している約束。
   // スプライト側には icons.test.js の同種のガードがあるが、
   // CSS 側には無かったので 4 箇所すり抜けていた。
-  const files = ["base.css", "controls.css", "calendar.css", "packing.css"];
+  const files = ["base.css", "controls.css", "calendar.css", "packing.css", "souvenirs.css"];
   for (const name of files) {
     // コメント中の例示や出典メモは対象外
     const src = readCss(name).replace(/\/\*[\s\S]*?\*\//g, "");
