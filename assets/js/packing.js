@@ -83,9 +83,14 @@ function restoreFocus(focusKey) {
 /**
  * 描き直す。ドラッグは表を作り直すたびに配線し直す ──
  * 前の表の要素はもう文書にいないので、リスナも一緒に捨てる。
+ *
+ * @param {string|null} [focusKeyOverride] 押した瞬間のボタンではなく、
+ *   別の要素へフォーカスを送りたいときに渡す（例: 項目を追加した直後、
+ *   新しい行の名前欄へ）。渡さなければ、いつもどおり document.activeElement
+ *   の focusKey を使う。
  */
-function draw() {
-  const focusKey = document.activeElement?.dataset?.focusKey ?? null;
+function draw(focusKeyOverride) {
+  const focusKey = focusKeyOverride ?? document.activeElement?.dataset?.focusKey ?? null;
 
   renderProgress({ mount: els.progress, data: state.data });
   renderTable({
@@ -97,7 +102,22 @@ function draw() {
 
   drag?.detach();
   drag = state.editing
-    ? attachDrag({ root: els.table, getData: () => state.data, commit: apply })
+    ? attachDrag({
+        root: els.table,
+        getData: () => state.data,
+        commit: apply,
+        // rebuildFromOrder() の内部不変条件が破れたときの逃げ道。ここで拾わないと
+        // 例外は pointerup のリスナの外に出られず、コンソールにしか残らない
+        // （apply() の try/catch は保存の失敗しか見ておらず、組み直し自体の失敗は
+        // apply を呼ぶ前に起きるのでその外側になる）。draw() でドラッグ中に動いた
+        // DOM を実際のデータへ戻し、そのあとで setNotice を上書きして知らせる
+        // （safeDraw は成功時に setNotice(null) するので、順序を逆にしない）。
+        onError: (error) => {
+          console.error("packing: 並べ替えの反映に失敗しました", error);
+          safeDraw("並べ替えの反映");
+          setNotice(`並べ替えを反映できませんでした。${error?.message ?? String(error)}`);
+        },
+      })
     : null;
 
   restoreFocus(focusKey);
@@ -107,9 +127,9 @@ function draw() {
  * 再描画の失敗を画面に出す（schedule.js の safeDraw と同じ役割）。
  * ここで落ちると、表が半分だけ描かれた状態で止まり、利用者には何も伝わらない。
  */
-function safeDraw(context) {
+function safeDraw(context, focusKeyOverride) {
   try {
-    draw();
+    draw(focusKeyOverride);
     setNotice(null);
   } catch (error) {
     console.error(`packing: 再描画に失敗しました（${context}）`, error);
@@ -172,8 +192,13 @@ function setStampNotice(message) {
  * ここが無くても saveLocal が必ず行う ── ここで先に呼ぶのは、保存の失敗を
  * 「検査に落ちた」と「保存領域に書けなかった」で区別しやすくしておく、
  * という明示のための呼び出しであり、実際の関所は saveLocal 側にある。
+ *
+ * @param {object} next 保存するデータ
+ * @param {string|null} [focusKeyOverride] draw() へそのまま渡す。項目・区分の
+ *   追加のように「押したボタンではなく新しく生まれた入力欄へフォーカスを送りたい」
+ *   呼び出しだけが指定する（設計書 §7.3「追加後は入力欄にフォーカス」）。
  */
-function apply(next) {
+function apply(next, focusKeyOverride) {
   try {
     validatePacking(next);
     state.data = sync.saveLocal(next);
@@ -187,7 +212,7 @@ function apply(next) {
     return;
   }
   publishUI?.refreshDirty();
-  safeDraw("持ち物リストの保存");
+  safeDraw("持ち物リストの保存", focusKeyOverride);
 }
 
 const handlers = {
@@ -207,14 +232,18 @@ const handlers = {
     apply(withGroup(state.data, { ...group, ...patch }));
   },
   onAddItem(groupId) {
+    // id は withItem() に渡す前に採番する ── 追加後にどの行が新顔かを
+    // apply() へ伝える手段が、他に無い（設計書 §7.3「追加後は入力欄にフォーカス」）。
+    const id = nextItemId(state.data.groups);
     apply(
       withItem(state.data, groupId, {
-        id: nextItemId(state.data.groups),
+        id,
         name: "新しい項目",
         note: "",
         a: false,
         b: false,
-      })
+      }),
+      `item:${id}:name`
     );
   },
   onDeleteItem: (itemId) => apply(withoutItem(state.data, itemId)),
@@ -237,16 +266,25 @@ function buildToolbar() {
 
   els.addGroup.innerHTML = icon("i-plus", "ico--sm");
   els.addGroup.appendChild(el("span", null, "区分を追加"));
-  els.addGroup.addEventListener("click", () =>
+  els.addGroup.addEventListener("click", () => {
+    // このボタンは #pk-table の外（ツールバー）にいて draw() では作り直されない。
+    // つまり document.activeElement を控える通常の経路では何も起きず
+    // （このボタン自身に data-focus-key が無いので restoreFocus が素通りする）、
+    // クリック後もブラウザは既定でこのボタンにフォーカスを残す。
+    // それでは新しく増えた区分（表の最後尾）へは、既存の区分をすべて
+    // タブで飛び越さないと辿り着けない ── onAddItem と同じ理由で、
+    // id を先に採番し、明示的に新しい区分名の入力欄へ送る。
+    const id = nextGroupId(state.data.groups);
     apply(
       withGroup(state.data, {
-        id: nextGroupId(state.data.groups),
+        id,
         name: "新しい区分",
         icon: "i-note",
         items: [],
-      })
-    )
-  );
+      }),
+      `group:${id}:name`
+    );
+  });
 
   els.editToggle.disabled = false;
   els.addGroup.disabled = false;

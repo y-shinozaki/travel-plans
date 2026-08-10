@@ -172,7 +172,7 @@ export function createSync({
       validate(stored);
       return { draft: stored, rejected: false };
     } catch (error) {
-      console.warn("sync: 手元の下書きが旅程の形になっていないため使いません", error);
+      console.warn(`sync: 手元の下書きが${noun}の形になっていないため使いません`, error);
       return { draft: null, rejected: true };
     }
   }
@@ -230,7 +230,7 @@ export function createSync({
       // 「オフラインです」と言うのは嘘になる。そのまま投げて呼び出し側に見せる
       if (error instanceof DecryptError) throw error;
       fetchError = error;
-      console.warn("sync: 最新の旅程データを確認できませんでした", error);
+      console.warn(`sync: 最新の${noun}データを確認できませんでした`, error);
     }
 
     // 検証は「見せるより前」。壊れたリモートを黙って画面に出さない。

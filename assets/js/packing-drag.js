@@ -102,9 +102,15 @@ function readOrder(root) {
  * @param {HTMLElement} deps.root 表全体。ここから querySelectorAll で並びを読む
  * @param {() => object} deps.getData 現在の持ち物データ
  * @param {(data:object) => void} deps.commit 組み直した結果を保存して描き直す
+ * @param {(error: Error) => void} [deps.onError] rebuildFromOrder() が投げたときの逃げ道。
+ *   ここで拾わないと、投げた例外は pointerup のリスナの外に出られず
+ *   コンソールにしか残らない ── rebuildFromOrder のコメントにあるとおり、
+ *   その throw は「項目が黙って消える」ことを防ぐためにわざと大声にしてある。
+ *   このコールバックが無いと、その大声を聞くのがコンソールを見た人だけになり、
+ *   画面の前の利用者には何も伝わらない（packing.js の setNotice へ渡す想定）
  * @returns {{detach: () => void}}
  */
-export function attachDrag({ root, getData, commit }) {
+export function attachDrag({ root, getData, commit, onError }) {
   let dragging = null; // { row, placeholderAfter }
 
   function onPointerDown(event) {
@@ -156,7 +162,15 @@ export function attachDrag({ root, getData, commit }) {
     dragging.row.classList.remove(DRAGGING_CLASS);
     dragging = null;
     // ここで初めてデータを組み直す。DOM が正
-    commit(rebuildFromOrder(getData(), readOrder(root)));
+    try {
+      commit(rebuildFromOrder(getData(), readOrder(root)));
+    } catch (error) {
+      // rebuildFromOrder の throw をここで止めないと、pointerup のリスナの
+      // 外に出て console にしか残らない。commit（= packing.js の apply）は
+      // 保存の失敗（検査・保存領域）しか拾わない ── 組み直し自体の失敗は
+      // commit を呼ぶ前に起きるので、apply の try/catch の外側になる
+      onError?.(error);
+    }
   }
 
   root.addEventListener("pointerdown", onPointerDown);

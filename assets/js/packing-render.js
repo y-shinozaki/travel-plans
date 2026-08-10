@@ -299,7 +299,7 @@ export function renderTable({ mount, data, editing, handlers = {} }) {
       "p",
       "body",
       editing
-        ? "まだ何もありません。下の「区分を追加」から始めてください。"
+        ? "まだ何もありません。「区分を追加」から始めてください。"
         : "まだ何もありません。「リストを編集」から追加できます。"
     );
     mount.replaceChildren(empty);

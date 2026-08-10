@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { rebuildFromOrder } from "../assets/js/packing-drag.js";
+import { rebuildFromOrder, attachDrag } from "../assets/js/packing-drag.js";
 import { validatePacking } from "../assets/js/packing-validate.js";
 import { PACKING } from "./fixtures/packing.js";
 
@@ -167,6 +167,94 @@ function deepFreeze(value) {
   }
   return value;
 }
+
+// ── attachDrag の配線（Final review の Fix 4） ──────────────────────
+//
+// attachDrag() 本体は Pointer Events / document.elementFromPoint に依存する
+// ので、node --test では通常は対象外（CLAUDE.md「テスト」参照）。ただし
+// pointerdown → pointerup だけなら、両方に触れる最小限のスタブで
+// 組み立てられる（pointermove・elementFromPoint は使わずに済む）。
+// ここで確かめたいのは 1 点だけ ── commit（rebuildFromOrder の結果を渡す先）が
+// 同期的に例外を投げても、その例外が pointerup のリスナの外へ漏れず
+// onError に渡ること。rebuildFromOrder 自身の「到達不能」の throw は、
+// data.groups を自分でしか作れない都合上ここから正規の経路では再現できない
+// （2 本のループが data.groups の id を必ず 1 度ずつ置くため）が、
+// onPointerUp の try/catch は rebuildFromOrder と commit の両方を
+// 同じブロックで囲んでいるので、commit 側の例外で同じ配線を検証できる。
+
+/** テストに要る分だけの要素スタブ。closest はテストごとに個別に差し替える。 */
+function stubEl(dataset = {}) {
+  return {
+    dataset,
+    classList: { add() {}, remove() {} },
+    setPointerCapture() {},
+    closest() {
+      return null;
+    },
+  };
+}
+
+test("commit が同期的に例外を投げても、onPointerUp の外へ漏らさず onError へ渡す", () => {
+  const item = stubEl({ itemId: "it-001" });
+  const groupEl = {
+    dataset: { groupId: "g-001" },
+    querySelectorAll: (sel) => (sel === "[data-item-id]" ? [item] : []),
+  };
+  const root = {
+    listeners: {},
+    addEventListener(type, fn) {
+      this.listeners[type] = fn;
+    },
+    removeEventListener() {},
+    querySelectorAll(sel) {
+      return sel === "[data-group-id]" ? [groupEl] : [];
+    },
+  };
+
+  const handle = stubEl({ dragHandle: "1" });
+  handle.closest = (sel) =>
+    sel === "[data-drag-handle]" ? handle : sel === "[data-item-id]" ? item : null;
+
+  const windowListeners = {};
+  const previousWindow = globalThis.window;
+  globalThis.window = {
+    addEventListener(type, fn) {
+      windowListeners[type] = fn;
+    },
+    removeEventListener() {},
+  };
+
+  const errors = [];
+  let drag;
+  try {
+    drag = attachDrag({
+      root,
+      getData: () => PACKING,
+      commit: () => {
+        throw new Error("boom");
+      },
+      onError: (error) => errors.push(error),
+    });
+
+    root.listeners.pointerdown({
+      target: handle,
+      button: 0,
+      pointerId: 1,
+      preventDefault() {},
+    });
+    // pointerdown が dragging をセットできていること（さもないと pointerup は
+    // 早期 return し、このテストは commit を一度も呼ばずに「成功」する）
+    assert.equal(errors.length, 0, "pointerup より前に onError が呼ばれています");
+
+    windowListeners.pointerup();
+  } finally {
+    drag?.detach();
+    globalThis.window = previousWindow;
+  }
+
+  assert.equal(errors.length, 1, "commit の例外が onError に届いていません");
+  assert.equal(errors[0].message, "boom");
+});
 
 test("入力データを書き換えない", () => {
   // data を凍結してから渡す。1 か所でも直接代入していれば
