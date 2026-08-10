@@ -567,3 +567,85 @@ test("区分ヘッダーの達成数は a かつ b が true の項目数（progr
   // g-empty: 0/0
   assert.deepEqual(counts, ["1 / 3", "0 / 1", "0 / 0"]);
 });
+
+/*
+ * Review finding (Task 10 の再レビュー): 再描画のたびに mount.replaceChildren() が
+ * 全ノードを作り直すので、フォーカスしていた要素はもう文書にいない。
+ * packing.js がフォーカスを戻すには、id から作った安定したキーが要る ──
+ * 位置から作ると、並べ替えたその瞬間にキーが変わり、何のためのキーか分からなくなる。
+ * 以下の 3 本はそれぞれ別の壊れ方を拾う: キーが付いていない／キーが重複する／
+ * キーが位置に依存してしまう（並べ替えると変わる）。
+ */
+
+test("項目・区分の操作コントロールに data-focus-key が付く（id から作る）", () => {
+  const { make } = stubDocument();
+  const mount = make("div");
+  renderTable({ mount, data: PACKING, editing: true, handlers: {} });
+
+  const keys = new Set(findAll(mount, (n) => n.dataset?.focusKey).map((n) => n.dataset.focusKey));
+
+  // 項目（passport）まわり
+  assert.ok(keys.has("item:passport:up"), "項目の ↑ ボタンにキーが無い");
+  assert.ok(keys.has("item:passport:down"), "項目の ↓ ボタンにキーが無い");
+  assert.ok(keys.has("item:passport:del"), "項目の削除ボタンにキーが無い");
+  assert.ok(keys.has("item:passport:name"), "項目名の入力欄にキーが無い");
+  assert.ok(keys.has("item:passport:note"), "メモの入力欄にキーが無い");
+  assert.ok(keys.has("item:passport:check:a"), "項目のチェックボックス(a)にキーが無い");
+  assert.ok(keys.has("item:passport:check:b"), "項目のチェックボックス(b)にキーが無い");
+
+  // 区分（g-valuables）まわり
+  assert.ok(keys.has("group:g-valuables:name"), "区分名の入力欄にキーが無い");
+  assert.ok(keys.has("group:g-valuables:up"), "区分の ↑ ボタンにキーが無い");
+  assert.ok(keys.has("group:g-valuables:down"), "区分の ↓ ボタンにキーが無い");
+  assert.ok(keys.has("group:g-valuables:del"), "区分の削除ボタンにキーが無い");
+  assert.ok(keys.has("group:g-valuables:add"), "「項目を追加」ボタンにキーが無い");
+});
+
+test("読み取りモードでは data-focus-key を持つ要素が 1 つも無い（操作コントロール自体が無い）", () => {
+  const { make } = stubDocument();
+  const mount = make("div");
+  renderTable({ mount, data: PACKING, editing: false, handlers: {} });
+  // チェックボックスだけは読み取りモードでも押せる（設計書 §7.3）ので、
+  // 「無い」ではなく「チェックボックスの分だけある」を見る
+  const keys = findAll(mount, (n) => n.dataset?.focusKey).map((n) => n.dataset.focusKey);
+  assert.equal(keys.length, 8); // 4 項目 × 2 人分
+  assert.ok(keys.every((k) => /^item:.+:check:[ab]$/.test(k)));
+});
+
+test("data-focus-key は 1 回の描画内で重複しない", () => {
+  const { make } = stubDocument();
+  const mount = make("div");
+  renderTable({ mount, data: PACKING, editing: true, handlers: {} });
+  const keys = findAll(mount, (n) => n.dataset?.focusKey).map((n) => n.dataset.focusKey);
+  assert.ok(keys.length > 0, "focusKey を持つ要素が 1 つも無い（テストが空振りしている）");
+  assert.equal(new Set(keys).size, keys.length, "同じ focusKey を持つ要素が複数ある");
+});
+
+test("data-focus-key は位置ではなく id から作る（並べ替えても同じ項目なら同じキー）", () => {
+  const { make: make1 } = stubDocument();
+  const mount1 = make1("div");
+  renderTable({ mount: mount1, data: PACKING, editing: true, handlers: {} });
+  const before = findFirst(
+    mount1,
+    (n) => n.dataset?.focusKey === "item:passport:up"
+  );
+  assert.ok(before, "並べ替え前に item:passport:up が見つからない");
+
+  // g-valuables の中で passport を先頭から末尾へ動かす（＝ DOM 上の位置が変わる）。
+  // キーが位置から作られていれば、この並べ替えだけでキーが変わってしまうはず
+  const reordered = {
+    ...PACKING,
+    groups: PACKING.groups.map((g) =>
+      g.id === "g-valuables" ? { ...g, items: [...g.items.slice(1), g.items[0]] } : g
+    ),
+  };
+
+  const { make: make2 } = stubDocument();
+  const mount2 = make2("div");
+  renderTable({ mount: mount2, data: reordered, editing: true, handlers: {} });
+  const after = findFirst(
+    mount2,
+    (n) => n.dataset?.focusKey === "item:passport:up"
+  );
+  assert.ok(after, "並べ替え後に item:passport:up が見つからない（キーが位置依存になっている）");
+});

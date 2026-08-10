@@ -60,10 +60,33 @@ let sync = null;
 let drag = null;
 
 /**
+ * 描き直したあとにフォーカスを戻す。
+ *
+ * renderTable() は毎回 mount.replaceChildren() で全ノードを作り直すので、
+ * 押した瞬間のボタンや、入力していた最中の欄はもう文書にいない
+ * （detach された要素への focus() は何も起きず、フォーカスは <body> へ落ちる）。
+ * ↑↓ ボタンはドラッグを使えない人のための唯一の並べ替え手段（設計書 §7.3）で、
+ * 押すたびにフォーカスを失うと、次の 1 手のために毎回タブの先頭からやり直す
+ * ことになる ── 一番助けが要る操作をこのページ自身が壊すことになる。
+ *
+ * packing-render.js が付ける data-focus-key は id から作ってあるので、
+ * 並べ替えで位置が変わっても同じキーで引ける。見つからなければ
+ * （行そのものを削除した、など）publish-ui.js の focusFallback と同じ考え方で、
+ * 必ず存在するツールバーの先頭（編集トグル）へ逃がす。
+ */
+function restoreFocus(focusKey) {
+  if (!focusKey) return;
+  const next = els.table.querySelector(`[data-focus-key="${CSS.escape(focusKey)}"]`);
+  (next ?? els.editToggle)?.focus();
+}
+
+/**
  * 描き直す。ドラッグは表を作り直すたびに配線し直す ──
  * 前の表の要素はもう文書にいないので、リスナも一緒に捨てる。
  */
 function draw() {
+  const focusKey = document.activeElement?.dataset?.focusKey ?? null;
+
   renderProgress({ mount: els.progress, data: state.data });
   renderTable({
     mount: els.table,
@@ -76,6 +99,8 @@ function draw() {
   drag = state.editing
     ? attachDrag({ root: els.table, getData: () => state.data, commit: apply })
     : null;
+
+  restoreFocus(focusKey);
 }
 
 /**
@@ -109,14 +134,44 @@ function setNotice(message) {
 }
 
 /**
+ * 封筒の外側の updatedAt と中身が食い違っていたときの警告（outerStampMismatch）。
+ * schedule.js の setStampNotice と同じ役割・同じ理由で別要素にする。
+ *
+ * setNotice とは別の要素にする。safeDraw は再描画に成功するたびに
+ * setNotice(null) を呼ぶので、同じ要素を使うと編集モードの切り替えや
+ * 最初の保存といった操作でこの警告が黙って消える。GCM の認証タグの外に
+ * ある値の食い違いは操作の成否とは無関係な事実なので、次に公開して
+ * 外側が正しい値に上書きされるまで出続けるべきもの ── ここでは message に
+ * null 以外を渡す呼び出しが 1 か所（load 直後）しかなく、setStampNotice(null)
+ * を呼ぶ場所を作っていないのはそのため（消す理由がまだ無い）。
+ */
+let stampNoticeEl = null;
+function setStampNotice(message) {
+  if (!message && !stampNoticeEl) return;
+  if (!stampNoticeEl) {
+    stampNoticeEl = document.createElement("p");
+    stampNoticeEl.className = "ferror";
+    stampNoticeEl.setAttribute("role", "status");
+    els.table.parentNode.insertBefore(stampNoticeEl, els.table);
+  }
+  stampNoticeEl.textContent = message ?? "";
+  stampNoticeEl.hidden = !message;
+}
+
+/**
  * 変更を保存して描き直す。
  *
  * 順序が意味を持つ: 検査 → 下書きへ書く → 反映。saveLocal が投げたら
  * state も画面も動かない ── 保存できていないのに画面だけ新しい、という
  * 食い違いを作らない（schedule.js の commit と同じ）。
  *
- * 配列全体を validatePacking に通すのは、1 件ずつの検査では id の重複を
- * 検出できないため（event-editor.js の applyChange と同じ理由）。
+ * validatePacking(next) を先に呼ぶのは、id の重複検出の網としてではない
+ * （event-editor.js の applyChange とは違い、このファイルは 1 件ずつの検査を
+ * 経由しないので、そもそも「網の下」に何も無い）。sync.saveLocal も
+ * cfg.validate（= validatePacking）を内部で呼ぶので、検査そのものは
+ * ここが無くても saveLocal が必ず行う ── ここで先に呼ぶのは、保存の失敗を
+ * 「検査に落ちた」と「保存領域に書けなかった」で区別しやすくしておく、
+ * という明示のための呼び出しであり、実際の関所は saveLocal 側にある。
  */
 function apply(next) {
   try {
@@ -284,6 +339,19 @@ async function main() {
   }
 
   state.data = loaded.data;
+
+  if (loaded.outerStampMismatch) {
+    // 封筒の外側は認証されないので、改竄も破損も GCM は気付かない。
+    // 内側を正として表示しているが、黙って直すと誰も気付かないまま進む
+    // （schedule.js の同じ分岐と同じ理由。設計書 §6.2）。
+    // 「公開し直すと揃います」と言い切らない理由は sync.js の
+    // assertRemoteNotAhead のコメント参照 ── 常に揃うとは限らない
+    setStampNotice(
+      "リモートのファイルの更新時刻が中身と食い違っています。" +
+        "中身の時刻を正として表示しています。公開し直すと揃うことがあります。"
+    );
+  }
+
   buildToolbar();
   publishUI.start(loaded.source);
   draw();

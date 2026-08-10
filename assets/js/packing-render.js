@@ -9,6 +9,14 @@
  * 値は必ず el()（textContent）で入れる。innerHTML に入るのは icon() が返す
  * 定数だけ。ブラウザで入力した文字列を、リポジトリ書き込み権限を持つトークンを
  * 抱えたページ自身が描画するため（CLAUDE.md の規約）。
+ *
+ * すべての操作コントロール（↑↓・削除・名前とメモの入力欄・チェックボックス）に
+ * `dataset.focusKey` を付ける。id から作る（`item:<itemId>:up` のように）── 位置から
+ * 作ると、並べ替えたその瞬間に「動いた」という事実そのものでキーが変わってしまい、
+ * 何のためのキーか分からなくなる。packing.js の draw() が再描画のたびに
+ * `document.activeElement` のこのキーを控え、描き直したあと同じキーを持つ要素へ
+ * フォーカスを戻す（event-editor.js の focusEvent と同じ考え方 ── mount.replaceChildren()
+ * は毎回すべてのノードを作り直すので、押した瞬間の要素はもう文書にいない）。
  */
 
 import { el } from "./dom.js";
@@ -100,6 +108,7 @@ function checkCell(item, member, memberName, onToggle) {
   input.type = "checkbox";
   input.checked = item[member] === true;
   input.setAttribute("aria-label", `${memberName}: ${item.name}`);
+  input.dataset.focusKey = `item:${item.id}:check:${member}`;
   input.addEventListener("change", () => onToggle?.(item.id, member, input.checked));
 
   const box = el("span", "check__box");
@@ -127,6 +136,7 @@ function itemBody(item, editing, onRename) {
   name.type = "text";
   name.value = item.name;
   name.setAttribute("aria-label", "項目名");
+  name.dataset.focusKey = `item:${item.id}:name`;
   name.addEventListener("change", () => onRename?.(item.id, { name: name.value }));
 
   const note = document.createElement("input");
@@ -135,6 +145,7 @@ function itemBody(item, editing, onRename) {
   note.value = item.note ?? "";
   note.placeholder = "メモ";
   note.setAttribute("aria-label", "メモ");
+  note.dataset.focusKey = `item:${item.id}:note`;
   note.addEventListener("change", () => onRename?.(item.id, { note: note.value }));
 
   body.appendChild(name);
@@ -170,22 +181,24 @@ function itemRow(item, data, editing, handlers) {
     // ドラッグが使えない環境のために ↑↓ を常に併設する（設計書 §7.3）
     const up = iconButton("rowbtn", "i-arrow-right", "1 つ上へ");
     up.style.transform = "rotate(-90deg)";
+    up.dataset.focusKey = `item:${item.id}:up`;
     up.addEventListener("click", () => handlers.onMoveItem?.(item.id, -1));
     const down = iconButton("rowbtn", "i-arrow-right", "1 つ下へ");
     down.style.transform = "rotate(90deg)";
+    down.dataset.focusKey = `item:${item.id}:down`;
     down.addEventListener("click", () => handlers.onMoveItem?.(item.id, +1));
     acts.appendChild(up);
     acts.appendChild(down);
-    acts.appendChild(
-      armedIconButton({
-        cls: "rowbtn rowbtn--del",
-        armedCls: "rowbtn rowbtn--confirm",
-        iconId: "i-x",
-        label: `${item.name} を削除`,
-        armedLabel: "もう一度で削除",
-        onConfirm: () => handlers.onDeleteItem?.(item.id),
-      })
-    );
+    const del = armedIconButton({
+      cls: "rowbtn rowbtn--del",
+      armedCls: "rowbtn rowbtn--confirm",
+      iconId: "i-x",
+      label: `${item.name} を削除`,
+      armedLabel: "もう一度で削除",
+      onConfirm: () => handlers.onDeleteItem?.(item.id),
+    });
+    del.dataset.focusKey = `item:${item.id}:del`;
+    acts.appendChild(del);
     row.appendChild(acts);
   }
 
@@ -210,6 +223,7 @@ function groupBlock(group, data, editing, handlers) {
     name.type = "text";
     name.value = group.name;
     name.setAttribute("aria-label", "区分名");
+    name.dataset.focusKey = `group:${group.id}:name`;
     name.addEventListener("change", () =>
       handlers.onRenameGroup?.(group.id, { name: name.value })
     );
@@ -225,23 +239,25 @@ function groupBlock(group, data, editing, handlers) {
     const acts = el("div", "pkgroup__acts");
     const up = iconButton("rowbtn", "i-arrow-right", "この区分を 1 つ上へ");
     up.style.transform = "rotate(-90deg)";
+    up.dataset.focusKey = `group:${group.id}:up`;
     up.addEventListener("click", () => handlers.onMoveGroup?.(group.id, -1));
     const down = iconButton("rowbtn", "i-arrow-right", "この区分を 1 つ下へ");
     down.style.transform = "rotate(90deg)";
+    down.dataset.focusKey = `group:${group.id}:down`;
     down.addEventListener("click", () => handlers.onMoveGroup?.(group.id, +1));
     acts.appendChild(up);
     acts.appendChild(down);
-    acts.appendChild(
-      armedIconButton({
-        cls: "rowbtn rowbtn--del",
-        armedCls: "rowbtn rowbtn--confirm",
-        iconId: "i-x",
-        // 中身の数を出す（設計書 §7.3）。何件消えるのかを見ずに押させない
-        label: `${group.name} を削除`,
-        armedLabel: `もう一度で ${group.items.length} 件ごと削除`,
-        onConfirm: () => handlers.onDeleteGroup?.(group.id),
-      })
-    );
+    const del = armedIconButton({
+      cls: "rowbtn rowbtn--del",
+      armedCls: "rowbtn rowbtn--confirm",
+      iconId: "i-x",
+      // 中身の数を出す（設計書 §7.3）。何件消えるのかを見ずに押させない
+      label: `${group.name} を削除`,
+      armedLabel: `もう一度で ${group.items.length} 件ごと削除`,
+      onConfirm: () => handlers.onDeleteGroup?.(group.id),
+    });
+    del.dataset.focusKey = `group:${group.id}:del`;
+    acts.appendChild(del);
     head.appendChild(acts);
   }
 
@@ -260,6 +276,7 @@ function groupBlock(group, data, editing, handlers) {
     add.type = "button";
     add.innerHTML = icon("i-plus", "ico--sm");
     add.appendChild(el("span", null, "項目を追加"));
+    add.dataset.focusKey = `group:${group.id}:add`;
     add.addEventListener("click", () => handlers.onAddItem?.(group.id));
     block.appendChild(add);
   }
