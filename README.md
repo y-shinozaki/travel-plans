@@ -12,8 +12,9 @@
 - 詳細シートでのイベント情報表示
 - 持ち物リスト（区分ごとのチェックと、ドラッグでの並べ替え）
 - お土産リスト（何を・誰に・どこで買うか）
-- **合言葉でデータを暗号化**（PBKDF2 + AES-GCM）。リポジトリに置く `events.json` /
-  `packing.json` / `souvenirs.json` は暗号文で、初回に合言葉を決めて以降はその合言葉で開く
+- **合言葉でデータを暗号化**（PBKDF2 + AES-GCM）。リポジトリの `events.json` は常に存在し暗号文。
+  `packing.json` / `souvenirs.json` は最初の「公開」まで存在せず 404 を空のリストとして扱い、
+  その後はリポジトリに置かれて暗号文で保存される
 - **ブラウザ上での追加・編集・削除**（下書きは端末の `localStorage` に平文で保存）
 - **「公開」でリポジトリへ反映**（GitHub Contents API 経由。トークンを設定した端末のみ）
 - モバイル、タブレット、デスクトップに対応
@@ -111,9 +112,12 @@ travel-plans/
 │   │                      page-notice.js / focus-key.js / row-controls.js
 │   │                      （schedule / packing / souvenirs が共有するページ部品）
 │   ├── data/
-│   │   ├── events.json    旅程データ（唯一のソース。リポジトリ上は暗号文）
-│   │   ├── packing.json   持ち物データ（同上）
-│   │   └── souvenirs.json お土産データ（同上）
+│   │   ├── events.json     旅程データの唯一のソース（リポジトリ上は暗号文）
+│   │   ├── packing.json    持ち物データ。最初の「公開」まで存在しない設計で、
+│   │   │                   それまでは 404 を空のリストとして扱っていた
+│   │   │                   （2026-08-10 に最初の公開が済み、いまは存在する）
+│   │   └── souvenirs.json  お土産データ。持ち物と同じく最初の「公開」まで存在せず、
+│   │                       それまでは 404 を空のリストとして扱う（Phase B5）
 │   └── vendor/
 │       └── leaflet/       Leaflet 1.9.4 のセルフホスト版
 ├── tests/                 node --test 用のテスト

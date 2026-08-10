@@ -2801,13 +2801,13 @@ Expected: PASS
     ico: "i-shop",
     desc: "何を、誰に、どこで買うか。買ったものはチェックできます。",
     image:
-      "https://www.thailandtravel.or.jp/wp-content/uploads/2017/03/01871-808x538.jpg",
+      "https://www.thailandtravel.or.jp/wp-content/uploads/2017/11/Small_Chachoengsao-00024224.jpg",
   },
 ```
 
-**画像は暫定で持ち物と同じものを指している。** 別の写真に差し替えたい場合は
-`https:` のどのホストでもよい（CSP の `img-src` が `https:` のワイルドカード）。
-差し替えは Task 9 の後でも独立して行える。
+**画像は旅程の「ワット サマーン ラッタナーラーム」イベントと同じもの。**
+別の写真に差し替えたい場合は `https:` のどのホストでもよい（CSP の `img-src` が
+`https:` のワイルドカード）。
 
 - [ ] **Step 6: 全テストを流す**
 
