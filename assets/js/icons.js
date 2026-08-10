@@ -96,6 +96,9 @@ export const SPRITE = `
   <symbol id="i-check" viewBox="0 0 24 24">
     <path d="m4.5 12.6 5.2 5.2L19.5 6.6"/>
   </symbol>
+  <symbol id="i-grip" viewBox="0 0 24 24">
+    <path d="M8 7h8M8 12h8M8 17h8"/>
+  </symbol>
 </svg>`.trim();
 
 export const ICON_IDS = [
@@ -104,6 +107,8 @@ export const ICON_IDS = [
   "i-chat", "i-search", "i-luggage", "i-lock", "i-note", "i-pool", "i-x",
   // Phase B の編集 UI（ツールバーとシートのフッター）
   "i-edit", "i-plus", "i-check",
+  // Phase B2 の並べ替えハンドル
+  "i-grip",
 ];
 
 // カテゴリ既定アイコンの対応表（旧 CATEGORY_ICON）は categories.js にある。
