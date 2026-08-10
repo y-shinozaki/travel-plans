@@ -123,11 +123,59 @@ function draw(focusKeyOverride) {
   restoreFocus(focusKey);
 }
 
+/* ── 再描画の予約 ────────────────────────────────────────
+ *
+ * 入力欄の change は blur の最中に発火する ── つまり、利用者がボタンを押した
+ * mousedown の処理の**途中**で起きる。そこで表を replaceChildren すると:
+ *
+ * 1. 押しかけていたボタンが mouseup より前に文書から消え、click が発火しない。
+ *    名前を打ってすぐ「項目を追加」を押しても項目は増えず、画面には何も出ない
+ *    （2 度押せば動くので、余計に原因が分かりにくい）
+ * 2. ブラウザが移そうとしていたフォーカス先も一緒に消えるので、
+ *    document.activeElement は <body> になる。draw() がキーを拾えず、
+ *    フォーカスは落ちたままになる
+ *
+ * どちらも「今のイベントの処理中に DOM を作り直している」ことが原因なので、
+ * 描画を 1 tick 送って、click まで済んでから行う。そのとき activeElement は
+ * 利用者が実際に移った先を指しているので、キーもそこから正しく拾える。
+ *
+ * microtask（queueMicrotask）では足りない ── blur → change は mousedown の
+ * 既定動作の中で起きるため、microtask は mouseup より前に走ってしまう。
+ *
+ * 連続した変更（rename の直後に項目追加、など）は 1 回の描画にまとめる。
+ * まとめないと、先に予約した描画が新しいフォーカス指定を上書きしてしまう。
+ */
+let drawTimer = null;
+let drawContext = "";
+let drawOverride = null;
+
+function scheduleDraw(context, focusKeyOverride) {
+  drawContext = context;
+  // あとから来た指定を優先する。undefined で上書きして消さないこと
+  if (focusKeyOverride) drawOverride = focusKeyOverride;
+  if (drawTimer !== null) return;
+  drawTimer = setTimeout(() => {
+    drawTimer = null;
+    const override = drawOverride;
+    drawOverride = null;
+    safeDraw(drawContext, override);
+  }, 0);
+}
+
 /**
  * 再描画の失敗を画面に出す（schedule.js の safeDraw と同じ役割）。
  * ここで落ちると、表が半分だけ描かれた状態で止まり、利用者には何も伝わらない。
+ *
+ * 予約済みの描画があれば取り消してから描く。残すと、この呼び出しのあとに
+ * 予約分が走り、成功時の setNotice(null) が直前に出した文言を消してしまう
+ * （ドラッグの onError がまさにそれを出している）。
  */
 function safeDraw(context, focusKeyOverride) {
+  if (drawTimer !== null) {
+    clearTimeout(drawTimer);
+    drawTimer = null;
+    drawOverride = null;
+  }
   try {
     draw(focusKeyOverride);
     setNotice(null);
@@ -212,7 +260,9 @@ function apply(next, focusKeyOverride) {
     return;
   }
   publishUI?.refreshDirty();
-  safeDraw("持ち物リストの保存", focusKeyOverride);
+  // 即時ではなく予約する。apply() は入力欄の change からも呼ばれ、
+  // そこは利用者が押したボタンの mousedown の処理中だから（scheduleDraw 参照）
+  scheduleDraw("持ち物リストの保存", focusKeyOverride);
 }
 
 const handlers = {
