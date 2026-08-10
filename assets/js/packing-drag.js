@@ -67,7 +67,12 @@ export function rebuildFromOrder(data, order) {
       if (placedItems.has(item.id)) continue;
       placedItems.add(item.id);
       const at = indexOfGroup.get(original.id);
-      if (at === undefined) continue;
+      if (at === undefined) {
+        // 到達不能（上の 2 つのループが data.groups の id を必ず 1 度ずつ置くため）。
+        // それでも continue にしないのは、万一この不変条件が壊れたときに
+        // 項目が黙って消えるのが、このモジュールが防ぐために在るバグそのものだから。
+        throw new Error(`packing-drag: 区分 ${original.id} を索引できませんでした`);
+      }
       groups[at] = { ...groups[at], items: [...groups[at].items, item] };
     }
   }

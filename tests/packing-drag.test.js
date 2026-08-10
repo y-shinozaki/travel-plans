@@ -62,6 +62,14 @@ test("order に無い区分も落とさない", () => {
   const next = rebuildFromOrder(data, [{ id: "g-clothes", itemIds: ["swimwear"] }]);
   assert.equal(next.groups.length, 3);
   assert.equal(next.groups[0].id, "g-clothes", "order にある区分が先頭に来ること");
+  // 区分ごと order に無いとき、区分に入っていた項目も（区分の id や個数だけでなく
+  // 中身の id まで）そのまま戻ること。取りこぼした区分をいったん items: [] で
+  // 置いてから元の項目を後ろへ戻す経路が働いていることの確認
+  assert.deepEqual(
+    next.groups.find((g) => g.id === "g-valuables").items.map((i) => i.id),
+    ["passport", "cash", "insurance"],
+    "order に無い区分の項目が失われた、または重複しました"
+  );
 });
 
 test("知らない id が混ざっていても落ちない", () => {
