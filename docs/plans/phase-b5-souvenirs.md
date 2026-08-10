@@ -1681,7 +1681,7 @@ Expected: PASS（20 件）
 - [ ] **Step 5: 全テストを流す**
 
 Run: `node --test`
-Expected: PASS。**518 + 15 + 20 = 553**
+Expected: PASS。**518 + 15 + 20 = 553**（実績は 554 ── レビューの裁定で検査を固定するテストを 1 件足したため）
 
 - [ ] **Step 6: コミット**
 
@@ -2147,7 +2147,7 @@ Expected: PASS（12 件）
 - [ ] **Step 5: 全テストを流す**
 
 Run: `node --test`
-Expected: PASS。**553 + 12 = 565**
+Expected: PASS。**554 + 12 = 566**（Task 4 の修正で 1 件増えたため、当初計画の 553/565 から 1 ずれている）
 
 - [ ] **Step 6: コミット**
 
@@ -2387,7 +2387,7 @@ const PAGES = ["index.html", "schedule.html", "packing.html", "souvenirs.html"];
 - [ ] **Step 5: 全テストを流す**
 
 Run: `node --test`
-Expected: PASS。**CSP の 5 件が 4 ページを見るようになり、色リテラル検査が 1 ファイル増える。件数は 565 のまま**（テストの本数ではなくループの中身が増えるため）
+Expected: PASS。**CSP の 5 件が 4 ページを見るようになり、色リテラル検査が 1 ファイル増える。件数は 566 のまま**（テストの本数ではなくループの中身が増えるため）
 
 - [ ] **Step 6: 色リテラル検査が実際に効いていることを確かめる**
 
@@ -2724,7 +2724,7 @@ Expected: `assets/js/souvenirs.js` の `createSync()` の `config` だけ（2 �
 - [ ] **Step 3: 全テストを流す**
 
 Run: `node --test`
-Expected: PASS。**565 のまま**（エントリポイントにはテストが無いのが規約）
+Expected: PASS。**566 のまま**（エントリポイントにはテストが無いのが規約）
 
 - [ ] **Step 4: コミット**
 
@@ -2812,7 +2812,7 @@ Expected: PASS
 - [ ] **Step 6: 全テストを流す**
 
 Run: `node --test`
-Expected: PASS。**565 のまま**（テストの本数は変わらず、中身が 3 ページ分になる）
+Expected: PASS。**566 のまま**（テストの本数は変わらず、中身が 3 ページ分になる）
 
 - [ ] **Step 7: ブラウザで通しで確かめる**
 
@@ -2924,7 +2924,7 @@ Expected: `MISSING:` が出ない（`assets/js/comments.js` と `assets/data/com
 - [ ] **Step 7: 全テストを流す**
 
 Run: `node --test`
-Expected: PASS（565）
+Expected: PASS（566）
 
 - [ ] **Step 8: コミット**
 
@@ -2937,7 +2937,7 @@ git commit -m "Record what B5 changed, and mark the two debts it paid off"
 
 ## 完了の定義
 
-- [ ] `node --test` が **565 pass / 0 fail**
+- [ ] `node --test` が **566 pass / 0 fail**
 - [ ] ブラウザで Task 8 Step 7 の 11 項目すべてを通した
 - [ ] **旅程ページと持ち物ページが壊れていない**（Task 1 Step 12 と Task 8 Step 7-11）
 - [ ] `grep` で `souvenirs` の `localStorage` キーが `souvenirs.js` の 1 か所だけにある
