@@ -32,6 +32,10 @@ import { passthroughCodec, DecryptError } from "./crypto.js";
  * store.write(draftKey, …) が旅程の既定キーへ書き、旅程の未公開の編集が
  * その瞬間に消える（設計書 §13）。
  *
+ * draftKey は下書き本体（events.json と同じ形の JSON）を書く localStorage のキー。
+ * baseKey は最後に「リモートと揃えた」時刻を書くキーで、未公開の変更があるかの
+ * 基準になる（`hasUnpublishedChanges()` 参照）。
+ *
  * baseKey に入る時刻は公開した端末の時計で押される。押す端末が複数あるので、
  * 順序関係は保たれない ── A の時計が 10 分遅れていれば、A があとから公開した版の
  * updatedAt は B の版より古くなり、こちらの base（B の版を取り込んだ時刻）を
@@ -134,6 +138,13 @@ export function createSync({
    * 起動時の 1 回。リモートを取り、下書きと突き合わせて、どちらを見せるかを返す。
    *
    * 返す source は decideSync の判断そのまま。画面の分岐は Task 9 側で行う。
+   *
+   * 返す outerStampMismatch は、封筒の外側の updatedAt（GCM の認証タグの外にあり、
+   * 改竄も破損も検知できない ── crypto.js の isEnvelope 付近のコメント参照）と、
+   * 復号できた中身の updatedAt が食い違っていたかを示す。これを無視することは、
+   * 認証されていない外側の updatedAt を突き合わせ（assertRemoteNotAhead）に
+   * 使い続けることを意味する。画面はこのフラグを見て、次に公開したときに
+   * 外側が正しい値に上書きされることを利用者に伝えること（Task 9 側の役割）。
    */
   async function load() {
     const stored = store.read(draftKey, null);
@@ -262,12 +273,20 @@ export function createSync({
   /**
    * リモートを取り込み、下書きを捨てて base を揃える。
    * 失敗は投げる。押したのに何も起きないのが一番困る。
+   *
+   * validate(data) の戻り値は使わず、投げなければ data をそのまま採用する。
+   * ここ以外の validate 呼び出し（load / saveLocal / publish）もすべて同じ
+   * 「投げさせるためだけに呼ぶ」形にしている。既定の validateEvents はたまたま
+   * data を返す（validate.js 参照）が、それを当てにすると、2 つ目の JSON 用に
+   * 「不正なら投げる、正常なら何も返さない」という自然な検証器を書いた瞬間、
+   * storeAdopted(undefined) が走って下書きにゴミを、base に null を書く ──
+   * 「取り込む」を押したらリモートの内容が消える、という静かなデータ消失になる。
    */
   async function adoptRemote() {
     const { data } = await fetchAndDecode();
-    const remote = validate(data);
-    storeAdopted(remote);
-    return remote;
+    validate(data);
+    storeAdopted(data);
+    return data;
   }
 
   /**
@@ -324,10 +343,15 @@ export function createSync({
   /**
    * 公開する。順序が意味を持つ:
    *
-   *   検証 → GET で sha と本文 → 突き合わせ → PUT → base を更新
+   *   検証 → 時刻 → 暗号化 → GET で sha と本文 → 突き合わせ → PUT → base を更新
    *
    * 検証を後ろに回すと壊れたデータがリポジトリに入り、同行者のページが起動しなくなる。
    * base を PUT より前に進めると、失敗した公開が「同期済み」に見える。
+   * 暗号化は検証と GET の間に固定の位置を持つ ── 検証より前に回すと壊れたデータを
+   * 暗号文にしてしまい誰も中身を確かめられなくなる。GET より後ろに回す理由は無い
+   * （突き合わせは暗号化しても無改造の assertRemoteNotAhead が読む、封筒の外側の
+   * updatedAt を見るだけなので、暗号化の前後どちらに置いても動きは変わらないが、
+   * 検証・時刻確定・暗号化はここでひとまとまりの「送る内容を作る」工程として揃えてある）。
    *
    * 競合（別端末が先に公開した）は握りつぶさない。突き合わせで見つけた場合も
    * サーバーが 409 を返した場合も、呼び出し側が「取り込んでから公開し直す」導線を
