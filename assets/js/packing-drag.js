@@ -111,7 +111,25 @@ function readOrder(root) {
  * @returns {{detach: () => void}}
  */
 export function attachDrag({ root, getData, commit, onError }) {
-  let dragging = null; // { row, placeholderAfter }
+  let dragging = null; // { row, grabOffset }
+
+  /**
+   * 掴んでいる行を、指（カーソル）の下へ動かす。
+   *
+   * 毎回いったん transform を外して「素の位置」を測り直してから当て直す。
+   * ドラッグ中は下の行が入れ替わるので行の素の位置そのものが動く ──
+   * 掴んだ瞬間の座標との差分を積むやり方だと、入れ替わるたびに指と行が
+   * ずれていく。測り直せば、何度入れ替わっても指の下に留まる。
+   *
+   * grabOffset は「行の上端から、掴んだ点までの距離」。これを保つので、
+   * 行の真ん中を掴めば真ん中が、端を掴めば端が指に付いてくる。
+   */
+  function follow(clientY) {
+    const { row, grabOffset } = dragging;
+    row.style.transform = "";
+    const natural = row.getBoundingClientRect();
+    row.style.transform = `translateY(${clientY - natural.top - grabOffset}px)`;
+  }
 
   function onPointerDown(event) {
     const handle = event.target.closest?.("[data-drag-handle]");
@@ -120,8 +138,9 @@ export function attachDrag({ root, getData, commit, onError }) {
     if (!row) return;
 
     event.preventDefault();
-    dragging = { row };
+    dragging = { row, grabOffset: event.clientY - row.getBoundingClientRect().top };
     row.classList.add(DRAGGING_CLASS);
+    follow(event.clientY);
 
     // capture は補助。失敗する環境があるので握って続ける
     // （pointermove / pointerup は window に付けてあるので、capture が
@@ -141,25 +160,32 @@ export function attachDrag({ root, getData, commit, onError }) {
     if (!dragging) return;
     event.preventDefault();
 
+    // 掴んでいる行は .is-dragging で pointer-events: none にしてあるので、
+    // elementFromPoint は自分自身ではなく「下にある行」を返す
     const under = document.elementFromPoint(event.clientX, event.clientY);
     const target = under?.closest?.("[data-item-id]");
     if (target && target !== dragging.row) {
       const box = target.getBoundingClientRect();
       const after = event.clientY > box.top + box.height / 2;
       target.parentNode.insertBefore(dragging.row, after ? target.nextSibling : target);
-      return;
+    } else {
+      // 空の区分の上に来たとき。行が 1 つも無いので elementFromPoint では拾えない
+      const emptyGroup = under?.closest?.("[data-item-list]");
+      if (emptyGroup && !emptyGroup.querySelector("[data-item-id]")) {
+        emptyGroup.appendChild(dragging.row);
+      }
     }
 
-    // 空の区分の上に来たとき。行が 1 つも無いので elementFromPoint では拾えない
-    const emptyGroup = under?.closest?.("[data-item-list]");
-    if (emptyGroup && !emptyGroup.querySelector("[data-item-id]")) {
-      emptyGroup.appendChild(dragging.row);
-    }
+    // 入れ替えたあとに当て直す。入れ替えで行の素の位置が変わっているので、
+    // ここを入れ替えより前に置くと 1 フレーム分ずれて見える
+    follow(event.clientY);
   }
 
   function onPointerUp() {
     if (!dragging) return;
     dragging.row.classList.remove(DRAGGING_CLASS);
+    // 持ち上げを解く。ここで消さないと、行が浮いたまま次の描画まで残る
+    dragging.row.style.transform = "";
     dragging = null;
     // ここで初めてデータを組み直す。DOM が正
     try {

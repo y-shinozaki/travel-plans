@@ -133,9 +133,21 @@
 .pkdrag:active {
   cursor: grabbing;
 }
+/* 掴んでいる行。指（カーソル）と一緒に動く（packing-drag.js の follow()）。
+   紙を 1 枚持ち上げた見え方にする ── 薄くするのではなく、影を付けて浮かせる。
+   薄くすると「掴めている」より「無効になった」に見える。
+
+   pointer-events: none が要る。付けないと elementFromPoint が指の下にある
+   この行自身を返してしまい、どこへ落とすのかを判定できない。
+   transition を付けないこと ── 指の動きに 1 拍遅れて付いてくる。 */
 .pkitem.is-dragging {
-  opacity: 0.5;
-  background: var(--sand);
+  position: relative;
+  z-index: 2;
+  background: var(--paper);
+  border-radius: var(--r-xs);
+  box-shadow: 0 8px 24px rgb(var(--ink-rgb) / 0.16);
+  pointer-events: none;
+  cursor: grabbing;
 }
 
 /* 編集モードの出し分けは CSS で隠すのではなく、packing-render.js が
