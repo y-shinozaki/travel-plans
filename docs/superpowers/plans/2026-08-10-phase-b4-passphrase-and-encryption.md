@@ -1203,8 +1203,16 @@ git commit -m "Make createSync take the keys, validator, message, and codec toge
 
 **Files:**
 - Create: `assets/js/load-error.js`
-- Modify: `assets/js/schedule.js`
-- Test: `tests/load-error.test.js`
+- Modify: `assets/js/schedule.js`, `assets/js/publish-ui.js`
+- Test: `tests/load-error.test.js`, `tests/publish-ui.test.js`
+
+> **2026-08-10 追記（レビューの Critical を受けて）**: 当初この計画は
+> 「`createPublishUI()` の呼び出しを `load()` より前へ移す」とだけ書いていたが、
+> **それでは何も変わらない。** `createPublishUI()` は要素を組み立てるだけで DOM に
+> 挿入せず、実際にマウントするのは `start()` の中の `replaceChildren` だけ。
+> その `start()` は `load()` の後ろにあるので、リモートが壊れた端末では
+> 公開ボタンもトークン設定も現れないまま ── このタスクが存在する理由が未達だった。
+> **マウントを `start()` から出すこと**（下記）。
 
 **Interfaces:**
 - Consumes: Task 2 の `DecryptError`、既存の `EventDataError`
@@ -1479,6 +1487,43 @@ async function main() {
 ```
 
 元の位置にあった `publishUI = createPublishUI({...})` のブロックを削除し、`publishUI.start(loaded.source)` は `draw()` の直前に残す。
+
+**そのうえで `assets/js/publish-ui.js` のマウントを `start()` から出す。** これをしないと、上の並べ替えは何の効果も持たない（`createPublishUI()` は要素を組み立てるだけで DOM に挿入しない）。
+
+`createPublishUI()` の本体の末尾で、**store しか読まない初期化**をすべて済ませる:
+
+```js
+  // ここまでで DOM への挿入を終える。**start() まで待たないこと。**
+  // これらが読むのは store だけで（refreshDirty → sync.hasUnpublishedChanges() は
+  // localStorage を見る、getData はクリックされるまで呼ばれない）、旅程データを
+  // 必要としない。start() に残すと、load() が投げた端末では replaceChildren が
+  // 一度も走らず、公開ボタンもトークン設定も DOM に現れない ──
+  // events.json の手編集を廃止した以上、それは復旧手段がゼロになるということ。
+  buildPanel();
+  setPanelOpen(false);
+  clearStatus();
+  refreshDirty();
+  renderControls();
+```
+
+`start(source)` に残すのは **`source` に依存する同期バーだけ**にする（`use-remote` / `remote-is-newer` / `offline` の案内）。`start()` から上の 5 行を削除すること。
+
+`tests/publish-ui.test.js` に 1 件足す ── **`start()` を呼ばなくても公開の導線が DOM に入っていること**。これが今回の眼目を機械的に守る唯一のテストになる（`schedule.js` は `node --test` から import できないため）。
+
+```js
+test("start() を呼ぶ前に、公開の導線が DOM に入っている", () => {
+  // load() が投げた端末でも復旧手段が残ることの機械的な保証。
+  // createPublishUI が要素を組み立てるだけで挿入しないと、
+  // リモートが壊れた端末には公開ボタンもトークン設定も現れない
+  const els = makeEls();            // 既存のヘルパーに合わせて読み替えること
+  const store = createStore(fakeBackend());
+  writeToken(store, "ghp_test");
+
+  createPublishUI({ els, store, sync: fakeSync(), getData: () => null, onAdopt: () => {} });
+
+  assert.ok(els.controls.childNodes.length > 0, "start() 前に controls が空のまま");
+});
+```
 
 - [ ] **Step 4: 通ることを確認する**
 
