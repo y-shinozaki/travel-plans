@@ -2163,8 +2163,8 @@ git commit -m "Draw the souvenir list quietly, and keep the tick reachable witho
 **Files:**
 - Create: `souvenirs.html`
 - Create: `assets/css/souvenirs.css`
-- Modify: `tests/csp.test.js:6`
-- Modify: `tests/tokens.test.js:199`
+- Modify: `tests/csp.test.js`（`PAGES` 定数）
+- Modify: `tests/tokens.test.js` の色リテラル検査のファイル一覧
 
 **注意（忘れると検査が黙って素通りする）**
 
@@ -2376,7 +2376,7 @@ git commit -m "Draw the souvenir list quietly, and keep the tick reachable witho
 const PAGES = ["index.html", "schedule.html", "packing.html", "souvenirs.html"];
 ```
 
-- [ ] **Step 4: `tests/tokens.test.js:199` の色リテラル検査に足す**
+- [ ] **Step 4: `tests/tokens.test.js` の色リテラル検査のファイル一覧 の色リテラル検査に足す**
 
 ```javascript
   const files = ["base.css", "controls.css", "calendar.css", "packing.css", "souvenirs.css"];
@@ -2387,7 +2387,7 @@ const PAGES = ["index.html", "schedule.html", "packing.html", "souvenirs.html"];
 - [ ] **Step 5: 全テストを流す**
 
 Run: `node --test`
-Expected: PASS。**CSP の 5 件が 4 ページを見るようになり、色リテラル検査が 1 ファイル増える。件数は 566 のまま**（テストの本数ではなくループの中身が増えるため）
+Expected: PASS。**CSP の 5 件が 4 ページを見るようになり、色リテラル検査が 1 ファイル増える。件数は 567 のまま**（テストの本数ではなくループの中身が増えるため）
 
 - [ ] **Step 6: 色リテラル検査が実際に効いていることを確かめる**
 
@@ -2724,7 +2724,7 @@ Expected: `assets/js/souvenirs.js` の `createSync()` の `config` だけ（2 �
 - [ ] **Step 3: 全テストを流す**
 
 Run: `node --test`
-Expected: PASS。**566 のまま**（エントリポイントにはテストが無いのが規約）
+Expected: PASS。**567 のまま**（エントリポイントにはテストが無いのが規約）
 
 - [ ] **Step 4: コミット**
 
@@ -2738,9 +2738,9 @@ git commit -m "Wire the souvenir page up, starting from nothing"
 ## Task 8: メニューとナビに 3 つ目を足す
 
 **Files:**
-- Modify: `assets/js/nav.js:3-6`
-- Modify: `assets/js/menu.js:13-32`
-- Modify: `tests/renderers.test.js:356-395`
+- Modify: `assets/js/nav.js`（`PAGES` 定数）
+- Modify: `assets/js/menu.js`（`CARDS` 定数）
+- Modify: `tests/renderers.test.js`（`renderNav` のテスト群）
 
 - [ ] **Step 1: `tests/renderers.test.js` の `renderNav` のテストを 3 ページ分に直す**
 
@@ -2812,7 +2812,7 @@ Expected: PASS
 - [ ] **Step 6: 全テストを流す**
 
 Run: `node --test`
-Expected: PASS。**566 のまま**（テストの本数は変わらず、中身が 3 ページ分になる）
+Expected: PASS。**567 のまま**（テストの本数は変わらず、中身が 3 ページ分になる）
 
 - [ ] **Step 7: ブラウザで通しで確かめる**
 
@@ -2924,7 +2924,7 @@ Expected: `MISSING:` が出ない（`assets/js/comments.js` と `assets/data/com
 - [ ] **Step 7: 全テストを流す**
 
 Run: `node --test`
-Expected: PASS（566）
+Expected: PASS（567）
 
 - [ ] **Step 8: コミット**
 
@@ -2937,7 +2937,7 @@ git commit -m "Record what B5 changed, and mark the two debts it paid off"
 
 ## 完了の定義
 
-- [ ] `node --test` が **566 pass / 0 fail**
+- [ ] `node --test` が **567 pass / 0 fail**
 - [ ] ブラウザで Task 8 Step 7 の 11 項目すべてを通した
 - [ ] **旅程ページと持ち物ページが壊れていない**（Task 1 Step 12 と Task 8 Step 7-11）
 - [ ] `grep` で `souvenirs` の `localStorage` キーが `souvenirs.js` の 1 か所だけにある
