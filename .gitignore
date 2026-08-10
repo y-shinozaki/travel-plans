@@ -48,3 +48,6 @@ private/
 
 # Superpowers subagent-driven-development の作業領域（コミット対象外）
 .superpowers/
+
+# Claude Code の worktree 置き場（作業用。リポジトリには入れない）
+.claude/worktrees/
