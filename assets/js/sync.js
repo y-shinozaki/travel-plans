@@ -135,6 +135,46 @@ export function createSync({
   }
 
   /**
+   * 検証を通った下書きを読む。load() と readDraft() の両方が、下書きを
+   * 「使えるかどうか」の判断先としてここ 1 か所だけを見る ── 2 か所に同じ検証を
+   * 書くと、片方だけ直る事故が起きる（片方は投げる規則を変えたのにもう片方は
+   * 古いまま、など）。
+   *
+   * 投げずに null へ落とすのは、投げると「localStorage を消すまでページが
+   * 起動しない」状態になるため。保存されている値は消さない。中身を救い出す
+   * 道を残しておく。
+   *
+   * @returns {{draft: object|null, rejected: boolean}} rejected は「保存は
+   *   あったが検証に落ちた」場合だけ true。load() はこれを使って
+   *   「取り込んでよいか（救出できる中身を上書きしないか）」を判断する。
+   */
+  function readValidDraft() {
+    const stored = store.read(draftKey, null);
+    if (!isPlainObject(stored)) return { draft: null, rejected: false };
+    try {
+      validate(stored);
+      return { draft: stored, rejected: false };
+    } catch (error) {
+      console.warn("sync: 手元の下書きが旅程の形になっていないため使いません", error);
+      return { draft: null, rejected: true };
+    }
+  }
+
+  /**
+   * 検証を通った下書きを返す（無い・壊れているなら null）。
+   *
+   * load() が投げたあとの復旧経路のためにある。リモートの events.json が
+   * 検証に落ちると load() は手元の下書きがどれだけ正しくても全端末で投げる ──
+   * そのとき画面に公開ボタンがあっても state.data が空では押せない。
+   * 手元に正しい下書きを持つ端末がそれを公開してリモートを直す、というのが
+   * events.json の手編集を廃止したあとの唯一の復旧手段なので（設計書 §6.5）、
+   * その端末が下書きに到達できる必要がある。
+   */
+  function readDraft() {
+    return readValidDraft().draft;
+  }
+
+  /**
    * 起動時の 1 回。リモートを取り、下書きと突き合わせて、どちらを見せるかを返す。
    *
    * 返す source は decideSync の判断そのまま。画面の分岐は Task 9 側で行う。
@@ -147,28 +187,13 @@ export function createSync({
    * 外側が正しい値に上書きされることを利用者に伝えること（Task 9 側の役割）。
    */
   async function load() {
-    const stored = store.read(draftKey, null);
     const baseUpdatedAt = store.read(baseKey, null);
 
     // 下書きも検証する。壊れたリモートを画面に出さないのに壊れた下書きは出す、
     // では筋が通らない。旅行の日数を減らせば、他の端末に残っている下書きは
     // まとめて範囲外になる ── 手で書き換えなくても起こることなので、
     // 「アプリ経由なら壊れない」とは言えない。
-    //
-    // 投げずにリモートへ落とすのは、投げると「localStorage を消すまで
-    // ページが起動しない」状態になるため。保存されている値は消さない。
-    // 中身を救い出す道を残しておく。
-    let draft = isPlainObject(stored) ? stored : null;
-    let draftRejected = false;
-    if (draft !== null) {
-      try {
-        validate(draft);
-      } catch (error) {
-        console.warn("sync: 手元の下書きが旅程の形になっていないため使いません", error);
-        draft = null;
-        draftRejected = true;
-      }
-    }
+    const { draft, rejected: draftRejected } = readValidDraft();
     const hasLocal = draft !== null;
 
     // remote が使えるかは remoteOk で持つ。null をセンチネルにすると、
@@ -323,11 +348,12 @@ export function createSync({
       // publish() が正しい updatedAt を押し直し、次回から突き合わせが復活する。
       // ここで 409 にすると、その唯一の直し方まで塞いでしまう。
       //
-      // 「リモートが壊れていれば何であれ公開で直せる」わけではない。
-      // days / events の側が壊れていると load() のリモート検証が投げ、
-      // schedule.js は publishUI を組み立てないまま終わる ── 公開ボタンも
-      // トークン設定も画面に無いので、その場合の復旧手段はリポジトリへの
-      // git コミットだけになる（設計書 §13 の繰り越し）。
+      // 「リモートが壊れていれば何であれ公開で直せる」わけではない ── ただし
+      // days / events の側が壊れていて load() のリモート検証が投げる場合も、
+      // 公開ボタンとトークン設定は画面に出る（schedule.js は publishUI を
+      // load() より前に組み立てる）。readDraft() が検証を通った下書きを
+      // 返せば、この修正のあとはその下書きで実際に公開できる。手元に正しい
+      // 下書きが無い端末だけが、リポジトリへの git コミットに頼ることになる。
       console.warn("sync: リモートの updatedAt が読めないため、公開前の突き合わせを省略します");
       return false;
     }
@@ -403,5 +429,5 @@ export function createSync({
     return { commitUrl, conflictChecked };
   }
 
-  return { load, saveLocal, adoptRemote, publish, hasUnpublishedChanges };
+  return { load, saveLocal, adoptRemote, publish, hasUnpublishedChanges, readDraft };
 }

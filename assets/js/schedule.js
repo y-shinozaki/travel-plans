@@ -325,6 +325,19 @@ async function main() {
   try {
     loaded = await sync.load();
   } catch (error) {
+    // リモートが壊れていても、手元に正しい下書きがあれば公開で直せる。
+    // state.data を埋めておかないと、画面に出ている公開ボタンが
+    // validateEvents(null) で必ず失敗する ── 直せる導線があるように見えて
+    // 実際には押せない、という一番悪い状態になる（設計書 §6.5）。
+    // 画面には引き続きエラーを出す。下書きは「公開して直す」ためだけに載せる。
+    // ここで旅程を描いてしまうと「読めているのにエラーが出ている」という
+    // 別の混乱になるので、draw() は呼ばない ── 描画は showLoadError に任せる。
+    const draft = sync.readDraft();
+    if (draft) {
+      setData(draft);
+      publishUI?.refreshDirty();
+    }
+
     // sync.load() の失敗は「取りに行けなかった」「JSON として読めなかった」
     // 「中身が旅程の形になっていない」「復号できなかった」の 4 種類で、
     // 直し方がそれぞれ違う。案内を出し分けられるよう、ここで種別を付け直す

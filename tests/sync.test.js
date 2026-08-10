@@ -244,6 +244,37 @@ test("壊れたリモートは例外にし、下書きを書き換えない", as
   assert.equal(JSON.parse(raw(BASE_KEY)), "2026-08-09T10:00:00.000Z");
 });
 
+test("readDraft() は、load() が投げる状況でも検証を通った下書きを返す", async () => {
+  // events.json の手編集を廃止したあとの復旧手段は「正しい下書きを持つ端末が
+  // 公開し直す」の 1 本だけ（設計書 §6.5）。リモートが検証に落ちて load() が
+  // 投げても、下書き自体が壊れているとは限らない ── readDraft() は load() と
+  // 同じ検証（readValidDraft）を通した下書きを、load() の成否と無関係に返す
+  const draft = plan("2026-08-09T11:00:00.000Z");
+  const { sync } = setup({
+    initial: {
+      [DRAFT_KEY]: JSON.stringify(draft),
+      [BASE_KEY]: JSON.stringify("2026-08-09T10:00:00.000Z"),
+    },
+    handler: () => jsonResponse(200, BROKEN),
+  });
+
+  await assert.rejects(() => sync.load(), EventDataError);
+  assert.deepEqual(sync.readDraft(), draft);
+});
+
+test("readDraft() は壊れた下書きには null を返す", async () => {
+  const broken = plan("2026-08-09T11:00:00.000Z", [ev({ cat: "cat-NOPE", startDay: 99 })]);
+  const { sync } = setup({ initial: { [DRAFT_KEY]: JSON.stringify(broken) } });
+
+  const { result } = await captureConsole(() => sync.readDraft());
+  assert.equal(result, null);
+});
+
+test("readDraft() は下書きが無ければ null を返す", () => {
+  const { sync } = setup();
+  assert.equal(sync.readDraft(), null);
+});
+
 test("リモート本文がリテラルの null でも検証で弾く", async () => {
   // null をセンチネルに使うと「取れなかった」と区別が付かず、
   // 最後に throw null をやってしまう（呼び出し側の error.message が TypeError になる）
