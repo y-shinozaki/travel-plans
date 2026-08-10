@@ -112,8 +112,21 @@
 
 /* ドラッグハンドル。touch-action: none を付けないと、
    スクロールのジェスチャが pointermove を奪う（設計書 §7.3）。 */
+/* ドラッグハンドル。
+   touch-action: none を付けないと、スクロールのジェスチャが pointermove を奪う
+   （設計書 §7.3）。ただしそれだけでは足りなかった ── 2026-08-10 の実機確認で
+   「つまめない」。記号は ico--sm（15px）で、当たり判定もその 15x20px しか
+   無かった。指で狙うには小さすぎる（iOS の指針と WCAG 2.5.5 の目安は 44x44px）。
+
+   記号の見た目は変えず、掴める範囲だけ広げる: 幅を持たせ、align-self: stretch で
+   行の高さいっぱいを当たり判定にする。**width と align-self を消さないこと**
+   ── 消しても自動テストは通り、実機で初めて掴めなくなる。 */
 .pkdrag {
   flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  align-self: stretch;
   touch-action: none;
   cursor: grab;
 }

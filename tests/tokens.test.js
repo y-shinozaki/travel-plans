@@ -226,6 +226,31 @@ test("packing.css の .pkdrag に touch-action: none がある", () => {
   );
 });
 
+test("packing.css の .pkdrag が指で掴める大きさを持っている", () => {
+  // 2026-08-10 の実機確認で「つまめない」。touch-action: none は効いていたが、
+  // 当たり判定が記号そのままの 15x20px しかなく、指では狙えなかった
+  // （iOS の指針と WCAG 2.5.5 の目安は 44x44px）。
+  // 記号の大きさは ico--sm のままなので、掴める範囲は width と
+  // align-self: stretch（行の高さいっぱい）が作っている。どちらかが消えても
+  // 見た目は変わらず、実機で初めて掴めなくなる ── だから宣言を機械的に見張る。
+  const src = readCss("packing.css").replace(/\/\*[\s\S]*?\*\//g, "");
+  const block = src.match(/\.pkdrag\s*\{([^}]*)\}/);
+  assert.ok(block, "packing.css に .pkdrag ブロックが見つかりません");
+
+  const width = block[1].match(/(?:^|;)\s*width\s*:\s*(\d+)px\s*;/);
+  assert.ok(width, ".pkdrag に width の宣言がありません（当たり判定の横幅）");
+  assert.ok(
+    Number(width[1]) >= 32,
+    `.pkdrag の width が狭すぎます（${width[1]}px）。指で掴める幅を確保すること`
+  );
+
+  assert.match(
+    block[1],
+    /align-self\s*:\s*stretch\s*;/,
+    ".pkdrag に align-self: stretch がありません（行の高さいっぱいを掴めるようにする）"
+  );
+});
+
 test("角丸トークンが5段階そろっている", () => {
   // css.includes() だとコメント内の文字列一致でも通ってしまうため、
   // 実際の宣言として値を持つかを readLengthTokens() のパース結果で検証する。
