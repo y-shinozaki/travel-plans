@@ -1112,3 +1112,56 @@ test("hasUnpublishedChanges は注入した draftKey / baseKey だけを見る",
     "旅程側の未公開の変更を持ち物側が拾っています"
   );
 });
+
+// ── 404 と通信断の区別（Task 4） ─────────────────────────────────
+//
+// packing.json はまだリポジトリに存在しない。素の fetch は 404 を返す。
+// fetchRemote が投げる Error に status を乗せて、呼び出し側が
+// 「まだ無い」と「取れなかった」を見分けられるようにする。
+
+test("404 は status を持った失敗として投げる（まだ無いファイルと通信断を区別する）", async () => {
+  const backend = memoryBackend();
+  const store = createStore(backend);
+  const sync = createSync({
+    store,
+    fetchImpl: async () => ({ ok: false, status: 404, json: async () => ({}) }),
+    config: {
+      path: "assets/data/packing.json",
+      draftKey: "packing",
+      baseKey: "packing-base",
+      validate: (data) => data,
+      commitMessage: () => "Update packing list",
+      noun: "持ち物",
+      codec: { async encode(d) { return d; }, async decode(v) { return { data: v, outerStampMismatch: false }; } },
+    },
+  });
+
+  await captureConsole(() =>
+    assert.rejects(
+      () => sync.load(),
+      (error) => {
+        assert.equal(error.status, 404, "status が付いていません");
+        assert.match(error.message, /持ち物/, "noun が文言に効いていません");
+        return true;
+      }
+    )
+  );
+});
+
+test("通信断には status が付かない（404 と取り違えない）", async () => {
+  const { sync } = setup({
+    handler: () => {
+      throw new TypeError("Failed to fetch");
+    },
+  });
+
+  await captureConsole(() =>
+    assert.rejects(
+      () => sync.load(),
+      (error) => {
+        assert.equal(error.status, undefined);
+        return true;
+      }
+    )
+  );
+});
