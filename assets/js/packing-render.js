@@ -126,8 +126,13 @@ function checkCell(item, member, memberName, onToggle) {
 function itemBody(item, editing, onRename) {
   const body = el("div", "pkitem__body");
   if (!editing) {
-    body.appendChild(el("p", "pkitem__name", item.name));
-    if (item.note) body.appendChild(el("p", "pkitem__note", item.note));
+    // 読み取りモードでは名前とメモを同じ行に流す（2026-08-10、縦を詰めるため）。
+    // 段を分けると 39 項目で画面 3 つ分を超える。メモは折り返して 2 行目に落ちるので、
+    // 長いメモが切り捨てられることはない
+    const line = el("p", "pkitem__line");
+    line.appendChild(el("span", "pkitem__name", item.name));
+    if (item.note) line.appendChild(el("span", "pkitem__note", item.note));
+    body.appendChild(line);
     return body;
   }
 

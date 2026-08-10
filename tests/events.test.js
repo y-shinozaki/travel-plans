@@ -91,10 +91,13 @@ test("collectLocations は同一座標を1件にまとめる", () => {
   assert.deepEqual(collectLocations(evs, null).map((e) => e.id), ["a", "c"]);
 });
 
-test("collectLocations はカテゴリで絞り込める", () => {
+test("collectLocations は隠すカテゴリを除く", () => {
   const evs = [
     { id: "a", cat: "cat-move", lat: 13.69, lng: 100.75 },
     { id: "c", cat: "cat-food", lat: 13.73, lng: 100.56 },
   ];
-  assert.deepEqual(collectLocations(evs, "cat-food").map((e) => e.id), ["c"]);
+  assert.deepEqual(collectLocations(evs, new Set(["cat-move"])).map((e) => e.id), ["c"]);
+  // 空集合と未指定はどちらも「何も隠さない」
+  assert.equal(collectLocations(evs, new Set()).length, 2);
+  assert.equal(collectLocations(evs, null).length, 2);
 });

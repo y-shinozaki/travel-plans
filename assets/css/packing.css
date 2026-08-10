@@ -42,14 +42,14 @@
 
 /* ── 表 ── */
 .pkgroup {
-  margin-top: var(--s5);
+  margin-top: var(--s3);
   border-top: 1px solid var(--line-soft);
 }
 .pkgroup__head {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: var(--s2) 0;
+  padding: 10px 0;
 }
 .pkgroup__ico {
   display: grid;
@@ -83,21 +83,31 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 9px 0;
+  padding: 5px 0;
   border-top: 1px solid rgb(var(--ink-rgb) / 0.06);
 }
 .pkitem__body {
   flex: 1 1 auto;
   min-width: 0;
 }
+/* 読み取りモードは名前とメモを 1 行に流す（packing-render.js の itemBody）。
+   折り返しは許す ── 長いメモを ellipsis で切ると、読めない情報が残る。 */
+.pkitem__line {
+  margin: 0;
+  line-height: 1.5;
+}
 .pkitem__name {
   font-size: 14px;
   color: var(--ink);
 }
 .pkitem__note {
-  margin-top: 2px;
+  margin-left: 10px;
   font-size: 12px;
   color: var(--ink-2);
+}
+/* 編集モードは入力欄が積み重なるので、行の詰めを少し戻す */
+.pkitem:has(.inp) {
+  padding: 7px 0;
 }
 /* 入れる場所。読み取りモードのラベルと、編集モードの選択欄。
    未設定の項目は packing-render.js が何も作らないので、

@@ -8,7 +8,7 @@ import { el, makeSelectable } from "./dom.js";
 /** 1時間あたりのピクセル高さ。tokens.css の --hour-h と一致させること。 */
 export const HOUR_H = 44;
 
-export function renderCalendar({ mount, days, events, viewStart, viewEnd, catFilter, onSelect }) {
+export function renderCalendar({ mount, days, events, viewStart, viewEnd, hiddenCats, onSelect }) {
   mount.innerHTML = "";
   // 列数は days の件数で決まる。CSS 側に repeat(6, ...) と焼き込むと
   // 日数が変わったときに黙って 2 行目へ折り返すため、データから供給する。
@@ -16,8 +16,8 @@ export function renderCalendar({ mount, days, events, viewStart, viewEnd, catFil
   const segments = expandEvents(events, days.length);
 
   mount.appendChild(buildHeader(days));
-  mount.appendChild(buildAllDayRow(days, segments, { catFilter, onSelect }));
-  mount.appendChild(buildBody(days, segments, { viewStart, viewEnd, catFilter, onSelect }));
+  mount.appendChild(buildAllDayRow(days, segments, { hiddenCats, onSelect }));
+  mount.appendChild(buildBody(days, segments, { viewStart, viewEnd, hiddenCats, onSelect }));
 }
 
 /**
@@ -25,7 +25,16 @@ export function renderCalendar({ mount, days, events, viewStart, viewEnd, catFil
  * 終日行と本体の 2 か所で使うため、条件はここ 1 か所にだけ書く
  * （同じ式を 2 か所に写すと、片方だけ直された状態が見つからない）。
  */
-const matchesCat = (seg, catFilter) => !catFilter || seg.ref.cat === catFilter;
+/**
+ * 隠すカテゴリの集合に入っていなければ描く。
+ *
+ * 2026-08-10 に「1 つだけ表示」から「選んだものを隠す」へ変えた。
+ * 宿泊は毎日ある終日イベントで、既定で隠しておきたいという要望が起点
+ * （schedule.js の HIDDEN_BY_DEFAULT）。
+ *
+ * hiddenCats を省略した呼び出しは「何も隠さない」= 全部描く。
+ */
+const isVisible = (seg, hiddenCats) => !hiddenCats?.has(seg.ref.cat);
 
 function buildHeader(days) {
   const row = el("div", "cal__row");
@@ -43,7 +52,7 @@ function buildHeader(days) {
   return row;
 }
 
-function buildAllDayRow(days, segments, { catFilter, onSelect }) {
+function buildAllDayRow(days, segments, { hiddenCats, onSelect }) {
   const row = el("div", "cal__row");
   row.appendChild(el("div", "cal__allday-label", "All day"));
   const cells = el("div", "cal__days");
@@ -51,7 +60,7 @@ function buildAllDayRow(days, segments, { catFilter, onSelect }) {
   days.forEach((_, dayIndex) => {
     const cell = el("div", "cal__allday-cell");
     const visible = segments.filter(
-      (s) => s.allDay && s.day === dayIndex && matchesCat(s, catFilter)
+      (s) => s.allDay && s.day === dayIndex && isVisible(s, hiddenCats)
     );
     for (const seg of visible) {
       const ev = seg.ref;
@@ -70,7 +79,7 @@ function buildAllDayRow(days, segments, { catFilter, onSelect }) {
   return row;
 }
 
-function buildBody(days, segments, { viewStart, viewEnd, catFilter, onSelect }) {
+function buildBody(days, segments, { viewStart, viewEnd, hiddenCats, onSelect }) {
   const row = el("div", "cal__row");
 
   const gutter = el("div", "cal__gutter");
@@ -93,7 +102,7 @@ function buildBody(days, segments, { viewStart, viewEnd, catFilter, onSelect }) 
         s.day === dayIndex &&
         s.end > viewStart &&
         s.start < viewEnd &&
-        matchesCat(s, catFilter)
+        isVisible(s, hiddenCats)
     );
 
     for (const seg of assignLanes(visible)) {

@@ -37,11 +37,11 @@ export function hasCoords(ev) {
   return Number.isFinite(ev.lat) && Number.isFinite(ev.lng);
 }
 
-export function collectLocations(events, catFilter) {
+export function collectLocations(events, hiddenCats) {
   const seen = new Map();
   for (const ev of events) {
     if (!hasCoords(ev)) continue;
-    if (catFilter && ev.cat !== catFilter) continue;
+    if (hiddenCats?.has(ev.cat)) continue;
     const key = `${ev.lat},${ev.lng}`;
     if (!seen.has(key)) seen.set(key, ev);
   }

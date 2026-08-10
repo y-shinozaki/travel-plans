@@ -21,13 +21,18 @@ import { DecryptError } from "./crypto.js";
  * 必ず 3 つまとめて差し替える ── 片方だけ更新すると、画面に出ている旅程と
  * 保存される旅程が食い違う。
  */
+/** 起動時に伏せておくカテゴリ。チップを押せばその場で出せる。 */
+const HIDDEN_BY_DEFAULT = ["cat-hotel"];
+
 const state = {
   data: null,
   days: [],
   events: [],
   viewStart: 6,
   viewEnd: 22,
-  catFilter: null,
+  // 隠すカテゴリ。既定で宿泊を伏せる ── 毎日ある終日イベントで、
+  // 出したままだと All day 行が埋まり、その日の予定が読み取りにくい（2026-08-10 の要望）
+  hiddenCats: new Set(HIDDEN_BY_DEFAULT),
   onSelect: null,
 };
 
@@ -75,11 +80,11 @@ function draw() {
     events: state.events,
     viewStart: state.viewStart,
     viewEnd: state.viewEnd,
-    catFilter: state.catFilter,
+    hiddenCats: state.hiddenCats,
     onSelect: state.onSelect,
   });
   // 表示時間帯を変えただけのときは、地図側が自分で差分を見て何もしない
-  mapView?.update(state.events, state.catFilter);
+  mapView?.update(state.events, state.hiddenCats);
 }
 
 /**
@@ -100,7 +105,7 @@ function safeDraw(context) {
   } catch (error) {
     console.error(
       `schedule: 再描画に失敗しました（${context}）`,
-      { viewStart: state.viewStart, viewEnd: state.viewEnd, catFilter: state.catFilter },
+      { viewStart: state.viewStart, viewEnd: state.viewEnd, hidden: [...state.hiddenCats] },
       error
     );
     setNotice(
@@ -168,29 +173,45 @@ function fillHourOptions(select, { min, max }, selected) {
   }
 }
 
+/**
+ * カテゴリごとの表示・非表示。
+ *
+ * 2026-08-10 に「1 つだけ表示」から「押したものを出し入れする」へ変えた。
+ * 前の形だと、宿泊を消したいだけなのに他の 4 つから 1 つを選ぶしかなく、
+ * 「宿泊以外を全部見る」が表現できなかった。
+ *
+ * aria-pressed は**そのカテゴリが見えているか**を表す。押すと反転する。
+ */
 function buildCategoryFilters() {
   const buttons = [];
-  const makeChip = (label, value) => {
-    const button = document.createElement("button");
-    button.className = "chip";
-    button.textContent = label;
-    button.setAttribute("aria-pressed", String(state.catFilter === value));
-    button.addEventListener("click", () => {
-      state.catFilter = state.catFilter === value ? null : value;
-      for (const b of buttons) {
-        b.setAttribute("aria-pressed", String(b.dataset.value === (state.catFilter ?? "")));
-      }
-      safeDraw(`カテゴリ「${label}」`);
-    });
-    button.dataset.value = value ?? "";
-    buttons.push(button);
-    return button;
+
+  const syncPressed = () => {
+    for (const b of buttons) {
+      b.setAttribute("aria-pressed", String(!state.hiddenCats.has(b.dataset.value)));
+    }
   };
 
-  els.catFilters.appendChild(makeChip("すべて", null));
   for (const [key, meta] of Object.entries(CAT_META)) {
-    els.catFilters.appendChild(makeChip(meta.label, key));
+    const button = document.createElement("button");
+    button.className = "chip";
+    button.textContent = meta.label;
+    button.dataset.value = key;
+    button.addEventListener("click", () => {
+      // Set を作り直す。その場で書き換えると、描画側が「同じ集合」と見て
+      // 差分なしと判断しうる（map.js の signatureOf は中身を見るので今は
+      // 起きないが、参照で持ち回る前提を作らない）
+      const next = new Set(state.hiddenCats);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      state.hiddenCats = next;
+      syncPressed();
+      safeDraw(`カテゴリ「${meta.label}」の表示切り替え`);
+    });
+    buttons.push(button);
+    els.catFilters.appendChild(button);
   }
+
+  syncPressed();
 }
 
 /**

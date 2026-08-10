@@ -12,7 +12,6 @@ const SUBTITLE = "依田家・篠崎家 合同";
 const CARDS = [
   {
     href: "schedule.html",
-    num: "01",
     eyebrow: "Itinerary",
     title: "旅程",
     ico: "i-calendar",
@@ -22,7 +21,6 @@ const CARDS = [
   },
   {
     href: "packing.html",
-    num: "02",
     eyebrow: "Packing",
     title: "持ち物リスト",
     ico: "i-luggage",
@@ -36,7 +34,6 @@ function cardHtml(card, index) {
   return `
   <a class="card reveal" href="${card.href}" style="--d:${(index * 0.12).toFixed(2)}s">
     <div class="card__img">
-      <span class="card__num">${card.num}</span>
       <img src="${card.image}" alt="" loading="lazy">
     </div>
     <div class="card__body">

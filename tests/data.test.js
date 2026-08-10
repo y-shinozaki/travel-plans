@@ -107,12 +107,23 @@ test("座標を持つイベントは同一地点にまとめられる", () => {
   assert.equal(collectLocations(data.events, null).length, 4, "重複除去後の地点数");
 });
 
-test("カテゴリで絞ると地点が実際に減る", () => {
+test("カテゴリを隠すと地点が実際に減る", () => {
   const all = collectLocations(data.events, null);
-  const food = collectLocations(data.events, "cat-food");
-  assert.ok(food.length > 0, "cat-food の地点が 0 件です");
-  assert.ok(food.length < all.length, "絞り込んでも件数が減っていません");
-  assert.ok(food.every((e) => e.cat === "cat-food"));
+  // 隠すカテゴリはフィクスチャから選ぶ。名前を決め打ちすると、座標を持たない
+  // カテゴリを指したときに「減らないのが正しい」のか「壊れている」のか区別できない
+  const target = all[0].cat;
+  const rest = collectLocations(data.events, new Set([target]));
+  assert.ok(all.length > 1, "地点が 1 件では減ったことを確かめられません");
+  assert.ok(rest.length < all.length, `${target} を隠しても件数が減っていません`);
+  assert.ok(rest.every((e) => e.cat !== target), "隠したカテゴリが残っています");
+
+  // 座標を持たないカテゴリを隠しても件数は変わらない（隠す対象が地点に無いだけ）
+  const noCoordCat = "cat-food";
+  assert.ok(
+    !all.some((e) => e.cat === noCoordCat),
+    "前提が変わりました: cat-food が地点を持つようになっています"
+  );
+  assert.equal(collectLocations(data.events, new Set([noCoordCat])).length, all.length);
 });
 
 test("重なり合う予定にレーンが割り当てられ、同じレーンは時間が重ならない", () => {

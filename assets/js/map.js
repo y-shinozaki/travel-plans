@@ -132,8 +132,8 @@ export function createMap({ mapMount, listMount, days, onSelect }) {
   }
 
   return {
-    update(events, catFilter) {
-      const locations = collectLocations(events, catFilter);
+    update(events, hiddenCats) {
+      const locations = collectLocations(events, hiddenCats);
       // 表示時間帯を変えただけでは集合は変わらない。それでも再構築すると
       // fitBounds が走り、ユーザーが選んだ地点・ズーム・ポップアップを
       // 巻き戻してしまう（マーカーと一覧の作り直しも丸ごと無駄になる）。

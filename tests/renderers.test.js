@@ -221,7 +221,7 @@ function renderWithStub(days, events, options = {}) {
       events,
       viewStart: 6,
       viewEnd: 22,
-      catFilter: null,
+      hiddenCats: new Set(),
       onSelect: () => {},
       ...options,
     });
@@ -276,10 +276,10 @@ test("renderCalendar: 列数を days の件数から供給する", () => {
 });
 
 /* ──────────────────────────────────────────────────────────
-   カテゴリ絞り込み。既存のテストはすべて catFilter: null で呼んでおり、
-   絞り込みの述語は一度も実行されていなかった。
+   カテゴリの表示・非表示。2026-08-10 に「1 つだけ表示」から
+   「hiddenCats に入っているものを隠す」へ契約を変えた。
    時間指定ブロック（本体）と終日ピル（All day 行）は別の経路なので、
-   両方が同じように絞られることを見る。
+   両方が同じ規則で隠れることを見る ── 片方だけ直す改変を通さないため。
    ────────────────────────────────────────────────────────── */
 
 const FILTER_DAYS = [{ date: "8/12", dow: "水" }];
@@ -291,8 +291,8 @@ const FILTER_EVENTS = [
   { id: "a-food", cat: "cat-food", title: "朝食付き", allDay: true, startDay: 0, endDay: 0 },
 ];
 
-test("renderCalendar: catFilter が null なら全カテゴリを描く", () => {
-  const { mount } = renderWithStub(FILTER_DAYS, FILTER_EVENTS, { catFilter: null });
+test("renderCalendar: hiddenCats が空なら全カテゴリを描く", () => {
+  const { mount } = renderWithStub(FILTER_DAYS, FILTER_EVENTS, { hiddenCats: new Set() });
   assert.deepEqual(classNames(mount, "ev "), ["ev cat-food", "ev cat-sight"]);
   assert.deepEqual(classNames(mount, "allday-pill "), [
     "allday-pill cat-hotel",
@@ -300,22 +300,41 @@ test("renderCalendar: catFilter が null なら全カテゴリを描く", () => 
   ]);
 });
 
-test("renderCalendar: catFilter は時間指定ブロックを絞り込む", () => {
-  const { mount } = renderWithStub(FILTER_DAYS, FILTER_EVENTS, { catFilter: "cat-food" });
-  assert.deepEqual(classNames(mount, "ev "), ["ev cat-food"], "本体が絞り込まれていません");
+test("renderCalendar: hiddenCats は時間指定ブロックを隠す", () => {
+  const { mount } = renderWithStub(FILTER_DAYS, FILTER_EVENTS, {
+    hiddenCats: new Set(["cat-sight"]),
+  });
+  assert.deepEqual(classNames(mount, "ev "), ["ev cat-food"], "本体が隠れていません");
 });
 
-test("renderCalendar: catFilter は終日ピルも絞り込む", () => {
-  const { mount } = renderWithStub(FILTER_DAYS, FILTER_EVENTS, { catFilter: "cat-food" });
+test("renderCalendar: hiddenCats は終日ピルも隠す", () => {
+  const { mount } = renderWithStub(FILTER_DAYS, FILTER_EVENTS, {
+    hiddenCats: new Set(["cat-hotel"]),
+  });
   assert.deepEqual(
     classNames(mount, "allday-pill "),
     ["allday-pill cat-food"],
-    "All day 行が絞り込まれていません"
+    "All day 行が隠れていません"
+  );
+  // 終日だけを隠しても時間指定ブロックは残る（経路が混ざっていないこと）
+  assert.deepEqual(classNames(mount, "ev "), ["ev cat-food", "ev cat-sight"]);
+});
+
+test("renderCalendar: 既定で宿泊を隠す想定どおり、All day 行から宿泊だけが消える", () => {
+  // schedule.js の HIDDEN_BY_DEFAULT が cat-hotel を伏せる。その見え方を固定する
+  const { mount } = renderWithStub(FILTER_DAYS, FILTER_EVENTS, {
+    hiddenCats: new Set(["cat-hotel"]),
+  });
+  assert.ok(
+    !classNames(mount, "allday-pill ").some((c) => c.includes("cat-hotel")),
+    "宿泊の終日ピルが残っています"
   );
 });
 
-test("renderCalendar: 該当が無いカテゴリでは両方とも空になる", () => {
-  const { mount } = renderWithStub(FILTER_DAYS, FILTER_EVENTS, { catFilter: "cat-shop" });
+test("renderCalendar: 全カテゴリを隠すと両方とも空になる", () => {
+  const { mount } = renderWithStub(FILTER_DAYS, FILTER_EVENTS, {
+    hiddenCats: new Set(["cat-food", "cat-sight", "cat-hotel"]),
+  });
   assert.deepEqual(classNames(mount, "ev "), []);
   assert.deepEqual(classNames(mount, "allday-pill "), []);
   // 行や列の骨格は残る（絞り込みでカレンダーごと消えない）

@@ -158,10 +158,15 @@ button {
   animation-delay: var(--d, 0s);
 }
 
-/* 行マスクで見出しをせり上げる */
+/* 行マスクで見出しをせり上げる。
+   マスクを上へ 0.16em 広げ、同じだけ margin で戻す ── line-height が 1.04 なので
+   行ボックスが和文セリフの字面より低く、overflow: hidden が「六」の上辺を削っていた
+   （2026-08-10 に指摘）。下端は広げないので、せり上がる前の文字は今までどおり隠れる。 */
 .lines .ln {
   display: block;
   overflow: hidden;
+  padding-top: 0.16em;
+  margin-top: -0.16em;
 }
 .lines .ln > i {
   display: block;
@@ -224,29 +229,19 @@ button {
   padding-bottom: var(--s8);
 }
 
-/* セクション見出しの共通レイアウト（左にラベル、右に本体） */
-.shead {
-  display: grid;
-  grid-template-columns: 190px 1fr;
-  gap: var(--s5);
+/* ページ見出し。旅程と持ち物で同じ形にする（2026-08-10 に統一）。
+   以前は旅程だけが 2 カラムの .shead で通し番号「01」を持ち、持ち物は
+   eyebrow + 見出しの積み重ねだった。番号は増えるページの数だけ意味が薄れるので落とした。
+   見出しの大きさは各ページの style 属性ではなくここで決める ── 2 ページに
+   別々の clamp を書いていたのが、そもそも揃わなくなった原因だった。 */
+.pagehead {
   padding-bottom: var(--s5);
 }
-.shead__idx {
-  font-size: 10px;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: var(--ink-2);
-  padding-top: 12px;
+.pagehead .eyebrow {
+  margin-bottom: var(--s2);
 }
-.shead__idx .n {
-  font-family: var(--serif);
-  display: block;
-  font-size: 34px;
-  letter-spacing: 0;
-  color: var(--ink);
-  line-height: 1;
-  margin-bottom: 10px;
-  font-weight: 200;
+.pagehead .display {
+  font-size: clamp(34px, 4.8vw, 58px);
 }
 .hairline {
   height: 1px;
@@ -344,17 +339,6 @@ button {
   transform: scale(1.06);
   filter: saturate(1);
 }
-.card__num {
-  position: absolute;
-  top: var(--s3);
-  left: var(--s3);
-  z-index: 2;
-  color: var(--sand);
-  font-family: var(--serif);
-  font-size: 15px;
-  letter-spacing: 2px;
-  mix-blend-mode: difference;
-}
 .card__body {
   padding: var(--s4) var(--s3) var(--s5);
 }
@@ -378,20 +362,6 @@ button {
 @media (max-width: 1180px) {
   .menu__grid {
     grid-template-columns: 1fr;
-  }
-  .shead {
-    grid-template-columns: 1fr;
-    gap: var(--s3);
-  }
-  .shead__idx {
-    padding-top: 0;
-  }
-  .shead__idx .n {
-    display: inline-block;
-    margin-right: var(--s2);
-    margin-bottom: 0;
-    font-size: 26px;
-    vertical-align: -3px;
   }
 }
 @media (max-width: 760px) {
