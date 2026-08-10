@@ -143,6 +143,17 @@ test("renderTable: 値が innerHTML に流れない（編集モード。value / 
     .map((n) => n.dataset?.itemId)
     .filter(Boolean);
   assert.deepEqual(ids, ["sv-1"], "行が描かれていません");
+  // 編集モードでは値が innerHTML にも textContent にも乗らず、input.value /
+  // placeholder に渡る。読み取りモードのテストと同じ理由で、否定条件（innerHTML に
+  // 出ていないこと）だけを見ると、4 つの入力欄が丸ごと描かれなくなる回帰でも
+  // 素通りしてしまう。先に、値が実際に input.value として出たことを確かめる
+  // （name / recipient / shop / note の 4 欄）
+  const payloadInputs = walk(mount).filter((n) => n.tagName === "INPUT" && n.value === payload);
+  assert.equal(
+    payloadInputs.length,
+    4,
+    `値が input.value として出た入力欄が 4 つではありません（実際: ${payloadInputs.length}）`
+  );
   for (const html of htmlSink) {
     assert.ok(!html.includes(payload), `innerHTML に値が流れました: ${html}`);
   }
