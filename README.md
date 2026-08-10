@@ -11,16 +11,18 @@
 - カテゴリによるイベントフィルタリング
 - 詳細シートでのイベント情報表示
 - 持ち物リスト（区分ごとのチェックと、ドラッグでの並べ替え）
-- **合言葉でデータを暗号化**（PBKDF2 + AES-GCM）。リポジトリに置く `events.json` /
-  `packing.json` は暗号文で、初回に合言葉を決めて以降はその合言葉で開く
+- お土産リスト（何を・誰に・どこで買うか）
+- **合言葉でデータを暗号化**（PBKDF2 + AES-GCM）。リポジトリの `events.json` / `packing.json` は
+  常に存在し暗号文（`packing.json` は 2026-08-10 に最初の公開が済んだ）。`souvenirs.json` は
+  まだ最初の「公開」を待っており、それまでは 404 を空のリストとして扱う
 - **ブラウザ上での追加・編集・削除**（下書きは端末の `localStorage` に平文で保存）
 - **「公開」でリポジトリへ反映**（GitHub Contents API 経由。トークンを設定した端末のみ）
 - モバイル、タブレット、デスクトップに対応
 - ビルドプロセス不要 — ローカルサーバーを起動するだけ
 
-3 ページとも実装済み。メニュー（`index.html`。合言葉の入力もここ）、
-旅程カレンダーと地図（`schedule.html`）、持ち物リスト（`packing.html`）で、
-旅程も持ち物も画面から編集・公開できる。
+4 ページとも実装済み。メニュー（`index.html`。合言葉の入力もここ）、
+旅程カレンダーと地図（`schedule.html`）、持ち物リスト（`packing.html`）、
+お土産リスト（`souvenirs.html`）で、旅程・持ち物・お土産のいずれも画面から編集・公開できる。
 
 ## ドキュメント
 
@@ -36,7 +38,7 @@
 
 ## 技術スタック
 
-- **HTML5、CSS3**: 3 ページ構成。色・余白・角丸・モーションは `assets/css/tokens.css` の
+- **HTML5、CSS3**: 4 ページ構成。色・余白・角丸・モーションは `assets/css/tokens.css` の
   CSS カスタムプロパティに集約
 - **JavaScript**: フレームワークを使用しないバニラ JavaScript（ES モジュール）
 - **Leaflet.js**: インタラクティブマップライブラリ。CDN ではなく `assets/vendor/leaflet/` に
@@ -67,7 +69,9 @@ node --test
 静的な値に加えて、保存と公開の層（`store` / `base64` / `sync-decide` / `github` / `sync`）、
 合言葉と暗号化の層（`crypto` / `auth` / `auth-form` / `load-error`）、
 持ち物リストの層（`packing-validate` / `packing-data` / `packing-render` / `packing-drag`）、
-編集フォームとエディタ、公開画面、3 ページの CSP を検証する。通信・`localStorage`・時刻は
+お土産リストの層（`souvenirs-validate` / `souvenirs-data` / `souvenirs-render`）、
+ページ共通部品（`page-notice` / `focus-key` / `row-controls`）、
+編集フォームとエディタ、公開画面、4 ページの CSP を検証する。通信・`localStorage`・時刻は
 すべて差し替え可能にしてあるので、テストは外部と通信しない。
 カレンダー描画やレスポンシブ崩れなど、DOM に依存する部分はブラウザで目視・実測して確認する。
 
@@ -81,14 +85,17 @@ travel-plans/
 ├── index.html             メニュー（合言葉の入力もここ）
 ├── schedule.html          旅程カレンダーと地図（編集・公開もここ）
 ├── packing.html           持ち物リスト（編集・公開もここ）
+├── souvenirs.html         お土産リスト（編集・公開もここ）
 ├── assets/
 │   ├── css/
 │   │   ├── tokens.css     色・余白・角丸・モーションの唯一の定義場所
 │   │   ├── base.css       リセット、タイポグラフィ、共通レイアウト、reveal 演出
 │   │   ├── controls.css   ボタン・チップ・入力欄・詳細シート・編集フォーム・公開まわり
 │   │   ├── calendar.css   schedule.html 専用（カレンダー・地図・レスポンシブ）
-│   │   └── packing.css    packing.html 専用
-│   ├── js/                menu.js / schedule.js / packing.js（各ページのエントリポイント）、
+│   │   ├── packing.css    packing.html 専用
+│   │   └── souvenirs.css  souvenirs.html 専用
+│   ├── js/                menu.js / schedule.js / packing.js / souvenirs.js
+│   │                      （各ページのエントリポイント）、
 │   │                      countdown.js（メニューの出発カウントダウン）、
 │   │                      calendar.js / map.js / sheet.js / nav.js / reveal.js / icons.js、
 │   │                      categories.js / dom.js / validate.js / data-error.js（共通部品）、
@@ -99,10 +106,18 @@ travel-plans/
 │   │                      crypto.js / auth.js / auth-form.js（合言葉と暗号化）、
 │   │                      load-error.js（読み込み失敗の分類）、
 │   │                      packing-validate.js / packing-data.js / packing-render.js /
-│   │                      packing-drag.js（持ち物リスト）
+│   │                      packing-drag.js（持ち物リスト）、
+│   │                      souvenirs-validate.js / souvenirs-data.js /
+│   │                      souvenirs-render.js（お土産リスト）、
+│   │                      page-notice.js / focus-key.js / row-controls.js
+│   │                      （schedule / packing / souvenirs が共有するページ部品）
 │   ├── data/
-│   │   ├── events.json    旅程データ（唯一のソース。リポジトリ上は暗号文）
-│   │   └── packing.json   持ち物データ（同上）
+│   │   ├── events.json     旅程データの唯一のソース（リポジトリ上は暗号文）
+│   │   ├── packing.json    持ち物データ。最初の「公開」まで存在しない設計で、
+│   │   │                   それまでは 404 を空のリストとして扱っていた
+│   │   │                   （2026-08-10 に最初の公開が済み、いまは存在する）
+│   │   └── souvenirs.json  お土産データ。持ち物と同じく最初の「公開」まで存在せず、
+│   │                       それまでは 404 を空のリストとして扱う（Phase B5）
 │   └── vendor/
 │       └── leaflet/       Leaflet 1.9.4 のセルフホスト版
 ├── tests/                 node --test 用のテスト
@@ -167,11 +182,13 @@ travel-plans/
 
 ## 保存と公開
 
-- **正はリポジトリの `assets/data/events.json` と `assets/data/packing.json`。**
+- **正はリポジトリの `assets/data/events.json` / `assets/data/packing.json` /
+  `assets/data/souvenirs.json`。**
   ただしリポジトリ上は暗号文（封筒 JSON）で、合言葉が要る。
   同行者は合言葉を入れてページを開けば最新を受け取る
 - **編集は端末の `localStorage` に下書きとして入る**（平文。旅程は `tp:events`、
-  持ち物は `tp:packing`。最後にリモートと揃えた時刻がそれぞれ `-base` 付きのキー）
+  持ち物は `tp:packing`、お土産は `tp:souvenirs`。最後にリモートと揃えた時刻が
+  それぞれ `-base` 付きのキー）
 - **「公開」を押した端末だけ**が GitHub Contents API でリポジトリへコミットする。
   トークンを設定していない端末には公開ボタン自体が出ない（閲覧と下書き編集はできる）
 - 新旧の判定はどちらも JSON トップレベルの `updatedAt`。公開の直前にもリモートを取り直して
@@ -273,7 +290,7 @@ map.js の createMap() → 座標を持つイベントからマーカーと位�
 このリポジトリへの書き込み権限を持つ GitHub トークンをブラウザに保存している。
 CDN 経由で読み込むスクリプトが差し替えられた場合、そのトークンを盗み出されたり、
 リポジトリへ任意の内容を push されたりする恐れがあるため、サードパーティの JS は CDN から
-読み込まず `assets/vendor/leaflet/` に自前で配置している。同じ理由で、3 ページすべてに
+読み込まず `assets/vendor/leaflet/` に自前で配置している。同じ理由で、4 ページすべてに
 `script-src 'self'` の Content-Security-Policy を置き、インライン script を排除している。
 トークンの具体的な保存先・扱いは
 `docs/spec/travel-plans-redesign.md` §5.4・§5.5 を参照。

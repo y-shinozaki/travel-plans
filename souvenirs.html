@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Phase B でリポジトリ書き込み権限を持つトークンをブラウザに保存するため、
+         スクリプトの実行元を自分自身だけに絞る。'unsafe-inline' を入れないので
+         インライン script と javascript: URL は実行されない。
+         style は Leaflet と自前コードが style 属性を多用するため許可が要る
+         （狙いはスクリプト実行の遮断であって、スタイルではない）。 -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self';
+               script-src 'self';
+               style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+               font-src https://fonts.gstatic.com;
+               img-src 'self' data: https:;
+               connect-src 'self' https://api.github.com;
+               base-uri 'self';
+               form-action 'none'"
+    />
+    <title>Thailand 2026</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,200;6..72,300;6..72,400&family=Inter:wght@300;400;500&family=Noto+Sans+JP:wght@300;400;500&family=Noto+Serif+JP:wght@200;300;400&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="assets/css/tokens.css" />
+    <link rel="stylesheet" href="assets/css/base.css" />
+    <link rel="stylesheet" href="assets/css/controls.css" />
+    <link rel="stylesheet" href="assets/css/souvenirs.css" />
+  </head>
+  <body data-page="souvenirs">
+    <nav class="nav" id="nav"></nav>
+    <!-- role / aria-label は他ページと揃える。同じ役割の領域なので -->
+    <div class="syncbar" id="syncbar" role="region" aria-label="同期の状態" hidden></div>
+
+    <main class="wrap sec">
+      <div class="pagehead reveal">
+        <p class="eyebrow">Souvenirs</p>
+        <h1 class="display lines"><span class="ln"><i>お土産リスト</i></span></h1>
+      </div>
+
+      <div class="svprog reveal" id="sv-progress"></div>
+
+      <div class="toolbar reveal">
+        <!-- ラベルとアイコンは JS が入れる。HTML に <use href="#i-..."> を
+             直書きすると injectSprite() より前にパースされ、WebKit が参照を
+             解決し直さないことがある（packing.html と同じ理由）。
+             データが読めていない状態で押されないよう disabled で置く。 -->
+        <div class="toolbar__group toolbar__group--end">
+          <button class="tbtn" id="sv-edit-toggle" type="button" aria-pressed="false" disabled></button>
+          <button class="tbtn" id="sv-add" type="button" disabled></button>
+          <!-- 公開ボタンとトークン設定の置き場。トークンが無いときに
+               公開ボタンを置かないので、中身は publish-ui.js が入れる。 -->
+          <span class="toolbar__group" id="pub-controls"></span>
+        </div>
+      </div>
+
+      <div class="pub">
+        <div class="pubpanel" id="pub-panel" hidden></div>
+        <div class="pubstat" id="pub-status" role="status" aria-live="polite" hidden></div>
+      </div>
+
+      <div id="sv-table"></div>
+    </main>
+
+    <script type="module" src="assets/js/souvenirs.js"></script>
+  </body>
+</html>

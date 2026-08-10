@@ -1,0 +1,120 @@
+/* お土産リスト（souvenirs.html）専用。
+   色・余白・角丸・モーションの値は tokens.css の変数だけを使う。
+   行アクションと入力欄は controls.css の .rowbtn / .inp を流用する
+   （.rowbtn--del / .rowbtn--confirm / .inp--note）。
+   進捗は packing.css の .pkprog と同じ作法だが、1 本しか出さないので
+   クラスを共有せず別に持つ（片方の都合でもう片方が動くのを避ける）。 */
+
+/* ── 進捗 ── */
+.svprog {
+  margin-top: var(--s3);
+}
+.svprog__one {
+  max-width: 320px;
+}
+.svprog__name {
+  font-size: 11px;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.svprog__count {
+  font-family: var(--serif);
+  font-size: 22px;
+  font-weight: 300;
+  color: var(--ink);
+}
+.svprog__bar {
+  height: 2px;
+  margin-top: 6px;
+  background: var(--line-soft);
+  border-radius: var(--r-pill);
+  overflow: hidden;
+}
+.svprog__fill {
+  height: 100%;
+  background: var(--ink);
+  transition: width var(--t-mid) var(--e-out);
+}
+
+/* ── 表 ── */
+.svitems {
+  list-style: none;
+  margin: var(--s3) 0 0;
+  padding: 0;
+  border-top: 1px solid var(--line-soft);
+}
+.svitem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-top: 1px solid rgb(var(--ink-rgb) / 0.06);
+}
+.svitem:first-child {
+  border-top: 0;
+}
+.svitem__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+/* 読み取りモードの 1 行。名前・誰に・どこで を同じ行に流す */
+.svitem__line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+.svitem__name {
+  color: var(--ink);
+}
+.svitem__to,
+.svitem__shop {
+  font-size: 12px;
+  color: var(--ink-2);
+}
+/* 「どこで」は薄い囲みにして、誰に と見分けが付くようにする */
+.svitem__shop {
+  padding: 1px 8px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-pill);
+}
+.svitem__note {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.svitem__acts {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+}
+
+/* 編集モードの入力欄。4 つ並ぶので、狭い画面では折り返させる */
+.svitem__body .inp {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+/* controls.css の .inp--note は margin-top: 5px を持つ（ラベル直下に積む場面向け）。
+   ここは 1 行に並べて中央揃えする場面なので、その余白だけ打ち消す ── 4 つのうち
+   「何を」（.inp のみ）は margin を持たないため、残り 3 つだけが約 2.5px 沈んで見えていた。 */
+.svitem__body .inp--note {
+  margin-top: 0;
+}
+
+/* ── レスポンシブ ── */
+/* カレンダーと違い横スクロールにしない。時間軸のような
+   「横に連続した意味」を持たないため（設計書 §7.6）。 */
+@media (max-width: 760px) {
+  .svitem {
+    align-items: flex-start;
+  }
+  .svitem__body .inp {
+    flex-basis: 100%;
+  }
+}

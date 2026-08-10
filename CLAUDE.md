@@ -15,13 +15,13 @@ python3 -m http.server 8000
 
 ## アーキテクチャ概要
 
-### ファイル構成（Phase B2 時点）
+### ファイル構成（Phase B5 時点）
 
 ```
 travel-plans/
-├── index.html / schedule.html / packing.html
+├── index.html / schedule.html / packing.html / souvenirs.html
 │                             実装済み（メニュー〈合言葉の入力〉／旅程カレンダー・地図・
-│                             編集・公開／持ち物リストとエディタ）
+│                             編集・公開／持ち物リストとエディタ／お土産リスト）
 ├── assets/
 │   ├── css/
 │   │   ├── tokens.css      色・余白・角丸・モーションの唯一の定義場所
@@ -32,7 +32,9 @@ travel-plans/
 │   │   │                   ツールバー（`.toolbar` 系。Phase B2 で calendar.css から移設）
 │   │   ├── calendar.css    schedule.html 専用（カレンダー・地図・レスポンシブ）。
 │   │   │                   `.toolbar select` だけは schedule 専用なのでここに残る
-│   │   └── packing.css     packing.html 専用（Phase B2）。色リテラル検査
+│   │   ├── packing.css     packing.html 専用（Phase B2）。色リテラル検査
+│   │   │                   （tokens.test.js）の対象ファイルにも入っている
+│   │   └── souvenirs.css   souvenirs.html 専用（Phase B5）。同じ検査
 │   │                       （tokens.test.js）の対象ファイルにも入っている
 │   ├── js/
 │   │   ├── time.js         10進時間 ⇔ HH:MM 変換、timeLabel()
@@ -72,7 +74,10 @@ travel-plans/
 │   │   ├── auth-form.js    合言葉フォームの組み立て（index.html。DOM は menu.js から
 │   │   │                   注入で受け取り、自分では document を触らない）
 │   │   ├── load-error.js   読み込み失敗の分類と文言（純粋関数）。classifyLoadError() は
-│   │   │                   Phase B2 で { noun, path } を取る一般形になった（既定は旅程）
+│   │   │                   Phase B2 で { noun, path } を取る一般形になった（既定は旅程）。
+│   │   │                   Phase B5 で toLoadError() を足した（sync.load() の失敗に
+│   │   │                   種別を付け直す。EventDataError/PackingDataError/
+│   │   │                   SouvenirDataError は共通の DataError 1 本で拾える）
 │   │   ├── menu.js         index.html のエントリポイント
 │   │   ├── schedule.js     schedule.html のエントリポイント
 │   │   │  ── ここから下が Phase B2 で追加した持ち物リストの層 ──
@@ -86,12 +91,37 @@ travel-plans/
 │   │   │                       操作コントロールが増える
 │   │   ├── packing-drag.js     Pointer Events による並べ替え。DOM を正として、
 │   │   │                       指を離した時点で配列を組み直す
-│   │   └── packing.js          packing.html のエントリポイント
+│   │   ├── packing.js          packing.html のエントリポイント
+│   │   │  ── ここから下が Phase B5 で追加したページ共通部品とお土産リストの層 ──
+│   │   ├── page-notice.js      createNotices() / createDrawLoop() / REDRAW_FAILED。
+│   │   │                       schedule.js と packing.js がそれぞれ全文コピーで持って
+│   │   │                       いた「失敗を画面に出す」処理（設計書 §13）を 1 か所に
+│   │   │                       まとめ、souvenirs.js を含む 3 ページが呼ぶ形にした
+│   │   ├── focus-key.js        itemFocusKey() / groupFocusKey() / souvenirFocusKey()。
+│   │   │                       フォーカスキーの書式を「組み立てる側」と
+│   │   │                       「querySelector する側」の両方が呼ぶ唯一の場所
+│   │   │                       （書式が 2 か所に分かれていると、片方だけ変えても
+│   │   │                       例外が出ずフォーカスが静かに落ちる。設計書 §13）
+│   │   ├── row-controls.js     iconButton() / armedIconButton() / CHECK_MARK。
+│   │   │                       一覧の行に置くコントロールを packing と souvenirs の
+│   │   │                       両方が使う（「1 度目で身構え、2 度目で実行」の実体は
+│   │   │                       ここ 1 か所だけ）
+│   │   ├── souvenirs-validate.js validateSouvenirs()。持ち物と同じ方針で不備を
+│   │   │                       全部集めて名指しする。id と bought は必須、
+│   │   │                       name / recipient / shop はキーとして必須だが
+│   │   │                       空文字を許し、note だけが省略できる（設計書 §4.5）
+│   │   ├── souvenirs-data.js   お土産リストの純粋なデータ操作（追加・削除・進捗・
+│   │   │                       店名候補）。持ち物と違い階層も members も持たない
+│   │   ├── souvenirs-render.js お土産リストの描画。「買った」のチェックだけは
+│   │   │                       編集モードでなくても押せる
+│   │   └── souvenirs.js        souvenirs.html のエントリポイント
 │   ├── data/
 │   │   ├── events.json     旅程データの唯一のソース（表示用文字列は持たない）
-│   │   └── packing.json    持ち物データ。最初の「公開」まで存在しない設計で、
-│   │                       それまでは 404 を空のリストとして扱っていた
-│   │                       （2026-08-10 に最初の公開が済み、いまは存在する）
+│   │   ├── packing.json    持ち物データ。最初の「公開」まで存在しない設計で、
+│   │   │                   それまでは 404 を空のリストとして扱っていた
+│   │   │                   （2026-08-10 に最初の公開が済み、いまは存在する）
+│   │   └── souvenirs.json  お土産データ。持ち物と同じく最初の「公開」まで存在せず、
+│   │                       それまでは 404 を空のリストとして扱う（Phase B5）
 │   └── vendor/
 │       └── leaflet/        Leaflet 1.9.4 を自前で配置（理由は「外部ライブラリ」参照）
 ├── tests/                  node --test で実行する純粋関数・静的検証のテスト
@@ -121,10 +151,22 @@ travel-plans/
 
 - **Phase B3**（コメント機能）: `assets/js/comments.js`、`assets/data/comments.json` など
 
+**Phase B5（ページ共通部品の抽出とお土産リスト）は完了した。** 前半は
+`schedule.js` と `packing.js` が個別に持っていた「失敗を画面に出す」処理と、
+一覧行のコントロール、フォーカスキーの書式を `page-notice.js` / `row-controls.js` /
+`focus-key.js` へ抽出した（3 本目〈B3 の `comments.js`〉を書く前に重複を潰しておく、
+という設計書 §13 の判断）。後半は `assets/css/souvenirs.css`、
+`assets/js/souvenirs.js` / `souvenirs-data.js` / `souvenirs-validate.js` /
+`souvenirs-render.js` を追加し、`souvenirs.html` を実装済みページにした
+（`load-error.js` にも `toLoadError()` を足した）。**この抽出により、B3 が
+`comments.js` を足すときは新しい重複を作らず、`page-notice.js` / `row-controls.js` /
+`focus-key.js` をそのまま呼ぶこと。**
+
 **Phase B4（合言葉と暗号化）は完了した。** `assets/js/auth.js` `crypto.js` `auth-form.js`、
 `index.html` の合言葉入力、`sync.js` の暗号化対応を追加した。**同期する JSON は
-暗号文になる**（現時点で同期しているのは `events.json` と B2 で足した `packing.json` だが、
-B3 で足す `comments.json` も同じ鍵・同じソルトで暗号化する設計になっている）。
+暗号文になる**（現時点で同期しているのは `events.json` / `packing.json`
+（B2 で追加）/ `souvenirs.json`（B5 で追加）で、B3 で足す `comments.json` も
+同じ鍵・同じソルトで暗号化する設計になっている）。
 仮ページ `archive.html` の削除もここで行った（後述「暗号化（Phase B4）」参照）。
 
 **Phase B2（持ち物リストとエディタ）は完了した。** `assets/css/packing.css`、
@@ -204,7 +246,7 @@ map.js の createMap() → 座標を持つイベントからマーカーと位�
 - **「公開」を押した端末だけが**、GitHub Contents API 経由でリポジトリへコミットする。
   トークンを持たない端末は閲覧と下書き編集のみ（公開ボタン自体が置かれない）
 
-`localStorage` のキーは `store.js` が `tp:` を前置する。使うのは 6 つ:
+`localStorage` のキーは `store.js` が `tp:` を前置する。使うのは 8 つ:
 
 | キー | 中身 | 書く場所 |
 |---|---|---|
@@ -212,14 +254,17 @@ map.js の createMap() → 座標を持つイベントからマーカーと位�
 | `tp:events-base` | 旅程を最後にリモートと揃えた時点の `updatedAt` 文字列 | `sync.js` の `DEFAULT_CONFIG.baseKey` |
 | `tp:packing` | 持ち物リストの下書き（`packing.json` と同じ形＋`updatedAt`。平文のまま） | `packing.js` が `createSync()` に渡す `config`（Phase B2 で追加） |
 | `tp:packing-base` | 持ち物リストを最後にリモートと揃えた時点の `updatedAt` 文字列 | 同上 |
+| `tp:souvenirs` | お土産リストの下書き（`souvenirs.json` と同じ形＋`updatedAt`。平文のまま） | `souvenirs.js` が `createSync()` に渡す `config`（Phase B5 で追加） |
+| `tp:souvenirs-base` | お土産リストを最後にリモートと揃えた時点の `updatedAt` 文字列 | 同上 |
 | `tp:gh-token` | 公開用トークン（平文） | `token.js` |
 | `tp:key` | 合言葉から導いた鍵素材（`salt.iter.key` を `.` 区切りで連結） | `auth.js` |
 
 キー名を他のファイルに書き写さないこと。`tp:events` / `tp:events-base` を知っているのは
 `sync.js`（の既定 `DEFAULT_CONFIG`）、`tp:packing` / `tp:packing-base` を知っているのは
-`packing.js` が組み立てる `config` だけ、`tp:gh-token` は `token.js`、`tp:key` は
+`packing.js` が組み立てる `config` だけ、`tp:souvenirs` / `tp:souvenirs-base` を知っているのは
+`souvenirs.js` が組み立てる `config` だけ、`tp:gh-token` は `token.js`、`tp:key` は
 `auth.js`（唯一の出入口）だけ。
-（この 6 つのほかに `publish-ui.js` が `tp:write-probe` を一瞬だけ書いて消す。
+（この 8 つのほかに `publish-ui.js` が `tp:write-probe` を一瞬だけ書いて消す。
 保存領域に書けるかを実際に試すためで、残さない。）
 
 **`createSync()` の `config` は owner / repo / branch / path に加えて
@@ -227,7 +272,8 @@ map.js の createMap() → 座標を持つイベントからマーカーと位�
 （既定値は旅程用: `sync.js` の `DEFAULT_CONFIG` 参照）。5 つだったところへ Phase B2 で
 `noun`（画面の文言に使う名詞。「最新の◯◯を確認できませんでした」の◯◯）が 6 つ目として
 加わった。2 つ目の JSON（B2 で実装した `packing.json`。`packing.js` 参照）を実際に
-動かして確認済みなので、B3 で 3 つ目（`comments.json`）を足すときは `packing.js` の
+動かして確認済みで、3 つ目の JSON（B5 で実装した `souvenirs.json`。`souvenirs.js` 参照）も
+同じ形で動かして確認できた。B3 で 4 つ目（`comments.json`）を足すときは `souvenirs.js` の
 `createSync()` の呼び出しを写すこと。**6 つのうち一部だけを差し替えると、旅程の下書きが
 黙って消える**（`noun` だけは表示専用で取り違えてもデータは壊れないが、「危険なものだけ」
 に絞ると毎回どれが危険かを思い出す必要が生じるため、同じ組に入れてある。詳しい経緯は
@@ -368,23 +414,24 @@ validateEvents → 暗号化 → GET で sha と本文 → updatedAt の突き�
 
 ## Content-Security-Policy
 
-3 ページすべての `<head>` に `<meta http-equiv="Content-Security-Policy">` を置いている
-（内容は 3 ページで同一）。要点:
+4 ページすべての `<head>` に `<meta http-equiv="Content-Security-Policy">` を置いている
+（内容は 4 ページで同一）。要点:
 
 - **`script-src 'self'`** — `'unsafe-inline'` を入れていないので、インライン `<script>` も
   `javascript:` URL も実行されない。**インライン script を書かないこと**
-  （3 ページとも起動処理を `assets/js/` の外部ファイルに出しているのはこのため）
+  （4 ページとも起動処理を `assets/js/` の外部ファイルに出しているのはこのため）
 - `connect-src 'self' https://api.github.com` — 公開フローが叩く先だけを許可
 - `style-src` に `'unsafe-inline'` が要る（Leaflet と自前コードが `style` 属性を使うため）。
   狙いはスクリプト実行の遮断であって、スタイルではない
 - `img-src` が `https:` のワイルドカードなのは、`events.json` と `menu.js` が
   複数の外部ホストから画像を直リンクしているため（設計書 §13 の負債）
 
-`tests/csp.test.js` の 6 件が機械的に検査している。3 ページすべてを見るのが
+`tests/csp.test.js` の 7 件が機械的に検査している。4 ページすべてを見るのが
 「CSP がある」「`script-src` が `'self'` のみ」「インライン script が 1 つも無い」
-「`on*` 属性が 1 つも無い」「`connect-src` に GitHub API がある」の 5 件で、
-6 件目（`img-src` に地図タイル、`font-src` にフォント）だけは `schedule.html` しか
-見ていない（設計書 §13 のテストの穴）。
+「`on*` 属性が 1 つも無い」「`connect-src` に GitHub API がある」の 5 件、
+`archive.html`（取りやめた仮ページ）が実ファイルとして残っていないことを見るのが
+ページを見ない 1 件、残る 1 件（`img-src` に地図タイル、`font-src` にフォント）だけは
+`schedule.html` しか見ていない（設計書 §13 のテストの穴）。
 
 ## デザインシステム
 
@@ -423,9 +470,10 @@ validateEvents → 暗号化 → GET で sha と本文 → updatedAt の突き�
 新しいカテゴリは `tests/categories.test.js` の `CATEGORIES`（Phase A の想定一覧）にも足す。
 
 `tokens.test.js` の色リテラル検査（次項）は対象ファイルをハードコードしたリストで持っている。
-Phase B2 で `packing.css` をそのリストへ足した。**リストがハードコードのままなので、
-次に新しい CSS ファイルを足すときも同じ手順（このリストへの追加）が要る** ──
-忘れても検査は何も言わずに素通りする（設計書 §13「小さいもの」）。
+Phase B2 で `packing.css` を、Phase B5 で `souvenirs.css` をそのリストへ足した実績がある。
+**リストがハードコードのままなので、次に新しい CSS ファイルを足すときも同じ手順
+（このリストへの追加）が要る** ── 忘れても検査は何も言わずに素通りする
+（設計書 §13「小さいもの」）。
 
 ### データの検査（`assets/js/validate.js`）
 
@@ -532,7 +580,8 @@ node --test
 
 Phase B1 で追加したもの:
 
-- `csp.test.js` — 3 ページの CSP（前述「Content-Security-Policy」）
+- `csp.test.js` — 4 ページの CSP（前述「Content-Security-Policy」。
+  Phase B5 で `souvenirs.html` が対象に加わった）
 - `store.test.js` — 読みは既定値へ落とし、書きは必ず `StoreWriteError` で知らせること
 - `base64.test.js` — 日本語・絵文字・長い入力の往復
 - `sync-decide.test.js` — `decideSync()` の全分岐
@@ -579,10 +628,37 @@ Phase B2 で追加したもの:
 - `sync.test.js` は `noun` を含む 6 つの注入口を、注入した `draftKey` で実際に
   `saveLocal()` を回すところまで検査する
 
+Phase B5 で追加したもの:
+
+- `page-notice.test.js` — `createNotices()`（2 つの通知が別要素であること、
+  `alert` / `status` の役割の出し分け）と `createDrawLoop()`（`safeDraw` が
+  失敗を拾って文言を出すこと、`scheduleDraw` が 1 tick 送ってからまとめて描くこと、
+  あとから来たフォーカス指定で上書きし `undefined` では消さないこと、
+  `safeDraw` が予約を取り消してから描くこと）
+- `focus-key.test.js` — `itemFocusKey()` / `groupFocusKey()` / `souvenirFocusKey()`
+  が返す書式と、3 つの接頭辞が同じ `id` でも重ならないこと
+- `row-controls.test.js` — `iconButton()` / `armedIconButton()`（1 度目では実行せず
+  見た目と読み上げだけ変わり、2 度目で実行すること）、値がアイコン定数以外
+  `innerHTML` に流れないこと、`CHECK_MARK` が `use` ではなく生の `path` を持つこと
+  （controls.css のアニメーションがシャドウツリー越しに `<use>` を触れないため）
+- `souvenirs-validate.test.js` — `validateSouvenirs()`。`packing-validate.test.js` と
+  同じ方針で不備を全部集めて名指しする。`name` / `recipient` / `shop` は空文字を
+  許すがキー自体が無い行は弾くこと（空文字と未定義を区別すること）を検査する
+- `souvenirs-data.test.js` — `souvenirs-data.js` の純粋関数（採番・差し替え・削除・
+  進捗・店名候補）。`packing-data.test.js` と同じ方針
+- `souvenirs-render.test.js` — 描画される文字列、`data-item-id` / `data-focus-key`
+  の付与、「買った」のチェックが編集モードでなくても描かれること、
+  `editing` による入力欄・削除ボタンの出し分け
+- `load-error.test.js` は `toLoadError()` の分岐（`DataError` / `DecryptError` は
+  そのまま返す、`cause` が `SyntaxError` なら `DataParseError`、それ以外は
+  `DataFetchError`、`PackingDataError` も `DataError` として素通しすること）も
+  検査するようになった
+
 `tokens.test.js` は色そのものに加えて次の約束も機械的に守らせている:
 
 - `--hour-h`（tokens.css）と `HOUR_H`（calendar.js）が同じ値であること
-- `base.css` / `controls.css` / `calendar.css` / `packing.css` に色リテラルを書かないこと
+- `base.css` / `controls.css` / `calendar.css` / `packing.css` / `souvenirs.css` に
+  色リテラルを書かないこと
   （半透明が必要なら `rgb(var(--ink-rgb) / 0.14)` のようにチャンネルトークンを使う）
 - `CAT_META` の各カテゴリに `tokens.css` の 3 値と `calendar.css` の `.cat-xxx` が揃っていること
   （「新しいカテゴリを追加」参照。カテゴリ一覧は `CAT_META` から導いている）

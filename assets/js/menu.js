@@ -28,6 +28,17 @@ const CARDS = [
     image:
       "https://www.thailandtravel.or.jp/wp-content/uploads/2017/03/01871-808x538.jpg",
   },
+  {
+    href: "souvenirs.html",
+    eyebrow: "Souvenirs",
+    title: "お土産リスト",
+    ico: "i-shop",
+    desc: "何を、誰に、どこで買うか。買ったものはチェックできます。",
+    // 画像は旅程の「ワット サマーン ラッタナーラーム」イベントと同じ
+    // （commit 9afc981 で確認。events.json は暗号文なので、平文版から取得）
+    image:
+      "https://www.thailandtravel.or.jp/wp-content/uploads/2017/11/Small_Chachoengsao-00024224.jpg",
+  },
 ];
 
 function cardHtml(card, index) {
