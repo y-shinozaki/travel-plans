@@ -670,3 +670,29 @@
   font-weight: 300;
   max-width: 320px;
 }
+
+/* ══════════════════════════════════════════════════════════
+   TOOLBAR — 旅程と持ち物で共有する横並びの操作列
+   （calendar.css から移した。Phase B2 で 2 ページ目が使い始めたため。
+   .toolbar select は schedule だけが使うので calendar.css に残してある）
+   ══════════════════════════════════════════════════════════ */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  flex-wrap: wrap;
+  padding: var(--s3) 0;
+  border-top: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+}
+.toolbar__group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+/* 編集ボタンの組だけ右端へ寄せる。折り返したときは margin-left が効かず、
+   自然に左揃えの 2 行目になる（狭い画面ではそのほうが読みやすい）。 */
+.toolbar__group--end {
+  margin-left: auto;
+}
