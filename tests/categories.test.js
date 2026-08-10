@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { ICON_IDS } from "../assets/js/icons.js";
+import { ITINERARY as data } from "./fixtures/itinerary.js";
 import {
   CAT_META,
   catMeta,
@@ -56,11 +57,17 @@ test("未知のカテゴリは 3 つの入口すべてで同じように例外�
   }
 });
 
-test("events.json のカテゴリがすべて既知である", () => {
-  const data = JSON.parse(
-    readFileSync(new URL("../assets/data/events.json", import.meta.url), "utf8")
+test("旅程データのカテゴリがすべて既知である", () => {
+  // Phase B4 で events.json が暗号文になり実データを読めなくなったため、
+  // フィクスチャに切り替えた（経緯は tests/data.test.js の冒頭コメント）。
+  // フィクスチャは 5 つのカテゴリをすべて含むので、CAT_META とスプライトの
+  // 突き合わせは全カテゴリぶん働き続ける
+  assert.equal(data.events.length, 6, "フィクスチャの件数が想定と違います");
+  assert.equal(
+    new Set(data.events.map((e) => e.cat)).size,
+    Object.keys(CAT_META).length,
+    "フィクスチャが 5 つのカテゴリすべてを含んでいません"
   );
-  assert.equal(data.events.length, 43, "events.json の件数が想定と違います");
   for (const ev of data.events) {
     assert.doesNotThrow(() => catMeta(ev.cat), `${ev.title}: ${ev.cat}`);
     assert.ok(ICON_IDS.includes(iconOf(ev)), `${ev.title}: ${iconOf(ev)} がスプライトにありません`);

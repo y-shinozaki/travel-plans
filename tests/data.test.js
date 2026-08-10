@@ -1,13 +1,25 @@
 /**
- * 実データ（assets/data/events.json）をパイプラインに通す。
+ * 旅程データをパイプラインに通す。
  *
- * 個々の関数のテストは合成データで書いてあるが、実データそのものを
- * expandEvents / collectLocations / assignLanes に通すものが 1 つも無かった。
- * つまり「関数は正しいがデータが壊れた」という編集事故は誰も検知できなかった。
+ * **2026-08-10（Phase B4）で、このファイルの役割が 2 つに割れた。**
  *
- * 期待値は 2026-08-09 時点の内容から取った実測値。旅程を編集して数が変われば
- * ここが落ちる ── そのときは差分を確認したうえで期待値を更新すること
- * （落ちたから消す、ではなく、意図した変更かを一度見る）。
+ * 元は実データ（assets/data/events.json）を直接読み、検査とパイプラインに
+ * 通していた。狙いは「関数は正しいがデータが壊れた」という編集事故を
+ * コミット前に捕まえることだった。B4 で events.json が暗号文になったため、
+ * テストからは中身を読めなくなり、その役割は成立しなくなった。
+ *
+ * 残っているもの:
+ *
+ * 1. **リポジトリのファイルが封筒の形をしていること**（下の 2 件）。
+ *    中身は見られないが、「暗号化されないまま公開されていないか」は見張れる
+ * 2. **パイプラインの検査**は tests/fixtures/itinerary.js の合成データで行う。
+ *    expandEvents / collectLocations / assignLanes の振る舞いは守れるが、
+ *    実データの編集事故は検知できない
+ *
+ * **失われたものを黙って忘れないこと。** 実データを機械的に検査できるのは、
+ * 公開直前の validateEvents（sync.js の publish()）だけになった。壊れた旅程を
+ * リポジトリへ入れない砦はそこ 1 つで、コミット前には何も動かない
+ * （設計書 §13「テストの穴」に記録してある）。
  */
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -16,50 +28,72 @@ import { expandEvents, collectLocations, hasCoords } from "../assets/js/events.j
 import { assignLanes } from "../assets/js/lanes.js";
 import { validateEvents } from "../assets/js/validate.js";
 import { timeLabel } from "../assets/js/time.js";
+import { isEnvelope } from "../assets/js/crypto.js";
+import { ITINERARY as data } from "./fixtures/itinerary.js";
 
-const data = JSON.parse(
-  readFileSync(new URL("../assets/data/events.json", import.meta.url), "utf8")
+const publishedText = readFileSync(
+  new URL("../assets/data/events.json", import.meta.url),
+  "utf8"
 );
 
-test("実データが読み込み時の検査を通る", () => {
-  // schedule.js が起動時に呼ぶのと同じ検査。ここが落ちるならブラウザでも
-  // カレンダーが出ない（＝コミット前に気付ける）
+test("公開されている events.json は封筒になっている", () => {
+  const raw = JSON.parse(publishedText);
+  assert.equal(isEnvelope(raw), true, "暗号化されないまま公開されています");
+  // 外側の updatedAt は突き合わせ（assertRemoteNotAhead）が復号せずに読む。
+  // これが消えると B1 の競合検出が黙って効かなくなる
+  assert.equal(typeof raw.updatedAt, "string");
+  assert.equal(typeof raw.kdf.salt, "string");
+  assert.equal(typeof raw.kdf.iter, "number");
+  assert.equal(typeof raw.iv, "string");
+});
+
+test("封筒に旅程の中身が漏れていない", () => {
+  // 暗号文の外に出てよいのは updatedAt と kdf / iv だけ。
+  // 実際の行き先・人名がここに現れたら、暗号化の意味が無い
+  for (const word of ["スワンナプーム", "パタヤ", "バンコク", "ホテル", "依田", "篠崎", "cat-move"]) {
+    assert.ok(!publishedText.includes(word), `${word} が暗号文の外に出ています`);
+  }
+});
+
+test("フィクスチャが読み込み時の検査を通る", () => {
+  // schedule.js が起動時に呼ぶのと同じ検査。フィクスチャ自体が旅程の形を
+  // 保っていることの確認でもある（形が崩れると以降のテストが無意味になる）
   assert.doesNotThrow(() => validateEvents(data));
 });
 
-test("実データの件数が想定どおり", () => {
-  assert.equal(data.days.length, 6, "日数");
-  assert.equal(data.events.length, 43, "イベント件数");
-  assert.equal(data.events.filter((e) => e.allDay).length, 5, "終日イベント");
-  assert.equal(data.events.filter((e) => e.endDay > e.startDay).length, 3, "複数日イベント");
+test("フィクスチャの件数が想定どおり", () => {
+  assert.equal(data.days.length, 3, "日数");
+  assert.equal(data.events.length, 6, "イベント件数");
+  assert.equal(data.events.filter((e) => e.allDay).length, 1, "終日イベント");
+  assert.equal(data.events.filter((e) => e.endDay > e.startDay).length, 2, "複数日イベント");
 });
 
-test("実データの全イベントがカレンダーのセグメントになる（消えるイベントが無い）", () => {
+test("全イベントがカレンダーのセグメントになる（消えるイベントが無い）", () => {
   const segments = expandEvents(data.events, data.days.length);
   const covered = new Set(segments.map((s) => s.ref.id));
   const missing = data.events.filter((e) => !covered.has(e.id)).map((e) => `${e.id}/${e.title}`);
   assert.deepEqual(missing, [], "セグメントが 1 つも作られないイベントがあります");
 
-  // 単日 40 件 + ev-008（3 日）+ ev-009（3 日）+ ev-010（2 日）＝ 48
-  assert.equal(segments.length, 48, "セグメント総数");
+  // 単日 4 件 + fx-004（3 日）+ fx-005（2 日）＝ 9
+  assert.equal(segments.length, 9, "セグメント総数");
   for (const seg of segments) {
     assert.ok(seg.day >= 0 && seg.day < data.days.length, `${seg.ref.id}: day が範囲外`);
   }
 });
 
-test("日付をまたぐフライトは 2 日ぶんに割れる（start > end を壊さない）", () => {
-  // ev-010 は 21:55 発 → 翌 06:20 着。start > end は「間違い」ではないので、
+test("日付をまたぐ移動は 2 日ぶんに割れる（start > end を壊さない）", () => {
+  // fx-005 は 21:55 発 → 翌 06:20 着。start > end は「間違い」ではないので、
   // 正規化や入れ替えで直そうとしないこと
-  const flight = data.events.find((e) => e.id === "ev-010");
-  assert.ok(flight, "ev-010 がありません");
-  assert.ok(flight.start > flight.end, "ev-010 が日をまたぐ形ではなくなっています");
+  const flight = data.events.find((e) => e.id === "fx-005");
+  assert.ok(flight, "fx-005 がありません");
+  assert.ok(flight.start > flight.end, "fx-005 が日をまたぐ形ではなくなっています");
 
   const segs = expandEvents([flight], data.days.length);
   assert.deepEqual(
     segs.map((s) => [s.day, s.start, s.end]),
     [
-      [4, 21.92, 24],
-      [5, 0, 6.33],
+      [1, 21.92, 24],
+      [2, 0, 6.33],
     ]
   );
   assert.equal(timeLabel(flight), "21:55 → 06:20");
@@ -67,8 +101,10 @@ test("日付をまたぐフライトは 2 日ぶんに割れる（start > end �
 
 test("座標を持つイベントは同一地点にまとめられる", () => {
   const withCoords = data.events.filter(hasCoords);
-  assert.equal(withCoords.length, 22, "座標を持つイベント数");
-  assert.equal(collectLocations(data.events, null).length, 18, "重複除去後の地点数");
+  // fx-004 は lat/lng が両方 null なので外れる
+  assert.equal(withCoords.length, 5, "座標を持つイベント数");
+  // fx-001 と fx-002 が同じ座標なので 1 地点に畳まれ、5 → 4
+  assert.equal(collectLocations(data.events, null).length, 4, "重複除去後の地点数");
 });
 
 test("カテゴリで絞ると地点が実際に減る", () => {
@@ -104,6 +140,7 @@ test("重なり合う予定にレーンが割り当てられ、同じレーン�
     }
   }
 
-  // 実データには実際に重なる予定がある。1 のままなら重なり判定が死んでいる
+  // フィクスチャには実際に重なる予定（fx-001 と fx-003）がある。
+  // 1 のままなら重なり判定が死んでいる
   assert.ok(maxLanes >= 2, `重なりが 1 件も検出されていません（maxLanes=${maxLanes}）`);
 });

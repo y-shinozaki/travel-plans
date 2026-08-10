@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { SPRITE, ICON_IDS, icon, injectSprite } from "../assets/js/icons.js";
+import { ITINERARY as data } from "./fixtures/itinerary.js";
 
 const idsInSprite = () => [...SPRITE.matchAll(/<symbol[^>]*\bid="([^"]+)"/g)].map((m) => m[1]);
 
@@ -53,14 +53,21 @@ test("icon() は未知の id を拒否する", () => {
   assert.throws(() => icon("i-nope"), /i-nope/);
 });
 
-test("events.json が参照する個別アイコンがすべて存在する", () => {
+test("旅程データが参照する個別アイコンがすべて存在する", () => {
   // 描画時に <use> が解決できず、アイコンが消えるのを防ぐ。
   // カテゴリ既定アイコンとの突き合わせは categories.test.js が受け持つ。
-  const data = JSON.parse(
-    readFileSync(new URL("../assets/data/events.json", import.meta.url), "utf8")
+  //
+  // Phase B4 で events.json が暗号文になり実データを読めなくなったため、
+  // フィクスチャに切り替えた（経緯は tests/data.test.js の冒頭コメント）。
+  // **実データの icon を検査する役割はここで失われた。**
+  // icon を持つイベントが 1 件も無いとループが 0 回で素通りするので、
+  // 件数そのものを先に確かめる
+  assert.equal(data.events.length, 6, "フィクスチャの件数が想定と違います");
+  assert.equal(
+    data.events.filter((e) => e.icon).length,
+    1,
+    "個別 icon を持つイベントがフィクスチャから消えています（ループが素通りします）"
   );
-  // 空配列だとループが 0 回で素通りするので、件数そのものを先に確かめる
-  assert.equal(data.events.length, 43, "events.json の件数が想定と違います");
   for (const ev of data.events) {
     if (!ev.icon) continue;
     assert.ok(ICON_IDS.includes(ev.icon), `${ev.title}: ${ev.icon} がスプライトにありません`);

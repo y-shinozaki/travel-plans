@@ -1,6 +1,5 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import {
   nextEventId,
   mergeEvent,
@@ -12,9 +11,11 @@ import { emptyEvent, readEventForm, formProblems } from "../assets/js/event-form
 import { validateEvents } from "../assets/js/validate.js";
 import { decToHHMM } from "../assets/js/time.js";
 
-const DATA = JSON.parse(
-  readFileSync(new URL("../assets/data/events.json", import.meta.url), "utf8")
-);
+// Phase B4 で events.json が暗号文になり、テストから中身を読めなくなったため
+// フィクスチャに切り替えた（経緯は tests/data.test.js の冒頭コメント）。
+// フィクスチャは併合・採番・丸めの検査に必要な性質（image を持つ 1 件、
+// 時刻を持つ複数件、複数日、終日）を意図的に備えている。
+import { ITINERARY as DATA } from "./fixtures/itinerary.js";
 
 /**
  * フォームに表示される値を id → 文字列の表にする（描画せずに読み出しを再現する）。
@@ -96,12 +97,15 @@ test("フォームに無い image / imagePos / icon は編集で消えない", (
   assert.equal(updated.id, "ev-999");
 });
 
-test("併合しないと消えることを、実データで確かめる", () => {
+test("併合しないと消えることを確かめる", () => {
   // ここが「なぜ mergeEvent が要るのか」。readEventForm の戻り値をそのまま
-  // 保存すると、画像を持つ 24 件からキーごと image が消える。しかも
+  // 保存すると、画像を持つイベントからキーごと image が消える。しかも
   // image は省略できる項目なので validateEvents は何も言わない
+  //
+  // 下限は「フィクスチャから image が消えたら気付く」ための番人。
+  // 実データを読んでいた頃は 24 件あった（B4 で読めなくなった）
   const withImage = DATA.events.filter((ev) => ev.image);
-  assert.ok(withImage.length >= 20, `画像を持つイベントが ${withImage.length} 件しかありません`);
+  assert.ok(withImage.length >= 2, `画像を持つイベントが ${withImage.length} 件しかありません`);
 
   const naive = readEventForm(getter(valuesOf(withImage[0])));
   assert.equal("image" in naive, false);
@@ -141,10 +145,11 @@ test("実データのどの予定でも、タイトルだけの編集で省略�
 });
 
 test("触っていない時刻に往復の丸めを載せない", () => {
-  // 10.58 → "10:35" → 10.583333333333334 の揺れ。実データに 4 件ある。
-  // 表示は変わらないが、タイトルだけ直したときの公開差分にノイズが載る
+  // 10.58 → "10:35" → 10.583333333333334 の揺れ。
+  // 表示は変わらないが、タイトルだけ直したときの公開差分にノイズが載る。
+  // 下限は「フィクスチャから時刻つきイベントが消えたら気付く」ための番人
   const wobbly = DATA.events.filter((ev) => !ev.allDay && Number.isFinite(ev.start));
-  assert.ok(wobbly.length >= 30, `時刻を持つイベントが ${wobbly.length} 件しかありません`);
+  assert.ok(wobbly.length >= 5, `時刻を持つイベントが ${wobbly.length} 件しかありません`);
 
   for (const original of wobbly) {
     const updated = editTitle(original, `${original.title}（改）`);
@@ -221,7 +226,7 @@ test("削除は 1 件だけ取り除く", () => {
   const next = withoutEvent(DATA, DATA.events[3].id);
   assert.equal(next.events.length, DATA.events.length - 1);
   assert.ok(!next.events.some((ev) => ev.id === DATA.events[3].id));
-  assert.equal(DATA.events.length, 43, "元の配列が書き換えられています");
+  assert.equal(DATA.events.length, 6, "元の配列が書き換えられています");
   validateEvents(next);
 });
 
@@ -229,7 +234,7 @@ test("削除は 1 件だけ取り除く", () => {
 
 test("formProblems は古い dayCount を信じるが、validateEvents は騙されない", () => {
   // 日程を 3 日に縮めたのに、6 日だった頃の dayCount で検査した場合
-  const shrunk = { ...DATA, days: DATA.days.slice(0, 3) };
+  const shrunk = { ...DATA, days: DATA.days.slice(0, 2) };
   const ev = { ...DATA.events[0], startDay: 5, endDay: 5 };
   const input = readEventForm(getter(valuesOf(ev)));
 
@@ -481,7 +486,7 @@ test("配線: 新規追加は採番され、削除ボタンを出さない", () 
     fire(h.sheet.opens[0].foot[0]);
     assert.equal(h.commits.length, 1);
     const added = h.commits[0].events.at(-1);
-    assert.equal(added.id, "ev-046");
+    assert.equal(added.id, "ev-007");
     assert.ok(!DATA.events.some((ev) => ev.id === added.id));
     assert.equal(h.commits[0].events.length, DATA.events.length + 1);
     // 元が無いので、フォームに無いキーは付かない
