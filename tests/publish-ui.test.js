@@ -998,15 +998,22 @@ test("content を欠いた呼び出しは、その場で名指しして投げる
   const base = { els: dom(), store: fakeStore(), sync: fakeSync(), getData: () => ({}), onAdopt: () => {} };
 
   assert.throws(() => createPublishUI({ ...base }), /content/);
-  assert.throws(() => createPublishUI({ ...base, content: { noun: "持ち物" } }), /validate/);
-  assert.throws(() => createPublishUI({ ...base, content: { validate: () => {} } }), /noun/);
+  // /validate/ / /noun/ だけだと、content 自体が無いときの文言
+  // 「content（validate と noun）が必要です」にも両方マッチしてしまい、
+  // どの分岐が投げたのかをこのアサーションが区別できない。フィールド名まで絞る
+  assert.throws(() => createPublishUI({ ...base, content: { noun: "持ち物" } }), /content\.validate/);
+  assert.throws(() => createPublishUI({ ...base, content: { validate: () => {} } }), /content\.noun/);
 });
 
-test("公開前の検証は注入された validate を使う（validateEvents を呼ばない）", () => {
+test("公開前の検証は注入された validate を使う（validateEvents を呼ばない）", async () => {
   let seen = null;
+  const els = dom();
+  // トークンを持たせないと公開ボタンが DOM に置かれず、クリックできない
+  // （renderControls が hasToken(store) で出し分ける。:579 と同じ形）
+  const store = createStore(memoryBackend({ "tp:gh-token": TOKEN }));
   const ui = createPublishUI({
-    els: dom(),
-    store: fakeStore(),
+    els,
+    store,
     sync: fakeSync(),
     // 旅程としては不正（days も events も無い）だが、持ち物としては正しい形
     getData: () => ({ members: { a: "雄一", b: "朱汰" }, groups: [] }),
@@ -1020,6 +1027,19 @@ test("公開前の検証は注入された validate を使う（validateEvents �
   });
   assert.ok(ui);
   assert.equal(seen, null, "組み立てただけで検証を走らせないこと");
+
+  // ここで実際に検証が走る。validateEvents が呼ばれていたら
+  // { members, groups } は旅程として弾かれ、「この内容では公開できません」が
+  // 状態欄に残る ── つまりこのクリックは「注入された validate が呼ばれる」と
+  // 「validateEvents は呼ばれない」の両方を同時に確かめる
+  await click(findButton(els.controls, "公開"));
+
+  assert.deepEqual(seen, { members: { a: "雄一", b: "朱汰" }, groups: [] });
+  assert.equal(
+    textOf(els.status).includes("この内容では公開できません"),
+    false,
+    "validateEvents に落ちて公開が止まっています"
+  );
 });
 
 test("messagesFor は noun を文言に通す", () => {
