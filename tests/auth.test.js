@@ -109,3 +109,19 @@ test("writeKeyMaterial / readKeyMaterial が往復する", () => {
   writeKeyMaterial(store, material);
   assert.deepEqual(readKeyMaterial(store), material);
 });
+
+test("形は正しいが base64 が壊れている値は loadCodec が null を返す", async () => {
+  const backend = fakeBackend();
+  // 形は正しい（3 つに分かれている、iter は数値）が、salt/key が base64 として壊れている
+  backend.setItem("tp:key", "!!!not-base64.600000.also-bad");
+  const store = createStore(backend);
+
+  // readKeyMaterial は形の検査だけなので、壊れた値でも返す
+  assert.equal(readKeyMaterial(store) !== null, true);
+
+  // hasKey は形が正しければ true を返す
+  assert.equal(hasKey(store), true);
+
+  // しかし loadCodec は null を返す（例外にしない）
+  assert.equal(await loadCodec(store), null);
+});

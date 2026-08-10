@@ -96,12 +96,21 @@ export async function unlock(store, passphrase, kdf) {
 /**
  * 保存済みの鍵から codec を組み立てる（無ければ null）。
  * PBKDF2 はここでは走らない。それが鍵をキャッシュしている理由。
+ *
+ * 形は正しいが base64 として壊れている値を扱うときも null を返す。
+ * readKeyMaterial は形しか検査していないので、fromBase64Bytes が例外を投げるかもしれない。
+ * store.js の read() が JSON.parse の失敗を既定値に落としているのと同じ形にする。
  */
 export async function loadCodec(store) {
   const material = readKeyMaterial(store);
   if (material === null) return null;
 
-  const salt = fromBase64Bytes(material.salt);
-  const key = await importKeyBytes(fromBase64Bytes(material.key));
-  return createCodec({ key, salt, iterations: material.iter });
+  try {
+    const salt = fromBase64Bytes(material.salt);
+    const key = await importKeyBytes(fromBase64Bytes(material.key));
+    return createCodec({ key, salt, iterations: material.iter });
+  } catch {
+    // base64 デコード失敗、または crypto 操作失敗 → null に落とす
+    return null;
+  }
 }
