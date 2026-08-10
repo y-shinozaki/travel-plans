@@ -167,7 +167,9 @@ function mount({ store, fetchImpl, path = PATH, reload = () => {} } = {}) {
       reload();
     },
   });
-  return { ui, els, reloadCalls, dom: () => [els.state, els.actions, els.form].map(textOf).join(" ") };
+  // status を含めること。合言葉が漏れるとしたら最も可能性が高いのがここ
+  // （利用者向けの失敗文言を書き込む場所）── B4 最終レビュー Important 3
+  return { ui, els, reloadCalls, dom: () => [els.state, els.actions, els.form, els.status].map(textOf).join(" ") };
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -287,6 +289,28 @@ test("2xx でも JSON として読めない本文なら鍵を保存しない", a
 });
 
 /* ══════════════════════════════════════════════════════════
+   保存領域に書けない端末（B4 最終レビュー Important 1）
+   ══════════════════════════════════════════════════════════ */
+
+test("保存領域に書けない端末では、実際に起きていることを言い、再試行は勧めない", async () => {
+  const backend = memoryBackend();
+  backend.setItem = () => {
+    throw new Error("QuotaExceededError");
+  };
+  const store = createStore(backend);
+  const envelope = await envelopeFor(PASSPHRASE, PLAIN_DATA);
+  const h = mount({ store, fetchImpl: fakeFetch(() => jsonResponse(200, envelope)) });
+
+  h.els.input.value = PASSPHRASE;
+  submit(h.els.form);
+  await waitForSubmitDone(h);
+
+  assert.equal(textOf(h.els.status), MESSAGES.cannotPersist);
+  assert.notEqual(textOf(h.els.status), MESSAGES.keyFailed, "書けないだけなのに「もう一度」を勧めています");
+  assert.equal(hasKey(store), false);
+});
+
+/* ══════════════════════════════════════════════════════════
    合言葉が DOM にも store にも例外文にも残らない
    ══════════════════════════════════════════════════════════ */
 
@@ -335,7 +359,7 @@ test("鍵があれば常に「入れ直す」ボタンが出る。hasKey に関�
   assert.equal(textOf(h.els.state), MESSAGES.stateSet);
   assert.equal(h.els.form.hidden, true, "鍵がある間は入力欄を開いたままにしない");
   const reenter = findButton(h.els.actions, MESSAGES.reenter);
-  assert.ok(reenter, "入れ直すボタんがありません");
+  assert.ok(reenter, "入れ直すボタンがありません");
 });
 
 test("「入れ直す」は 1 度目で身構え、2 度目で鍵を消して入力欄を開く", async () => {

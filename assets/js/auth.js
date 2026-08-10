@@ -81,7 +81,12 @@ export function kdfMatches(store, kdf) {
  */
 export async function unlock(store, passphrase, kdf) {
   const salt = kdf?.salt ? fromBase64Bytes(kdf.salt) : randomBytes(SALT_BYTES);
-  const iterations = kdf?.iter ?? ITERATIONS;
+  // kdf.iter はリモートの JSON から来る値で、書き込み権限を持つ端末からしか
+  // 変えられないため実害は低いが、上限を入れておく。上限が無いと
+  // 「iter: 1000000000」のような値が PBKDF2 に渡ってブラウザが固まる
+  // （B4 最終レビュー Minor 5）。600,000（ITERATIONS）を大きく超える値は
+  // 想定していないので、実用上困らない値として 1,000,000 に丸める
+  const iterations = Math.min(kdf?.iter ?? ITERATIONS, 1_000_000);
 
   const key = await deriveKey(passphrase, salt, iterations);
   writeKeyMaterial(store, {

@@ -544,6 +544,15 @@
   margin: 0;
 }
 
+/* .pubpanel の grid は直下の子（この form 自体）にしか効かない。form の中の
+   4 要素（ラベル・入力・状態文言・ボタン）を縦に並べるには、form 自身にも
+   同じ grid/gap を付ける必要がある。.pubpanel を form に付け直すと padding と
+   border が二重になるので、別クラスにしてある（B4 最終レビュー Minor 6）。 */
+.pubpanel__form {
+  display: grid;
+  gap: var(--s2);
+}
+
 /* 公開・取り込みの結果。tone で地色だけ変える */
 .pubstat {
   display: grid;

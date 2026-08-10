@@ -352,8 +352,16 @@ export function createSync({
       // days / events の側が壊れていて load() のリモート検証が投げる場合も、
       // 公開ボタンとトークン設定は画面に出る（schedule.js は publishUI を
       // load() より前に組み立てる）。readDraft() が検証を通った下書きを
-      // 返せば、この修正のあとはその下書きで実際に公開できる。手元に正しい
-      // 下書きが無い端末だけが、リポジトリへの git コミットに頼ることになる。
+      // 返せば、手元に正しい下書きを持つ端末に限り、その下書きで実際に公開できる。
+      // 手元に正しい下書きが無い端末だけが、リポジトリへの git コミットに頼ることになる。
+      //
+      // **この経路と outerStampMismatch は別物、混同しないこと。** ここは
+      // remoteMs が null（updatedAt 自体が読めない）の場合の話で、下の
+      // `remoteMs > baseMs` の分岐（outerStampMismatch が起こりうる側）とは
+      // 独立している。外側の updatedAt が読めて base より進んでいる場合は
+      // この if を素通りして下の分岐に入り 409 になる。readDraft() があっても
+      // その 409 は公開では直せない（唯一の逃げ道 adoptRemote() も validate で
+      // 落ちるため）。
       console.warn("sync: リモートの updatedAt が読めないため、公開前の突き合わせを省略します");
       return false;
     }

@@ -19,6 +19,7 @@
 import { el } from "./dom.js";
 import { hasKey, unlock, clearKey } from "./auth.js";
 import { isEnvelope, DecryptError } from "./crypto.js";
+import { StoreWriteError } from "./store.js";
 
 export const MESSAGES = {
   needPassphrase: "合言葉を入力してください。",
@@ -32,6 +33,13 @@ export const MESSAGES = {
     "旅程を持っている端末から公開し直してください。",
   fetchFailed: "最新の旅程データを取得できませんでした。通信を確認してもう一度お試しください。",
   keyFailed: "鍵を作れませんでした。もう一度お試しください。",
+  // store.writeText が StoreWriteError を投げた場合専用。keyFailed と違い
+  // 「もう一度」を含めない ── プライベートブラウズや Cookie ブロックが原因なら
+  // 何度やり直しても保存できず、再試行を勧めるのは利用者を無意味な繰り返しへ
+  // 誘導するだけ（B4 最終レビュー Important 1）
+  cannotPersist:
+    "この端末では鍵を保存できません（プライベートブラウズや Cookie のブロックが" +
+    "有効かもしれません）。通常のブラウザで開いてください。",
   stateSet: "状態: 設定済み",
   stateUnset: "状態: 未設定",
   reenter: "合言葉を入れ直す",
@@ -178,7 +186,11 @@ export function createAuthForm({ els, store, path, fetchImpl = fetch, reload = (
     } catch (error) {
       console.error("auth-form: 鍵を作れませんでした", error);
       clearKey(store);
-      els.status.textContent = MESSAGES.keyFailed;
+      // StoreWriteError は「保存領域に書けない」という別の失敗で、何度やり直しても
+      // 直らない。keyFailed の「もう一度お試しください」を出すと、保存領域に書けない
+      // 端末（プライベートブラウズ、Cookie ブロックなど）を無意味な再試行へ誘導し、
+      // B4 以前は読めていたはずのページから締め出してしまう
+      els.status.textContent = error instanceof StoreWriteError ? MESSAGES.cannotPersist : MESSAGES.keyFailed;
     } finally {
       // 合言葉を DOM に残さない。成功・失敗を問わず必ず空にする
       els.input.value = "";
