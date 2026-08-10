@@ -35,6 +35,7 @@ import {
 } from "./packing-data.js";
 import { renderProgress, renderTable } from "./packing-render.js";
 import { attachDrag } from "./packing-drag.js";
+import { itemFocusKey, groupFocusKey } from "./focus-key.js";
 
 /** どのデータの話かを 1 か所に持つ。sync / publish-ui / load-error の 3 つが読む。 */
 const SUBJECT = { noun: "持ち物リスト", path: "assets/data/packing.json" };
@@ -214,7 +215,7 @@ const handlers = {
         a: false,
         b: false,
       }),
-      `item:${id}:name`
+      itemFocusKey(id, "name")
     );
   },
   onDeleteItem: (itemId) => apply(withoutItem(state.data, itemId)),
@@ -253,7 +254,7 @@ function buildToolbar() {
         icon: "i-note",
         items: [],
       }),
-      `group:${id}:name`
+      groupFocusKey(id, "name")
     );
   });
 

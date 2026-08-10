@@ -11,8 +11,8 @@
  * 抱えたページ自身が描画するため（CLAUDE.md の規約）。
  *
  * すべての操作コントロール（↑↓・削除・名前とメモの入力欄・チェックボックス）に
- * `dataset.focusKey` を付ける。id から作る（`item:<itemId>:up` のように）── 位置から
- * 作ると、並べ替えたその瞬間に「動いた」という事実そのものでキーが変わってしまい、
+ * `dataset.focusKey` を付ける。`itemFocusKey()` / `groupFocusKey()`（focus-key.js）が
+ * id から作る ── 位置から作ると、並べ替えたその瞬間に「動いた」という事実そのものでキーが変わってしまい、
  * 何のためのキーか分からなくなる。packing.js の draw() が再描画のたびに
  * `document.activeElement` のこのキーを控え、描き直したあと同じキーを持つ要素へ
  * フォーカスを戻す（event-editor.js の focusEvent と同じ考え方 ── mount.replaceChildren()
@@ -22,33 +22,8 @@
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
 import { progressOf, PLACE_META, PLACE_KEYS } from "./packing-data.js";
-
-/** 文字は textContent、アイコンだけ定数の innerHTML。値は絶対に混ぜない。 */
-function iconButton(cls, iconId, label) {
-  const button = el("button", cls);
-  button.type = "button";
-  button.innerHTML = icon(iconId, "ico--sm");
-  button.setAttribute("aria-label", label);
-  button.title = label;
-  return button;
-}
-
-/** 1 度目で身構え、2 度目で実行するボタン。confirm() は使わない。 */
-function armedIconButton({ cls, armedCls, iconId, label, armedLabel, onConfirm }) {
-  const button = iconButton(cls, iconId, label);
-  let armed = false;
-  button.addEventListener("click", () => {
-    if (!armed) {
-      armed = true;
-      button.className = armedCls;
-      button.setAttribute("aria-label", armedLabel);
-      button.title = armedLabel;
-      return;
-    }
-    onConfirm();
-  });
-  return button;
-}
+import { itemFocusKey, groupFocusKey } from "./focus-key.js";
+import { iconButton, armedIconButton, CHECK_MARK } from "./row-controls.js";
 
 /**
  * 2 人分の進捗。達成数と細いバー（設計書 §7.3）。
@@ -79,19 +54,6 @@ export function renderProgress({ mount, data }) {
 }
 
 /**
- * チェックの印。**icon("i-check") を使わないこと。**
- *
- * controls.css の `.check__box svg path` が stroke-dashoffset を遷移させて
- * チェックを描くアニメーションを持っている。icon() が返すのは
- * `<svg><use href="#i-check"/></svg>` で、path はシャドウツリーの中に入るため
- * このセレクタが届かない ── チェックを入れても印が出ないボックスになる。
- * event-form.js:126 と aman-mock.html:2487 も同じ生の SVG を書いている。
- */
-const CHECK_MARK =
-  '<svg viewBox="0 0 24 24" aria-hidden="true">' +
-  '<path d="m4.5 12.6 5.2 5.2L19.5 6.6"/></svg>';
-
-/**
  * チェックボックス 1 つ。**編集モードでなくても押せる**
  * （チェックを付けるのは「編集」ではなく、このページの主目的そのもの）。
  *
@@ -108,7 +70,7 @@ function checkCell(item, member, memberName, onToggle) {
   input.type = "checkbox";
   input.checked = item[member] === true;
   input.setAttribute("aria-label", `${memberName}: ${item.name}`);
-  input.dataset.focusKey = `item:${item.id}:check:${member}`;
+  input.dataset.focusKey = itemFocusKey(item.id, `check:${member}`);
   input.addEventListener("change", () => onToggle?.(item.id, member, input.checked));
 
   const box = el("span", "check__box");
@@ -141,7 +103,7 @@ function itemBody(item, editing, onRename) {
   name.type = "text";
   name.value = item.name;
   name.setAttribute("aria-label", "項目名");
-  name.dataset.focusKey = `item:${item.id}:name`;
+  name.dataset.focusKey = itemFocusKey(item.id, "name");
   name.addEventListener("change", () => onRename?.(item.id, { name: name.value }));
 
   const note = document.createElement("input");
@@ -150,7 +112,7 @@ function itemBody(item, editing, onRename) {
   note.value = item.note ?? "";
   note.placeholder = "メモ";
   note.setAttribute("aria-label", "メモ");
-  note.dataset.focusKey = `item:${item.id}:note`;
+  note.dataset.focusKey = itemFocusKey(item.id, "note");
   note.addEventListener("change", () => onRename?.(item.id, { note: note.value }));
 
   body.appendChild(name);
@@ -176,7 +138,7 @@ function placeCell(item, editing, onSetPlace) {
 
   const select = document.createElement("select");
   select.className = "pkplace__pick";
-  select.dataset.focusKey = `item:${item.id}:place`;
+  select.dataset.focusKey = itemFocusKey(item.id, "place");
   select.setAttribute("aria-label", "入れる場所");
 
   const blank = document.createElement("option");
@@ -228,11 +190,11 @@ function itemRow(item, data, editing, handlers) {
     // ドラッグが使えない環境のために ↑↓ を常に併設する（設計書 §7.3）
     const up = iconButton("rowbtn", "i-arrow-right", "1 つ上へ");
     up.style.transform = "rotate(-90deg)";
-    up.dataset.focusKey = `item:${item.id}:up`;
+    up.dataset.focusKey = itemFocusKey(item.id, "up");
     up.addEventListener("click", () => handlers.onMoveItem?.(item.id, -1));
     const down = iconButton("rowbtn", "i-arrow-right", "1 つ下へ");
     down.style.transform = "rotate(90deg)";
-    down.dataset.focusKey = `item:${item.id}:down`;
+    down.dataset.focusKey = itemFocusKey(item.id, "down");
     down.addEventListener("click", () => handlers.onMoveItem?.(item.id, +1));
     acts.appendChild(up);
     acts.appendChild(down);
@@ -244,7 +206,7 @@ function itemRow(item, data, editing, handlers) {
       armedLabel: "もう一度で削除",
       onConfirm: () => handlers.onDeleteItem?.(item.id),
     });
-    del.dataset.focusKey = `item:${item.id}:del`;
+    del.dataset.focusKey = itemFocusKey(item.id, "del");
     acts.appendChild(del);
     row.appendChild(acts);
   }
@@ -270,7 +232,7 @@ function groupBlock(group, data, editing, handlers) {
     name.type = "text";
     name.value = group.name;
     name.setAttribute("aria-label", "区分名");
-    name.dataset.focusKey = `group:${group.id}:name`;
+    name.dataset.focusKey = groupFocusKey(group.id, "name");
     name.addEventListener("change", () =>
       handlers.onRenameGroup?.(group.id, { name: name.value })
     );
@@ -286,11 +248,11 @@ function groupBlock(group, data, editing, handlers) {
     const acts = el("div", "pkgroup__acts");
     const up = iconButton("rowbtn", "i-arrow-right", "この区分を 1 つ上へ");
     up.style.transform = "rotate(-90deg)";
-    up.dataset.focusKey = `group:${group.id}:up`;
+    up.dataset.focusKey = groupFocusKey(group.id, "up");
     up.addEventListener("click", () => handlers.onMoveGroup?.(group.id, -1));
     const down = iconButton("rowbtn", "i-arrow-right", "この区分を 1 つ下へ");
     down.style.transform = "rotate(90deg)";
-    down.dataset.focusKey = `group:${group.id}:down`;
+    down.dataset.focusKey = groupFocusKey(group.id, "down");
     down.addEventListener("click", () => handlers.onMoveGroup?.(group.id, +1));
     acts.appendChild(up);
     acts.appendChild(down);
@@ -303,7 +265,7 @@ function groupBlock(group, data, editing, handlers) {
       armedLabel: `もう一度で ${group.items.length} 件ごと削除`,
       onConfirm: () => handlers.onDeleteGroup?.(group.id),
     });
-    del.dataset.focusKey = `group:${group.id}:del`;
+    del.dataset.focusKey = groupFocusKey(group.id, "del");
     acts.appendChild(del);
     head.appendChild(acts);
   }
@@ -323,7 +285,7 @@ function groupBlock(group, data, editing, handlers) {
     add.type = "button";
     add.innerHTML = icon("i-plus", "ico--sm");
     add.appendChild(el("span", null, "項目を追加"));
-    add.dataset.focusKey = `group:${group.id}:add`;
+    add.dataset.focusKey = groupFocusKey(group.id, "add");
     add.addEventListener("click", () => handlers.onAddItem?.(group.id));
     block.appendChild(add);
   }
