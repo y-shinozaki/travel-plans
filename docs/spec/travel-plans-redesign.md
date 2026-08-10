@@ -56,7 +56,7 @@ B4 で完了した** ── 消すと `nav.js` のページ一覧、`tests/csp.t
 ```
 travel-plans/
 ├── index.html / schedule.html / packing.html / souvenirs.html
-│                           （souvenirs 以外は実装済み。archive.html は取りやめ、
+│                           （4 ページとも実装済み。archive.html は取りやめ、
 │                             実ファイルも B4 で削除した）
 ├── assets/
 │   ├── css/
@@ -97,8 +97,14 @@ travel-plans/
 │   │   ├── crypto.js       PBKDF2 / AES-GCM。同期する JSON 全部の暗号化と復号 [B4]
 │   │   ├── packing.js      packing.html のエントリポイント               [B2]
 │   │   ├── souvenirs.js    souvenirs.html のエントリポイント             [B5]
-│   │   ├── page-notice.js  createNotices() / createSafeDraw()。3 ページが
+│   │   ├── page-notice.js  createNotices() / createDrawLoop()。3 ページが
 │   │   │                   共有する「失敗を画面に出す」経路（§13）        [B5]
+│   │   ├── focus-key.js    itemFocusKey() / groupFocusKey() /
+│   │   │                   souvenirFocusKey()。フォーカスキーの書式を
+│   │   │                   組み立てる側と参照する側の両方が呼ぶ場所（§13） [B5]
+│   │   ├── row-controls.js iconButton() / armedIconButton() / CHECK_MARK。
+│   │   │                   一覧行のコントロールを packing と souvenirs が
+│   │   │                   共有する部品                                 [B5]
 │   │   └── comments.js     汎用コメント（対象キー → 本文）               [B3]
 │   ├── data/
 │   │   ├── events.json     旅程（公開対象・リモートが正）
