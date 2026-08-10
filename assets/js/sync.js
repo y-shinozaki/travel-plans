@@ -6,7 +6,9 @@
  * トークンを持たない端末が旅程を開けなくなるため。
  *
  * store と fetchImpl と now を注入するのは、この層のテストを Node で全部通すため。
- * config を引数に取るのは、owner / repo / branch / path をここ 1 か所にまとめるため。
+ * config を引数に取るのは、owner / repo / branch / path に加えて draftKey / baseKey /
+ * validate / commitMessage / codec もここ 1 か所にまとめるため（Phase B4 で追加。
+ * 2 つ目の JSON を同期させるための注入口。詳しくは DEFAULT_CONFIG のコメント）。
  *
  * 設計書 §5.1〜§5.3 に対応。
  */
@@ -15,35 +17,42 @@ import { decideSync, toTime } from "./sync-decide.js";
 import { createGitHub, GitHubError, CONFLICT_MESSAGE } from "./github.js";
 import { validateEvents } from "./validate.js";
 import { readToken } from "./token.js";
-
-/** 下書き本体。 */
-const DRAFT_KEY = "events";
-/**
- * 最後に「リモートと揃えた」時刻。未公開の変更があるかの基準になる。
- *
- * 時刻は公開した端末の時計で押される。押す端末が複数あるので、順序関係は
- * 保たれない ── A の時計が 10 分遅れていれば、A があとから公開した版の
- * updatedAt は B の版より古くなり、こちらの base（B の版を取り込んだ時刻）を
- * 下回る。突き合わせは「進んでいない」と判断し、A の公開を黙って上書きする。
- *
- * 免疫を付けるには内容のハッシュか sha が要るが、読み込みはトークン無しの
- * 素の fetch なので sha が手に入らない（設計書 §13 の残存リスク）。
- * 上書きしてもコミットは git 履歴に残るので、復旧はできる。
- */
-const BASE_KEY = "events-base";
+import { passthroughCodec, DecryptError } from "./crypto.js";
 
 /**
- * 公開先。ここ以外に owner / repo / branch / path を書かないこと。
+ * 公開先と、ファイルごとに違う 5 つ。ここ以外に owner / repo / branch / path を書かないこと。
  *
  * path は 2 つの意味を兼ねている: 読み込みでは「ページからの相対 URL」、
  * Contents API では「リポジトリのルートからのパス」。今はページがリポジトリ直下に
  * 置かれているので一致している。ページをサブディレクトリへ移すなら分けること。
+ *
+ * draftKey / baseKey / validate / commitMessage / codec は 2 つ目の JSON
+ * （packing.json、comments.json）のために外へ出してある。**5 つは必ず揃えて渡すこと。**
+ * 一部だけを差し替えると、その JSON が自分の検証を通ったうえで
+ * store.write(draftKey, …) が旅程の既定キーへ書き、旅程の未公開の編集が
+ * その瞬間に消える（設計書 §13）。
+ *
+ * baseKey に入る時刻は公開した端末の時計で押される。押す端末が複数あるので、
+ * 順序関係は保たれない ── A の時計が 10 分遅れていれば、A があとから公開した版の
+ * updatedAt は B の版より古くなり、こちらの base（B の版を取り込んだ時刻）を
+ * 下回る。突き合わせは「進んでいない」と判断し、A の公開を黙って上書きする。
+ * 免疫を付けるには内容のハッシュか sha が要るが、読み込みはトークン無しの
+ * 素の fetch なので sha が手に入らない（設計書 §13 の残存リスク）。
+ * 上書きしてもコミットは git 履歴に残るので、復旧はできる。
  */
 export const DEFAULT_CONFIG = {
   owner: "y-shinozaki",
   repo: "travel-plans",
   branch: "main",
   path: "assets/data/events.json",
+  draftKey: "events",
+  baseKey: "events-base",
+  validate: validateEvents,
+  commitMessage: (data) => {
+    const count = data.events.length;
+    return `Update itinerary from the browser (${count} event${count === 1 ? "" : "s"})`;
+  },
+  codec: passthroughCodec,
 };
 
 /**
@@ -64,9 +73,12 @@ const stampOf = (data) => (typeof data?.updatedAt === "string" ? data.updatedAt 
 export function createSync({
   store,
   fetchImpl = fetch,
-  config = DEFAULT_CONFIG,
+  config = {},
   now = () => Date.now(),
 }) {
+  // 部分的な config でも owner / repo などの既定が落ちないよう、必ずスプレッドで重ねる。
+  const cfg = { ...DEFAULT_CONFIG, ...config };
+  const { draftKey, baseKey, validate, commitMessage, codec } = cfg;
   const nowIso = () => new Date(now()).toISOString();
 
   /**
@@ -79,7 +91,7 @@ export function createSync({
     let response;
     try {
       // 公開直後に古い応答を掴むと「公開したのに反映されない」に見えるため no-store
-      response = await fetchImpl(config.path, { cache: "no-store" });
+      response = await fetchImpl(cfg.path, { cache: "no-store" });
     } catch (error) {
       throw new Error("最新の旅程データを取得できませんでした（通信に失敗しました）", {
         cause: error,
@@ -96,6 +108,17 @@ export function createSync({
   }
 
   /**
+   * 取ってきた本文を復号する。平文（ct を持たない値）は素通しする ──
+   * 切り替え当日にこの経路を 1 回だけ通る（設計書 §6.5）。
+   *
+   * DecryptError は握らずに投げる。「合言葉が違う」「壊れている」は
+   * 直し方が違うので、呼び出し側が reason を見て文言を分ける（設計書 §9）。
+   */
+  async function fetchAndDecode() {
+    return codec.decode(await fetchRemote());
+  }
+
+  /**
    * 取り込みを書き込む。下書き → base の順で書く。
    *
    * 逆にすると、base だけ書けて下書きが書けなかったとき（容量超過など）に
@@ -103,8 +126,8 @@ export function createSync({
    * この順なら最悪でも次回に「新しい版があります」が出るだけで済む。
    */
   function storeAdopted(data) {
-    store.write(DRAFT_KEY, data);
-    store.write(BASE_KEY, stampOf(data));
+    store.write(draftKey, data);
+    store.write(baseKey, stampOf(data));
   }
 
   /**
@@ -113,8 +136,8 @@ export function createSync({
    * 返す source は decideSync の判断そのまま。画面の分岐は Task 9 側で行う。
    */
   async function load() {
-    const stored = store.read(DRAFT_KEY, null);
-    const baseUpdatedAt = store.read(BASE_KEY, null);
+    const stored = store.read(draftKey, null);
+    const baseUpdatedAt = store.read(baseKey, null);
 
     // 下書きも検証する。壊れたリモートを画面に出さないのに壊れた下書きは出す、
     // では筋が通らない。旅行の日数を減らせば、他の端末に残っている下書きは
@@ -128,7 +151,7 @@ export function createSync({
     let draftRejected = false;
     if (draft !== null) {
       try {
-        validateEvents(draft);
+        validate(draft);
       } catch (error) {
         console.warn("sync: 手元の下書きが旅程の形になっていないため使いません", error);
         draft = null;
@@ -142,18 +165,24 @@ export function createSync({
     let remote = null;
     let remoteOk = false;
     let fetchError = null;
+    let outerStampMismatch = false;
     try {
-      remote = await fetchRemote();
+      const decoded = await fetchAndDecode();
+      remote = decoded.data;
+      outerStampMismatch = decoded.outerStampMismatch;
       remoteOk = true;
     } catch (error) {
-      // 取りに行けなかっただけ。手元のデータで動作を続ける（設計書 §5.2）
+      // 取りに行けなかっただけ。手元のデータで動作を続ける（設計書 §5.2）。
+      // ただし復号の失敗は別物 ── リモートは取れていて中身が読めないので、
+      // 「オフラインです」と言うのは嘘になる。そのまま投げて呼び出し側に見せる
+      if (error instanceof DecryptError) throw error;
       fetchError = error;
       console.warn("sync: 最新の旅程データを確認できませんでした", error);
     }
 
     // 検証は「見せるより前」。壊れたリモートを黙って画面に出さない。
     // ここで投げても store には触っていないので、手元の下書きは残る。
-    if (remoteOk) validateEvents(remote);
+    if (remoteOk) validate(remote);
 
     const source = decideSync({
       remoteUpdatedAt: remoteOk ? (stampOf(remote) ?? UNCOMPARABLE) : null,
@@ -175,12 +204,14 @@ export function createSync({
           console.warn("sync: 取り込んだ内容を保存できませんでした", error);
         }
       }
-      return { data: remote, source, remoteUpdatedAt: stampOf(remote) };
+      return { data: remote, source, remoteUpdatedAt: stampOf(remote), outerStampMismatch };
     }
 
     // remote-is-newer でもリモートでは上書きしない。手元を見せたまま、
     // 取り込むかどうかを利用者に選ばせる（設計書 §5.2）
-    if (hasLocal) return { data: draft, source, remoteUpdatedAt: stampOf(remote) };
+    if (hasLocal) {
+      return { data: draft, source, remoteUpdatedAt: stampOf(remote), outerStampMismatch };
+    }
 
     // ここに来るのは remoteOk が false のときだけ（リモートが取れていれば
     // 使える下書きが無い時点で decideSync は use-remote を返す）。つまり fetchError がある。
@@ -209,9 +240,9 @@ export function createSync({
    * 下書きが無ければ false。公開するものが無い。
    */
   function hasUnpublishedChanges() {
-    const draft = store.read(DRAFT_KEY, null);
+    const draft = store.read(draftKey, null);
     if (!isPlainObject(draft)) return false;
-    return stampOf(draft) !== store.read(BASE_KEY, null);
+    return stampOf(draft) !== store.read(baseKey, null);
   }
 
   /**
@@ -222,9 +253,9 @@ export function createSync({
    * 「保存はできたが次の読み込みでページが起動しない」データが手元に残る。
    */
   function saveLocal(data) {
-    validateEvents(data);
+    validate(data);
     const stamped = { ...data, updatedAt: nowIso() };
-    store.write(DRAFT_KEY, stamped);
+    store.write(draftKey, stamped);
     return stamped;
   }
 
@@ -233,7 +264,8 @@ export function createSync({
    * 失敗は投げる。押したのに何も起きないのが一番困る。
    */
   async function adoptRemote() {
-    const remote = validateEvents(await fetchRemote());
+    const { data } = await fetchAndDecode();
+    const remote = validate(data);
     storeAdopted(remote);
     return remote;
   }
@@ -282,7 +314,7 @@ export function createSync({
     }
 
     // base が無い ＝ このリモートを取り込んだ証拠がない。上書きしてよい根拠もない
-    const baseMs = toTime(store.read(BASE_KEY, null));
+    const baseMs = toTime(store.read(baseKey, null));
     if (baseMs === null || remoteMs > baseMs) {
       throw new GitHubError(409, CONFLICT_MESSAGE);
     }
@@ -306,23 +338,34 @@ export function createSync({
    *   （assertRemoteNotAhead を参照）。画面に出すこと。
    */
   async function publish(data) {
-    validateEvents(data);
+    validate(data);
 
-    // トークンは公開のたびに読む。createSync のあとに設定しても効くように
-    const gh = createGitHub({ ...config, token: readToken(store), fetchImpl });
+    // トークンは公開のたびに読む。createSync のあとに設定しても効くように。
+    // cfg をスプレッドで丸ごと渡さないのは、codec / validate などが
+    // GitHub 層へ漏れないようにするため（あちらは owner / repo / branch / token /
+    // fetchImpl しか知らなくてよい）
+    const gh = createGitHub({
+      owner: cfg.owner,
+      repo: cfg.repo,
+      branch: cfg.branch,
+      token: readToken(store),
+      fetchImpl,
+    });
 
     const stamped = { ...data, updatedAt: nowIso() };
-    const text = `${JSON.stringify(stamped, null, 2)}\n`;
-    const count = stamped.events.length;
-    const message = `Update itinerary from the browser (${count} event${count === 1 ? "" : "s"})`;
+    // 暗号化は検証のあと。壊れたものを暗号文にすると、誰も中身を確かめられなくなる
+    const envelope = await codec.encode(stamped);
+    const text = `${JSON.stringify(envelope, null, 2)}\n`;
+    const message = commitMessage(stamped);
 
-    const current = await gh.getFile(config.path);
-    // 送る前に突き合わせる。ここで投げれば PUT は一度も飛ばない
+    const current = await gh.getFile(cfg.path);
+    // 送る前に突き合わせる。ここで投げれば PUT は一度も飛ばない。
+    // 読むのは封筒の外側の updatedAt なので、暗号化しても無改造で効く（設計書 §6.2）
     const conflictChecked = assertRemoteNotAhead(current);
 
     // ファイルがまだ無ければ sha なしで作成する（getFile は 404 で null を返す）
     const { commitUrl } = await gh.putFile({
-      path: config.path,
+      path: cfg.path,
       text,
       sha: current?.sha,
       message,

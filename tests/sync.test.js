@@ -7,6 +7,7 @@ import { createStore, StoreWriteError } from "../assets/js/store.js";
 import { EventDataError } from "../assets/js/validate.js";
 import { GitHubError } from "../assets/js/github.js";
 import { toBase64Utf8, fromBase64Utf8 } from "../assets/js/base64.js";
+import { deriveKey, createCodec, SALT_BYTES, DecryptError } from "../assets/js/crypto.js";
 
 /**
  * store は memoryBackend を差した本物の createStore を使う。
@@ -746,4 +747,245 @@ test("adoptRemote() は取得に失敗したら例外にし、下書きを消さ
 
   await assert.rejects(() => sync.adoptRemote(), /取得できません/);
   assert.deepEqual(JSON.parse(raw(DRAFT_KEY)), draft);
+});
+
+// ------------------------------------------------- sync: B4 の注入口（5 つ）
+
+/**
+ * days は validateEvents が中身（date / dow）まで見るので、B4 専用の
+ * イベントデータも既存の DAYS と同じ形にする（["8/12", ...] のような文字列配列は
+ * checkDays に「オブジェクトではない」と弾かれる）。
+ */
+const B4_DATA = {
+  updatedAt: "2026-08-10T00:00:00.000Z",
+  days: DAYS,
+  events: [
+    {
+      id: "ev-1",
+      cat: "cat-move",
+      title: "出国",
+      allDay: false,
+      startDay: 0,
+      endDay: 0,
+      start: 10,
+      end: 12,
+      location: "羽田",
+      lat: 35.55,
+      lng: 139.78,
+      url: "",
+      notes: "",
+      image: "",
+      imagePos: "",
+    },
+  ],
+};
+
+async function b4Codec() {
+  const salt = new Uint8Array(SALT_BYTES).fill(2);
+  const key = await deriveKey("ひみつの合言葉", salt, 1000);
+  return createCodec({ key, salt, iterations: 1000 });
+}
+
+/**
+ * fetch と GitHub API の最小スタブ。text には現在の本文（リモートの生 JSON 文字列）が
+ * 入り、PUT のたびに書き換わる。puts には送られた PUT の本文（base64 化前）を積む。
+ *
+ * btoa(unescape(...)) / atob 経由の手書きデコードは使わず、このリポジトリの
+ * base64.js（toBase64Utf8 / fromBase64Utf8）をそのまま使う ── unescape / escape は
+ * deprecated な global で、同じ変換をこのプロジェクトのやり方でも書けるため。
+ */
+function fakeRemote(initialText) {
+  const state = { text: initialText, puts: [] };
+  const fetchImpl = async (url, options = {}) => {
+    if (String(url).startsWith("https://api.github.com")) {
+      if ((options.method ?? "GET") === "GET") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ sha: "sha-1", content: toBase64Utf8(state.text) }),
+        };
+      }
+      const body = JSON.parse(options.body);
+      state.puts.push(body);
+      state.text = fromBase64Utf8(body.content);
+      return {
+        ok: true,
+        status: 200,
+        // putFile は content.sha と commit.html_url の両方が無いと
+        // 「予期しない応答」として弾く（github.js 参照）
+        json: async () => ({
+          content: { sha: "put-sha" },
+          commit: { html_url: "https://example/commit" },
+        }),
+      };
+    }
+    return { ok: true, status: 200, json: async () => JSON.parse(state.text) };
+  };
+  return { state, fetchImpl };
+}
+
+test("codec を注入すると封筒を PUT し、読むときは復号する", async () => {
+  const codec = await b4Codec();
+  const store = createStore(memoryBackend());
+  const { state, fetchImpl } = fakeRemote(JSON.stringify(B4_DATA));
+
+  const sync = createSync({
+    store,
+    fetchImpl,
+    config: { ...DEFAULT_CONFIG, codec },
+  });
+
+  writeToken(store, "ghp_test");
+  const loaded = await sync.load();
+  assert.deepEqual(loaded.data.events, B4_DATA.events); // 平文リモートを素通しで読めた
+
+  await sync.publish(loaded.data);
+
+  const published = JSON.parse(state.text);
+  assert.equal(typeof published.ct, "string"); // 封筒になった
+  assert.ok(!state.text.includes("出国")); // 行き先が出ていない
+  assert.equal(typeof published.updatedAt, "string"); // 外側の updatedAt は残る
+});
+
+test("封筒になったリモートを次の起動で読める", async () => {
+  const codec = await b4Codec();
+  const envelope = await codec.encode(B4_DATA);
+  const { fetchImpl } = fakeRemote(JSON.stringify(envelope));
+
+  const sync = createSync({
+    store: createStore(memoryBackend()),
+    fetchImpl,
+    config: { ...DEFAULT_CONFIG, codec },
+  });
+
+  const loaded = await sync.load();
+  assert.deepEqual(loaded.data.events, B4_DATA.events);
+  assert.equal(loaded.outerStampMismatch, false);
+});
+
+test("外側の updatedAt が書き換えられていれば load が知らせる", async () => {
+  const codec = await b4Codec();
+  const envelope = await codec.encode(B4_DATA);
+  const { fetchImpl } = fakeRemote(
+    JSON.stringify({ ...envelope, updatedAt: "2030-01-01T00:00:00.000Z" })
+  );
+
+  const sync = createSync({
+    store: createStore(memoryBackend()),
+    fetchImpl,
+    config: { ...DEFAULT_CONFIG, codec },
+  });
+
+  const loaded = await sync.load();
+  assert.equal(loaded.outerStampMismatch, true);
+  assert.equal(loaded.data.updatedAt, B4_DATA.updatedAt); // 内側が正
+});
+
+test("復号できないリモートは DecryptError のまま投げる（握らない）", async () => {
+  const mine = await b4Codec();
+  const otherSalt = new Uint8Array(SALT_BYTES).fill(8);
+  const other = createCodec({
+    key: await deriveKey("違う合言葉", otherSalt, 1000),
+    salt: otherSalt,
+    iterations: 1000,
+  });
+  const { fetchImpl } = fakeRemote(JSON.stringify(await other.encode(B4_DATA)));
+
+  const sync = createSync({
+    store: createStore(memoryBackend()),
+    fetchImpl,
+    config: { ...DEFAULT_CONFIG, codec: mine },
+  });
+
+  await assert.rejects(
+    () => sync.load(),
+    (e) => e instanceof DecryptError && e.reason === "wrong-key"
+  );
+});
+
+test("突き合わせは封筒の外側の updatedAt で効く", async () => {
+  const codec = await b4Codec();
+  const store = createStore(memoryBackend());
+  const { state, fetchImpl } = fakeRemote(JSON.stringify(await codec.encode(B4_DATA)));
+
+  const sync = createSync({ store, fetchImpl, config: { ...DEFAULT_CONFIG, codec } });
+  writeToken(store, "ghp_test");
+  await sync.load();
+
+  // 別端末が先に公開した状況を作る（外側の updatedAt だけ進める）
+  const ahead = { ...JSON.parse(state.text), updatedAt: "2031-01-01T00:00:00.000Z" };
+  state.text = JSON.stringify(ahead);
+
+  await assert.rejects(() => sync.publish(B4_DATA), (e) => e.status === 409);
+  assert.equal(state.puts.length, 0); // PUT は飛んでいない
+});
+
+test("draftKey / baseKey を差し替えると別のキーに書く", async () => {
+  const backend = memoryBackend();
+  const store = createStore(backend);
+  const { fetchImpl } = fakeRemote(JSON.stringify(B4_DATA));
+
+  const sync = createSync({
+    store,
+    fetchImpl,
+    config: { ...DEFAULT_CONFIG, draftKey: "packing", baseKey: "packing-base" },
+  });
+  await sync.load();
+
+  const dump = backend._dump();
+  assert.ok("tp:packing" in dump);
+  assert.ok("tp:packing-base" in dump);
+  assert.ok(!("tp:events" in dump)); // 旅程の下書きを踏まない
+  assert.ok(!("tp:events-base" in dump));
+});
+
+test("validate を差し替えると旅程以外も通せる", async () => {
+  const packing = { updatedAt: "2026-08-10T00:00:00.000Z", groups: [] };
+  const { fetchImpl } = fakeRemote(JSON.stringify(packing));
+
+  const sync = createSync({
+    store: createStore(memoryBackend()),
+    fetchImpl,
+    config: {
+      ...DEFAULT_CONFIG,
+      draftKey: "packing",
+      baseKey: "packing-base",
+      validate: (data) => data, // 持ち物用の検証器の代わり
+      commitMessage: () => "Update packing from the browser",
+    },
+  });
+
+  const loaded = await sync.load();
+  assert.deepEqual(loaded.data, packing);
+});
+
+test("commitMessage を差し替えるとコミット文が変わる", async () => {
+  const store = createStore(memoryBackend());
+  const { state, fetchImpl } = fakeRemote(JSON.stringify(B4_DATA));
+  const sync = createSync({
+    store,
+    fetchImpl,
+    config: { ...DEFAULT_CONFIG, commitMessage: () => "Custom message" },
+  });
+  writeToken(store, "ghp_test");
+  await sync.load();
+  await sync.publish(B4_DATA);
+  assert.equal(state.puts.at(-1).message, "Custom message");
+});
+
+test("既定値は B1 の挙動と完全に一致する（平文・events キー・従来の文言）", async () => {
+  const backend = memoryBackend();
+  const store = createStore(backend);
+  const { state, fetchImpl } = fakeRemote(JSON.stringify(B4_DATA));
+
+  const sync = createSync({ store, fetchImpl }); // config を渡さない
+  writeToken(store, "ghp_test");
+  await sync.load();
+  await sync.publish(B4_DATA);
+
+  const dump = backend._dump();
+  assert.ok("tp:events" in dump);
+  assert.ok("tp:events-base" in dump);
+  assert.equal(state.puts.at(-1).message, "Update itinerary from the browser (1 event)");
+  assert.equal(JSON.parse(state.text).ct, undefined); // 平文のまま
 });
