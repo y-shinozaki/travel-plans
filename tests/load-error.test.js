@@ -21,7 +21,11 @@ test("合言葉違いは再入力へ導く", () => {
 test("壊れた暗号文は合言葉のせいにしない", () => {
   const { kind, message } = classifyLoadError(new DecryptError("corrupt", "データが壊れています"));
   assert.equal(kind, "corrupt");
-  assert.ok(!message.includes("合言葉が違います"));
+  // "合言葉が違います" という文字列は load-error.js のどの分岐にも存在しないので、
+  // それを検査しても corrupt が wrong-key の文言に退行したことを検出できない。
+  // corrupt 分岐にしか出ない文言（公開し直す案内）で見分ける
+  assert.ok(message.includes("公開し直してください"));
+  assert.ok(!message.includes("index.html"));
 });
 
 test("形式が壊れた暗号文も corrupt 扱いで案内する", () => {
@@ -46,6 +50,17 @@ test("それ以外は種類と文言をそのまま見せる", () => {
   assert.equal(kind, "unknown");
   assert.ok(message.includes("TypeError"));
   assert.ok(message.includes("boom"));
+});
+
+test("null や undefined も unknown 扱いで、例外を投げずに文言を出す", () => {
+  for (const value of [null, undefined]) {
+    const { kind, message } = classifyLoadError(value);
+    assert.equal(kind, "unknown");
+    // error?.name ?? "Error" / error?.message ?? String(error) の分岐を固定する。
+    // null は String(null) === "null"、undefined は String(undefined) === "undefined"
+    assert.ok(message.includes("Error"));
+    assert.ok(message.includes(String(value)));
+  }
 });
 
 test("どの分類でも合言葉や鍵の中身は文言に載らない", () => {

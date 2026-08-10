@@ -13,6 +13,7 @@ import { createEventEditor } from "./event-editor.js";
 import { createPublishUI } from "./publish-ui.js";
 import { classifyLoadError, DataFetchError, DataParseError } from "./load-error.js";
 import { hasKey, loadCodec, clearKey } from "./auth.js";
+import { DecryptError } from "./crypto.js";
 
 /**
  * data が正で、days / events はその一部を指すだけの控え。
@@ -113,6 +114,11 @@ function safeDraw(context) {
  * カレンダーの上に出す一行の通知。message が null なら消す。
  * カレンダー本体（els.cal）を潰さないので、再描画に失敗しても
  * 直前まで見えていた内容はそのまま残る。
+ *
+ * safeDraw が成功のたびに setNotice(null) で消す ── 表示時間帯の変更などの
+ * 操作が「直った」ことを伝えるための一時的な通知だから。次に出す
+ * outerStampMismatch の警告は性質が違う（操作の成否とは無関係に、公開し直す
+ * まで出続けるべき）ので、同じ要素を共有せず setStampNotice を別に持つ。
  */
 let noticeEl = null;
 function setNotice(message) {
@@ -125,6 +131,30 @@ function setNotice(message) {
   }
   noticeEl.textContent = message ?? "";
   noticeEl.hidden = !message;
+}
+
+/**
+ * 封筒の外側の updatedAt と中身が食い違っていたときの警告（outerStampMismatch）。
+ *
+ * setNotice とは別の要素にする。safeDraw は再描画に成功するたびに
+ * setNotice(null) を呼ぶので、同じ要素を使うと表示時間帯を変える・予定を
+ * 保存するといった最初の操作でこの警告が黙って消える。GCM の認証タグの外に
+ * ある値の食い違いは操作の成否とは無関係な事実なので、次に公開して
+ * 外側が正しい値に上書きされるまで出続けるべきもの ── ここでは message に
+ * null 以外を渡す呼び出しが 1 か所（load 直後）しかなく、setStampNotice(null)
+ * を呼ぶ場所を作っていないのはそのため（消す理由がまだ無い）。
+ */
+let stampNoticeEl = null;
+function setStampNotice(message) {
+  if (!message && !stampNoticeEl) return;
+  if (!stampNoticeEl) {
+    stampNoticeEl = document.createElement("p");
+    stampNoticeEl.className = "ferror";
+    stampNoticeEl.setAttribute("role", "status");
+    els.cal.parentNode.insertBefore(stampNoticeEl, els.cal);
+  }
+  stampNoticeEl.textContent = message ?? "";
+  stampNoticeEl.hidden = !message;
 }
 
 function fillHourOptions(select, { min, max }, selected) {
@@ -300,7 +330,7 @@ async function main() {
     // 直し方がそれぞれ違う。案内を出し分けられるよう、ここで種別を付け直す
     // （JSON の解釈失敗だけは cause が SyntaxError になる）。
     if (error instanceof EventDataError) throw error;
-    if (error?.name === "DecryptError") throw error;
+    if (error instanceof DecryptError) throw error;
     if (error?.cause instanceof SyntaxError) throw new DataParseError(error.message, error.cause);
     throw new DataFetchError(error?.message ?? String(error));
   }
@@ -308,8 +338,10 @@ async function main() {
 
   if (loaded.outerStampMismatch) {
     // 封筒の外側は認証されないので、改竄も破損も GCM は気付かない。
-    // 内側を正として表示しているが、黙って直すと誰も気付かないまま進む
-    setNotice(
+    // 内側を正として表示しているが、黙って直すと誰も気付かないまま進む。
+    // setNotice ではなく setStampNotice を使う ── safeDraw の setNotice(null) で
+    // 最初の操作のあと消えてしまわないように（上のコメント参照）
+    setStampNotice(
       "リモートのファイルの更新時刻が中身と食い違っています。" +
         "中身の時刻を正として表示しています。公開し直すと揃います。"
     );

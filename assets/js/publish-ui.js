@@ -530,14 +530,12 @@ export function createPublishUI({ els, store, sync, getData, onAdopt }) {
    * 進んでいない」であって編集の有無ではなく、一度も編集していない端末でも
    * 2 回目の読み込みから use-local になる。ストアに聞けば、リモートを
    * 見ていない offline でも同じ精度で答えが出る。
+   *
+   * ここが持つのは source に依存する同期バーの出し分けだけ。パネル・状態・
+   * 公開ボタンの DOM への挿入は createPublishUI() 本体の末尾で済ませてあり、
+   * ここでは待たない（下のコメント参照）。
    */
   function start(source) {
-    buildPanel();
-    setPanelOpen(false);
-    clearStatus();
-    refreshDirty();
-    renderControls();
-
     if (source === "remote-is-newer") {
       const adopt = armedButton({
         cls: "tbtn",
@@ -565,6 +563,19 @@ export function createPublishUI({ els, store, sync, getData, onAdopt }) {
 
     hideBar();
   }
+
+  // ここまでで DOM への挿入を終える。**start() まで待たないこと。**
+  // これらが読むのは store だけで（refreshDirty → sync.hasUnpublishedChanges() は
+  // localStorage を見る、getData はクリックされるまで呼ばれない）、旅程データを
+  // 必要としない。start() に残すと、load() が投げた端末では replaceChildren が
+  // 一度も走らず、公開ボタンもトークン設定も DOM に現れない ──
+  // events.json の手編集を廃止した以上、それは復旧手段がゼロになるということ
+  // （レビューで見つかった Critical、Task 5）。
+  buildPanel();
+  setPanelOpen(false);
+  clearStatus();
+  refreshDirty();
+  renderControls();
 
   return {
     start,
