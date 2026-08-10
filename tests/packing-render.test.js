@@ -27,6 +27,13 @@ function stubDocument() {
       style: {},
       attrs: {},
       listeners: {},
+      // NOTE (review finding, not a defect today): unlike a real DOM, this setter
+      // does not clear `.children`. Every innerHTML assignment in packing-render.js
+      // happens *before* any appendChild on the same node, which is safe here and
+      // would also be safe in a real DOM (assigning innerHTML after children exist
+      // is what nukes them there). But if a future edit ever assigns innerHTML
+      // *after* appendChild on the same node, this stub will not catch the bug —
+      // .children keeps the appended nodes while a real browser would discard them.
       set innerHTML(v) {
         htmlSink.push(String(v));
         this._html = String(v);
@@ -145,18 +152,47 @@ test("項目名とメモは textContent に入り、innerHTML には出ない", 
   assert.ok(!html.includes("alert(1)"), "区分名が innerHTML に流れています");
 });
 
-test("行は data-item-id、区分は data-group-id を持つ（ドラッグが読む）", () => {
+test("行は data-item-id を持つ（ドラッグが読む）", () => {
   const { make } = stubDocument();
   const mount = make("div");
   renderTable({ mount, data: PACKING, editing: true, handlers: {} });
 
-  const ids = [];
-  const walk = (node) => {
-    if (node.dataset?.itemId) ids.push(node.dataset.itemId);
-    for (const child of node.children ?? []) walk(child);
-  };
-  walk(mount);
+  const ids = findAll(mount, (n) => n.dataset?.itemId).map((n) => n.dataset.itemId);
   assert.deepEqual(ids, ["passport", "cash", "insurance", "swimwear"]);
+});
+
+/*
+ * Review finding: the test above's title used to claim it also covered
+ * data-group-id, but its body never read it — packing-drag.js:92
+ * (`querySelectorAll("[data-group-id]")`, used for group reordering) had no
+ * assertion behind it. Split into its own honestly-named test.
+ */
+test("区分は data-group-id を持つ（packing-drag.js の区分並べ替えが読む）", () => {
+  const { make } = stubDocument();
+  const mount = make("div");
+  renderTable({ mount, data: PACKING, editing: true, handlers: {} });
+
+  const ids = findAll(mount, (n) => n.dataset?.groupId).map((n) => n.dataset.groupId);
+  assert.deepEqual(ids, ["g-valuables", "g-clothes", "g-empty"]);
+});
+
+/*
+ * Review finding: also untested. packing-drag.js:149 does
+ * `closest("[data-item-list]")` to find the empty-group drop target — without
+ * this marker, dragging an item onto an empty group silently fails to find a
+ * drop zone.
+ */
+test("項目リストの ul は data-item-list を持つ（空の区分にもドラッグで落とせる目印）", () => {
+  const { make } = stubDocument();
+  const mount = make("div");
+  renderTable({ mount, data: PACKING, editing: true, handlers: {} });
+
+  const lists = findAll(mount, (n) => n.dataset?.itemList);
+  // PACKING は区分が 3 つ（g-empty も含む）。空の区分にも ul 自体は必ず出る
+  assert.equal(lists.length, 3);
+  for (const list of lists) {
+    assert.equal(list.dataset.itemList, "1");
+  }
 });
 
 test("読み取りモードでは編集用のボタンを組み立てない", () => {
@@ -377,6 +413,148 @@ test("チェックを入れると onToggle(itemId, member, checked) が呼ばれ
   checkbox.checked = true;
   checkbox.dispatch("change");
   assert.deepEqual(calls, [["passport", "a", true]]);
+});
+
+/*
+ * Review finding: onMoveItem / onMoveGroup / onRenameItem / onRenameGroup /
+ * onAddItem were wired in packing-render.js but never dispatched in a test.
+ * Concretely undetectable before this: swapping the -1/+1 delta between the
+ * ↑ and ↓ buttons, or changing the { name } / { note } patch shape passed to
+ * onRenameItem. Task 10 wires these to real data mutations, so a swapped
+ * delta there would move rows the wrong way with nothing here to say so.
+ */
+
+test("項目の ↑ ボタンは onMoveItem(itemId, -1) を、↓ ボタンは onMoveItem(itemId, +1) を呼ぶ", () => {
+  const { make } = stubDocument();
+  const mount = make("div");
+  const calls = [];
+  renderTable({
+    mount,
+    data: PACKING,
+    editing: true,
+    handlers: { onMoveItem: (id, delta) => calls.push([id, delta]) },
+  });
+
+  // 深さ優先の描画順で最初に出る「1 つ上へ」「1 つ下へ」は先頭項目（passport）のもの
+  const up = findFirst(mount, (n) => n.tagName === "BUTTON" && n.attrs["aria-label"] === "1 つ上へ");
+  const down = findFirst(mount, (n) => n.tagName === "BUTTON" && n.attrs["aria-label"] === "1 つ下へ");
+  assert.ok(up && down, "項目の ↑↓ ボタンが見つかりません");
+
+  up.dispatch("click");
+  down.dispatch("click");
+  assert.deepEqual(calls, [
+    ["passport", -1],
+    ["passport", 1],
+  ]);
+});
+
+test("区分の ↑ ボタンは onMoveGroup(groupId, -1) を、↓ ボタンは onMoveGroup(groupId, +1) を呼ぶ", () => {
+  const { make } = stubDocument();
+  const mount = make("div");
+  const calls = [];
+  renderTable({
+    mount,
+    data: PACKING,
+    editing: true,
+    handlers: { onMoveGroup: (id, delta) => calls.push([id, delta]) },
+  });
+
+  const up = findFirst(
+    mount,
+    (n) => n.tagName === "BUTTON" && n.attrs["aria-label"] === "この区分を 1 つ上へ"
+  );
+  const down = findFirst(
+    mount,
+    (n) => n.tagName === "BUTTON" && n.attrs["aria-label"] === "この区分を 1 つ下へ"
+  );
+  assert.ok(up && down, "区分の ↑↓ ボタンが見つかりません");
+
+  up.dispatch("click");
+  down.dispatch("click");
+  assert.deepEqual(calls, [
+    ["g-valuables", -1],
+    ["g-valuables", 1],
+  ]);
+});
+
+test("項目名の入力欄は change で onRenameItem(itemId, { name }) を呼ぶ", () => {
+  const { make } = stubDocument();
+  const mount = make("div");
+  const calls = [];
+  renderTable({
+    mount,
+    data: PACKING,
+    editing: true,
+    handlers: { onRenameItem: (id, patch) => calls.push([id, patch]) },
+  });
+
+  const nameInput = findFirst(
+    mount,
+    (n) => n.tagName === "INPUT" && n.attrs["aria-label"] === "項目名"
+  );
+  assert.ok(nameInput, "項目名の入力欄が見つかりません");
+  nameInput.value = "新しいパスポート";
+  nameInput.dispatch("change");
+  assert.deepEqual(calls, [["passport", { name: "新しいパスポート" }]]);
+});
+
+test("メモの入力欄は change で onRenameItem(itemId, { note }) を呼ぶ", () => {
+  const { make } = stubDocument();
+  const mount = make("div");
+  const calls = [];
+  renderTable({
+    mount,
+    data: PACKING,
+    editing: true,
+    handlers: { onRenameItem: (id, patch) => calls.push([id, patch]) },
+  });
+
+  const noteInput = findFirst(
+    mount,
+    (n) => n.tagName === "INPUT" && n.attrs["aria-label"] === "メモ"
+  );
+  assert.ok(noteInput, "メモの入力欄が見つかりません");
+  noteInput.value = "更新後のメモ";
+  noteInput.dispatch("change");
+  assert.deepEqual(calls, [["passport", { note: "更新後のメモ" }]]);
+});
+
+test("区分名の入力欄は change で onRenameGroup(groupId, { name }) を呼ぶ", () => {
+  const { make } = stubDocument();
+  const mount = make("div");
+  const calls = [];
+  renderTable({
+    mount,
+    data: PACKING,
+    editing: true,
+    handlers: { onRenameGroup: (id, patch) => calls.push([id, patch]) },
+  });
+
+  const groupNameInput = findFirst(
+    mount,
+    (n) => n.tagName === "INPUT" && n.attrs["aria-label"] === "区分名"
+  );
+  assert.ok(groupNameInput, "区分名の入力欄が見つかりません");
+  groupNameInput.value = "貴重品";
+  groupNameInput.dispatch("change");
+  assert.deepEqual(calls, [["g-valuables", { name: "貴重品" }]]);
+});
+
+test("「項目を追加」ボタンは onAddItem(groupId) を呼ぶ", () => {
+  const { make } = stubDocument();
+  const mount = make("div");
+  const calls = [];
+  renderTable({
+    mount,
+    data: PACKING,
+    editing: true,
+    handlers: { onAddItem: (id) => calls.push(id) },
+  });
+
+  const addBtn = findFirst(mount, (n) => n.tagName === "BUTTON" && n.className === "tbtn");
+  assert.ok(addBtn, "項目を追加ボタンが見つかりません");
+  addBtn.dispatch("click");
+  assert.deepEqual(calls, ["g-valuables"]);
 });
 
 test("区分ヘッダーの達成数は a かつ b が true の項目数（progressOf とは別の集計）", () => {
