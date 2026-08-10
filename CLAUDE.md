@@ -20,7 +20,8 @@ python3 -m http.server 8000
 ```
 travel-plans/
 ├── index.html / schedule.html   実装済み（メニュー／旅程カレンダー・地図・編集・公開）
-├── packing.html / archive.html  Phase B2/C の仮ページ（リンクのみ、中身は未実装）
+├── packing.html                 Phase B2 の仮ページ（リンクのみ、中身は未実装）
+├── archive.html                 取りやめた検索アーカイブの仮ページ。B4 で削除する
 ├── assets/
 │   ├── css/
 │   │   ├── tokens.css      色・余白・角丸・モーションの唯一の定義場所
@@ -72,11 +73,16 @@ travel-plans/
 設計書（`docs/superpowers/specs/2026-08-09-travel-plans-redesign-design.md` §2.3）によると、
 残りのフェーズで以下が追加される予定:
 
+- **Phase B4**（合言葉と暗号化。**次はここ**）: `assets/js/auth.js` `crypto.js`、
+  `index.html` の合言葉入力、`sync.js` の暗号化対応。**同期する JSON 全部
+  （`events` / `packing` / `comments`）が暗号文になる**。仮ページ `archive.html` の
+  削除もここで行う
 - **Phase B2**（持ち物リストとエディタ）: `assets/css/packing.css`、`assets/data/packing.json` など
 - **Phase B3**（コメント機能）: `assets/js/comments.js`、`assets/data/comments.json` など
-- **Phase C**（変換スクリプト、暗号化、認証、検索アーカイブ）:
-  `assets/js/auth.js` `crypto.js`、`assets/css/archive.css`、`assets/data/archive.enc`、
-  `tools/build-archive.mjs`、`private/`（.gitignore 対象）など
+
+**旧 Phase C（Gmail / LINE の検索アーカイブ）は 2026-08-09 に取りやめた。**
+`archive.enc`・`tools/build-archive.mjs`・`assets/css/archive.css` は作らない。
+暗号化だけが B4 として残り、対象が検索データから同期する JSON 全部に変わっている。
 
 いずれもこの CLAUDE.md ではなく設計書を正とする。
 
@@ -394,7 +400,7 @@ validateEvents → GET で sha と本文 → updatedAt の突き合わせ → PU
 GitHub トークンをブラウザに保存している（Phase B1 で実装済み）。CDN 経由のスクリプトが差し替えられた場合、
 そのトークンを盗み出されたり、リポジトリへ任意の内容を push されたりする恐れがあるため、
 サードパーティの JS を一切 CDN から読み込まない方針にした。トークンの具体的な保存先・扱いは
-`docs/superpowers/specs/2026-08-09-travel-plans-redesign-design.md` §5.4・§6.4 を参照
+`docs/superpowers/specs/2026-08-09-travel-plans-redesign-design.md` §5.4・§5.5 を参照
 （この CLAUDE.md では詳細を重複させない — 設計変更のたびにここが古くなるのを避けるため）。
 Leaflet を更新する際は `assets/vendor/leaflet/` 配下のファイルを手動で差し替える。
 

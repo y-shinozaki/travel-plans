@@ -17,8 +17,8 @@
 
 現在実装済みなのはメニュー（`index.html`）と旅程カレンダー（`schedule.html`）で、
 旅程は画面から編集・公開できる。
-持ち物リスト（`packing.html`）と検索アーカイブ（`archive.html`）は Phase B2/C 向けの仮ページで、
-「メニューへ戻る」リンクのみ用意されている（`archive.html` は合言葉によるログインを予定しているが未実装）。
+持ち物リスト（`packing.html`）は Phase B2 向けの仮ページで、「メニューへ戻る」リンクのみ用意されている。
+`archive.html` は取りやめた検索アーカイブの仮ページで、Phase B4 で削除する。
 
 ## 技術スタック
 
@@ -62,7 +62,7 @@ travel-plans/
 ├── index.html            メニュー
 ├── schedule.html          旅程カレンダーと地図（編集・公開もここ）
 ├── packing.html           持ち物リスト（Phase B2 の仮ページ）
-├── archive.html           検索アーカイブ（Phase C の仮ページ）
+├── archive.html           取りやめた検索アーカイブの仮ページ（B4 で削除）
 ├── assets/
 │   ├── css/
 │   │   ├── tokens.css     色・余白・角丸・モーションの唯一の定義場所
@@ -241,7 +241,7 @@ CDN 経由で読み込むスクリプトが差し替えられた場合、その�
 読み込まず `assets/vendor/leaflet/` に自前で配置している。同じ理由で、4 ページすべてに
 `script-src 'self'` の Content-Security-Policy を置き、インライン script を排除している。
 トークンの具体的な保存先・扱いは
-`docs/superpowers/specs/2026-08-09-travel-plans-redesign-design.md` §5.4・§6.4 を参照。
+`docs/superpowers/specs/2026-08-09-travel-plans-redesign-design.md` §5.4・§5.5 を参照。
 
 ## デプロイメント
 
