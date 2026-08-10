@@ -1020,3 +1020,95 @@ test("既定値は B1 の挙動と完全に一致する（平文・events キー
   assert.equal(state.puts.at(-1).message, "Update itinerary from the browser (1 event)");
   assert.equal(JSON.parse(state.text).ct, undefined); // 平文のまま
 });
+
+/* ── 注入した draftKey / baseKey が実際に使われているか ──────────────
+ *
+ * 設計書 §13 が名指しする失敗はこれ: 2 つ目の JSON 用に createSync を作った
+ * つもりで、保存キーだけ既定のままだと、持ち物の saveLocal が旅程の下書き
+ * （tp:events）を上書きする。旅程の未公開の編集はその瞬間に消え、
+ * 気付くのは次に旅程ページを開いたときになる。
+ *
+ * 「投げないこと」ではなく「どのキーに書いたか」を見る。投げないだけなら
+ * 既定キーへ書いていても通ってしまう。
+ */
+test("saveLocal は注入した draftKey に書き、既定の events キーには触らない", () => {
+  const written = new Map();
+  const store = {
+    read: (key, fallback) => (written.has(key) ? written.get(key) : fallback),
+    write: (key, value) => written.set(key, value),
+    readText: () => null,
+    writeText: () => {},
+    remove: (key) => written.delete(key),
+    has: (key) => written.has(key),
+  };
+
+  // 旅程の下書きが先にある状態を作る。これが消えないことを確かめたい
+  written.set("events", { days: [{ date: "8/12", dow: "水" }], events: [], updatedAt: "2026-08-01T00:00:00.000Z" });
+
+  const sync = createSync({
+    store,
+    fetchImpl: async () => {
+      throw new Error("このテストは通信しない");
+    },
+    config: {
+      path: "assets/data/packing.json",
+      draftKey: "packing",
+      baseKey: "packing-base",
+      validate: (data) => data,
+      commitMessage: () => "Update packing list",
+      noun: "持ち物",
+      codec: { async encode(d) { return d; }, async decode(v) { return { data: v, outerStampMismatch: false }; } },
+    },
+    now: () => Date.parse("2026-08-10T12:00:00.000Z"),
+  });
+
+  sync.saveLocal({ members: { a: "雄一", b: "朱汰" }, groups: [] });
+
+  assert.ok(written.has("packing"), "注入した draftKey に書かれていません");
+  assert.deepEqual(
+    written.get("events").events,
+    [],
+    "旅程の下書き（events）が持ち物データで上書きされました"
+  );
+  assert.equal(written.get("events").updatedAt, "2026-08-01T00:00:00.000Z");
+});
+
+test("hasUnpublishedChanges は注入した draftKey / baseKey だけを見る", () => {
+  const written = new Map();
+  const store = {
+    read: (key, fallback) => (written.has(key) ? written.get(key) : fallback),
+    write: (key, value) => written.set(key, value),
+    readText: () => null,
+    writeText: () => {},
+    remove: (key) => written.delete(key),
+    has: (key) => written.has(key),
+  };
+
+  // 旅程側は「未公開の変更あり」の状態にしておく。持ち物側がこれを拾わないこと
+  written.set("events", { updatedAt: "2026-08-09T00:00:00.000Z" });
+  written.set("events-base", "2026-08-01T00:00:00.000Z");
+  written.set("packing", { updatedAt: "2026-08-05T00:00:00.000Z" });
+  written.set("packing-base", "2026-08-05T00:00:00.000Z");
+
+  const sync = createSync({
+    store,
+    fetchImpl: async () => {
+      throw new Error("このテストは通信しない");
+    },
+    config: {
+      path: "assets/data/packing.json",
+      draftKey: "packing",
+      baseKey: "packing-base",
+      validate: (data) => data,
+      commitMessage: () => "Update packing list",
+      noun: "持ち物",
+      codec: { async encode(d) { return d; }, async decode(v) { return { data: v, outerStampMismatch: false }; } },
+    },
+  });
+
+  assert.equal(
+    sync.hasUnpublishedChanges(),
+    false,
+    "旅程側の未公開の変更を持ち物側が拾っています"
+  );
+});
