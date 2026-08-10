@@ -75,8 +75,6 @@ travel-plans/
 │   │   │                   Phase B2 で { noun, path } を取る一般形になった（既定は旅程）
 │   │   ├── menu.js         index.html のエントリポイント
 │   │   ├── schedule.js     schedule.html のエントリポイント
-│   │   ├── stub-page.js    仮ページ用の共通エントリポイント。参照していた packing.html が
-│   │   │                   Phase B2 で実装されたため、現在は参照するページが無い
 │   │   │  ── ここから下が Phase B2 で追加した持ち物リストの層 ──
 │   │   ├── data-error.js       DataError。EventDataError（validate.js）と
 │   │   │                       PackingDataError（packing-validate.js）に共通の基底
@@ -90,17 +88,29 @@ travel-plans/
 │   │   │                       指を離した時点で配列を組み直す
 │   │   └── packing.js          packing.html のエントリポイント
 │   ├── data/
-│   │   └── events.json     旅程データの唯一のソース（表示用文字列は持たない）。
-│   │                       packing.json は同じ場所に無い ── 最初の「公開」まで
-│   │                       リポジトリに存在せず、それまでは 404 を空のリストとして扱う
+│   │   ├── events.json     旅程データの唯一のソース（表示用文字列は持たない）
+│   │   └── packing.json    持ち物データ。最初の「公開」まで存在しない設計で、
+│   │                       それまでは 404 を空のリストとして扱っていた
+│   │                       （2026-08-10 に最初の公開が済み、いまは存在する）
 │   └── vendor/
 │       └── leaflet/        Leaflet 1.9.4 を自前で配置（理由は「外部ライブラリ」参照）
 ├── tests/                  node --test で実行する純粋関数・静的検証のテスト
-├── DESIGN.md               デザイン仕様（aman.com 由来）
-└── docs/design-reference/mock-aman.html   検証済みの参照実装（実装対象ではなく、値を写す元）
+├── docs/                   ドキュメント（サイトとしては配信しない。docs/README.md が索引）
+│   ├── spec/               設計書。**食い違ったら常にこれが正**
+│   ├── plans/              フェーズごとの実装計画。完了後は歴史的記録であって正ではない
+│   ├── design/             デザイン仕様（design-system.md）と参照モック（aman-mock.html）
+│   └── handoff/            セッションをまたぐ引き継ぎ（残タスクと順序だけ）
+├── CLAUDE.md               このファイル。設計書の要約なので、迷ったら docs/spec/ を見る
+└── README.md               人向けの入口（機能・起動方法・構成）
 ```
 
-設計書（`docs/superpowers/specs/2026-08-09-travel-plans-redesign-design.md` §2.3）によると、
+**ルート直下に置いてよいのは、サイト本体（`*.html` / `assets/`）と
+リポジトリ全体にかかる設定（`_config.yml` / `.nojekyll` / `package.json` /
+`.gitignore`）と `README.md` / `CLAUDE.md` だけ。** ドキュメントは `docs/` へ入れる ──
+`_config.yml` の `exclude` が `docs/` を 1 行で外しているので、そこに置く限り
+何を書いても GitHub Pages のデプロイを壊さない（後述「デプロイメント」）。
+
+設計書（`docs/spec/travel-plans-redesign.md` §2.3）によると、
 残りのフェーズで以下が追加される予定:
 
 - **Phase B3**（コメント機能）: `assets/js/comments.js`、`assets/data/comments.json` など
@@ -357,7 +367,7 @@ validateEvents → 暗号化 → GET で sha と本文 → updatedAt の突き�
 
 - **`script-src 'self'`** — `'unsafe-inline'` を入れていないので、インライン `<script>` も
   `javascript:` URL も実行されない。**インライン script を書かないこと**
-  （`packing.html` のエントリポイントを `stub-page.js` に出したのはこのため）
+  （3 ページとも起動処理を `assets/js/` の外部ファイルに出しているのはこのため）
 - `connect-src 'self' https://api.github.com` — 公開フローが叩く先だけを許可
 - `style-src` に `'unsafe-inline'` が要る（Leaflet と自前コードが `style` 属性を使うため）。
   狙いはスクリプト実行の遮断であって、スタイルではない
@@ -374,7 +384,7 @@ validateEvents → 暗号化 → GET で sha と本文 → updatedAt の突き�
 
 すべての色・余白・角丸・モーションの値は `assets/css/tokens.css` の CSS カスタムプロパティに定義する。
 **ハードコードされた 16 進数値をコード中に書かないこと。** 色を変える／確認する手順は後述の
-「カラーを変更」を参照。パレットの出典と設計意図は `DESIGN.md` を参照。
+「カラーを変更」を参照。パレットの出典と設計意図は `docs/design/design-system.md` を参照。
 
 ## よく使う開発タスク
 
@@ -460,7 +470,7 @@ Phase B2 で `packing.css` をそのリストへ足した。**リストがハー
 
 ### カラーを変更
 
-1. `DESIGN.md` で対象の役割（Surface / Category など）を確認する
+1. `docs/design/design-system.md` で対象の役割（Surface / Category など）を確認する
 2. `assets/css/tokens.css` の CSS 変数を更新する。ハードコードした 16 進値をコードに書かない
 3. `node --test tests/tokens.test.js` を実行し、コントラスト比・色差のテストが通ることを確認する
    （彩度や明度を動かしすぎると可読性のテストが失敗する）
@@ -484,7 +494,7 @@ Phase B2 で `packing.css` をそのリストへ足した。**リストがハー
 GitHub トークンをブラウザに保存している（Phase B1 で実装済み）。CDN 経由のスクリプトが差し替えられた場合、
 そのトークンを盗み出されたり、リポジトリへ任意の内容を push されたりする恐れがあるため、
 サードパーティの JS を一切 CDN から読み込まない方針にした。トークンの具体的な保存先・扱いは
-`docs/superpowers/specs/2026-08-09-travel-plans-redesign-design.md` §5.4・§5.5 を参照
+`docs/spec/travel-plans-redesign.md` §5.4・§5.5 を参照
 （この CLAUDE.md では詳細を重複させない — 設計変更のたびにここが古くなるのを避けるため）。
 Leaflet を更新する際は `assets/vendor/leaflet/` 配下のファイルを手動で差し替える。
 
@@ -623,11 +633,11 @@ Safari 15.5 で対応したため、これがサポート下限を決めてい�
   Phase B2 の持ち物ページは公開されなかった ── ドキュメントの 1 行がページの公開を
   止められる、という結合そのものが問題だった
 - `_` で始まるファイル・ディレクトリが黙って配信対象から外れる
-- `CLAUDE.md` や `DESIGN.md` まで HTML ページとして生成される（誰も見ない）
+- `CLAUDE.md` や `docs/` 配下の md まで HTML ページとして生成される（誰も見ない）
 
 `.nojekyll` だけでは足りなかった（置いた状態でビルドが走り、同じエラーで落ちた）。
-`_config.yml` の `exclude` で `docs/` `tests/` とこのファイルを Jekyll から
-外してある。**この文書に波括弧を 2 つ続けて書いても安全なのは、その exclude のおかげ。**
+`_config.yml` の `exclude` で `docs/` `tests/` `CLAUDE.md` `README.md` `package.json` を
+Jekyll から外してある。**この文書に波括弧を 2 つ続けて書いても安全なのは、その exclude のおかげ。**
 サイト本体（`*.html` / `assets/`）は exclude に入れていないので、これまでどおり配信される。
 
 ## 今後の開発に向けたノート

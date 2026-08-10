@@ -9,9 +9,9 @@
 **Tech Stack:** バニラ JS（ES モジュール）、GitHub Contents API、`node --test`（依存ゼロ）
 
 **参照資料:**
-- 設計書: `docs/superpowers/specs/2026-08-09-travel-plans-redesign-design.md`（§5 保存と共有、§4.1 スキーマ、§13 Phase A からの繰り越し）
-- Phase A の計画: `docs/superpowers/plans/2026-08-09-phase-a-design-system-and-schedule.md`
-- 予定エディタの UI 見本: `docs/design-reference/mock-aman.html` の 05 セクションと `#evSheet`（検証済み）
+- 設計書: `docs/spec/travel-plans-redesign.md`（§5 保存と共有、§4.1 スキーマ、§13 Phase A からの繰り越し）
+- Phase A の計画: `docs/plans/phase-a-design-system-and-schedule.md`
+- 予定エディタの UI 見本: `docs/design/aman-mock.html` の 05 セクションと `#evSheet`（検証済み）
 - `CLAUDE.md` — 現行アーキテクチャ
 
 ---
@@ -1220,7 +1220,7 @@ Expected: FAIL。`Cannot find module .../assets/js/event-form.js`。
 
 - `emptyEvent(dayCount)` — `cat: "cat-sight"`、`allDay: false`、`startDay: 0`、`endDay: 0`、
   `start: 9`、`end: 10`、他は空文字または `null`。`id` は持たせない（保存時に採番する）
-- `eventFormHtml(ev, days)` — `docs/design-reference/mock-aman.html` の `#evSheet` の
+- `eventFormHtml(ev, days)` — `docs/design/aman-mock.html` の `#evSheet` の
   フォーム部分を元にする。入力欄の `id` は上のテストと一致させること。
   **すべての値を `escapeHtml()` に通す**
 - `readEventForm(getValue)` — 文字列を型に直す。時刻は `hhmmToDec`。座標は両方揃ったときのみ数値、
@@ -1337,7 +1337,7 @@ EOF
 - Modify: `assets/js/schedule.js`（結線）
 - Modify: `schedule.html`（ツールバーに「予定を編集」「予定を追加」）
 - Modify: `assets/css/controls.css`（追記のみ）
-- Reference: `docs/design-reference/mock-aman.html`
+- Reference: `docs/design/aman-mock.html`
 
 **Interfaces:**
 - Consumes: `eventFormHtml` / `readEventForm` / `formProblems` / `emptyEvent`、`createSheet`

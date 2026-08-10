@@ -1,7 +1,7 @@
 /*
  * デザイントークン
  * 出典: aman.com の computed style 実測値（2026-08-09 取得）
- * 詳細は DESIGN.md を参照。
+ * 詳細は docs/design/design-system.md を参照。
  *
  * 色をハードコードしないこと。色の変更はこのファイルだけで完結させる。
  */

@@ -43,22 +43,21 @@ packing.html     持ち物リスト（二人分チェック＋リストエディ
 
 未認証で `schedule.html` などを直接開いた場合は `index.html` へ戻す。
 
-`archive.html`（Gmail / LINE 横断検索）は取りやめた（§2.3）。仮ページの実ファイルは
-まだリポジトリに残っている。**削除は B4 で行う** ── 消すと `nav.js` のページ一覧、
-`tests/csp.test.js` の 4 ページ検査、`tests/renderers.test.js` の `renderNav`、
-`stub-page.js` の対象、メニューの 3 枚目のカード（§7.1）が同時に動くため、
-合言葉画面を作り直す B4 とまとめたほうが破綻が少ない。
+`archive.html`（Gmail / LINE 横断検索）は取りやめた（§2.3）。**実ファイルの削除は
+B4 で完了した** ── 消すと `nav.js` のページ一覧、`tests/csp.test.js` のページ検査、
+`tests/renderers.test.js` の `renderNav`、メニューの 3 枚目のカード（§7.1）が
+同時に動くため、合言葉画面を作り直す B4 とまとめた。
 
 ### 2.2 ファイル構成
 
-**印の読み方**: 印の無い行は Phase A / B1 で実在するファイル。`[B4]` `[B2]` `[B3]` は
-そのフェーズで追加する予定のもので、まだリポジトリに無い。
+**印の読み方**: `[B4]` `[B2]` はそのフェーズで追加したもの（**いずれも実在する**）。
+`[B3]` だけがまだリポジトリに無い。印の無い行は Phase A / B1 で追加したもの。
 
 ```
 travel-plans/
 ├── index.html / schedule.html / packing.html
-│                           （packing はリンクだけの仮ページ。
-│                             archive.html も実ファイルは残っているが取りやめ済み）
+│                           （3 ページとも実装済み。archive.html は取りやめ、
+│                             実ファイルも B4 で削除した）
 ├── assets/
 │   ├── css/
 │   │   ├── tokens.css      CSS 変数（唯一の色・余白・角丸・モーションの定義場所）
@@ -93,7 +92,6 @@ travel-plans/
 │   │   │  ── エントリポイント ──
 │   │   ├── menu.js         index.html
 │   │   ├── schedule.js     schedule.html
-│   │   ├── stub-page.js    packing.html / archive.html（CSP のため外部ファイル）
 │   │   ├── auth.js         合言葉入力、鍵導出、鍵のキャッシュ、遷移ガード [B4]
 │   │   ├── crypto.js       PBKDF2 / AES-GCM。同期する JSON 全部の暗号化と復号 [B4]
 │   │   ├── packing.js      packing.html のエントリポイント               [B2]
@@ -106,7 +104,14 @@ travel-plans/
 │       └── leaflet/        Leaflet 1.9.4 を自前で配置（§5.5 のセキュリティ理由）
 ├── tests/                  node --test（依存ゼロ・ビルドなし）
 ├── private/                .gitignore 対象。LINE のトーク履歴とスクリーンショット
-├── DESIGN.md               新デザイン仕様（Aman 由来）
+├── docs/                   ドキュメント（`_config.yml` の exclude で Jekyll から外す）
+│   ├── README.md           docs の索引
+│   ├── spec/               この設計書。食い違ったら常にこれが正
+│   ├── plans/              フェーズごとの実装計画（完了後は歴史的記録）
+│   ├── design/             design-system.md（Aman 由来の新デザイン仕様）と
+│   │                       aman-mock.html（検証済みの参照実装）
+│   └── handoff/            セッションをまたぐ引き継ぎ
+├── _config.yml / .nojekyll Jekyll 対策（§13。どちらも消さないこと）
 ├── CLAUDE.md / README.md
 ```
 
@@ -1230,7 +1235,7 @@ GCM は「合言葉が違う」と「暗号文が壊れている」を区別で�
   誰かが最初に「公開」を押した瞬間から出なくなる。Task 10 のレビューで発見し、
   この場ではメッセージを直せない（`decideSync()` は 404 かどうかを知らず、
   offline 判定はファイルの有無を区別しない設計になっている）ため繰り越した
-  （2026-08-10。合言葉を持つ人が確認する際の案内は `docs/HANDOFF-2026-08-10.md` にある）
+  （2026-08-10。合言葉を持つ人が確認する際の案内は `docs/handoff/2026-08-10.md` にある）
 - **§7.3 は「区分の追加」を表の最下部に置くよう求めているが、実装は
   ツールバー（表の上）に置いている。** `packing.html` の `#pk-add-group` は
   `#pk-edit-toggle` の隣にあり、`#pk-table` より前に来る。意図的な逸脱で、

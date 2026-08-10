@@ -10,16 +10,29 @@
 - Leaflet と CartoDB Positron タイルを使用したインタラクティブマップ
 - カテゴリによるイベントフィルタリング
 - 詳細シートでのイベント情報表示
-- **合言葉で旅程データを暗号化**（PBKDF2 + AES-GCM）。リポジトリに置く `events.json` は
-  暗号文で、初回に合言葉を決めて以降はその合言葉で開く
-- **ブラウザ上での予定の追加・編集・削除**（下書きは端末の `localStorage` に平文で保存）
+- 持ち物リスト（区分ごとのチェックと、ドラッグでの並べ替え）
+- **合言葉でデータを暗号化**（PBKDF2 + AES-GCM）。リポジトリに置く `events.json` /
+  `packing.json` は暗号文で、初回に合言葉を決めて以降はその合言葉で開く
+- **ブラウザ上での追加・編集・削除**（下書きは端末の `localStorage` に平文で保存）
 - **「公開」でリポジトリへ反映**（GitHub Contents API 経由。トークンを設定した端末のみ）
 - モバイル、タブレット、デスクトップに対応
 - ビルドプロセス不要 — ローカルサーバーを起動するだけ
 
-現在実装済みなのはメニュー（`index.html`。合言葉の入力もここ）と
-旅程カレンダー（`schedule.html`）で、旅程は画面から編集・公開できる。
-持ち物リスト（`packing.html`）は Phase B2 向けの仮ページで、「メニューへ戻る」リンクのみ用意されている。
+3 ページとも実装済み。メニュー（`index.html`。合言葉の入力もここ）、
+旅程カレンダーと地図（`schedule.html`）、持ち物リスト（`packing.html`）で、
+旅程も持ち物も画面から編集・公開できる。
+
+## ドキュメント
+
+設計の意図や判断の根拠は `docs/` にある。索引は [`docs/README.md`](docs/README.md)。
+
+| 目的 | 場所 |
+|---|---|
+| **いま何が正しいのか**（唯一の正） | [`docs/spec/travel-plans-redesign.md`](docs/spec/travel-plans-redesign.md) |
+| **次に何をするのか**（残タスク） | [`docs/handoff/2026-08-10.md`](docs/handoff/2026-08-10.md) |
+| 色・余白・タイポグラフィの値 | [`docs/design/design-system.md`](docs/design/design-system.md) |
+| フェーズごとの実装手順（完了済みの記録） | [`docs/plans/`](docs/plans/) |
+| コードを書くときの規約 | [`CLAUDE.md`](CLAUDE.md) |
 
 ## 技術スタック
 
@@ -53,46 +66,63 @@ node --test
 `tests/` は時刻変換・イベント展開・レーン配置・アイコン・デザイントークンの純粋関数と
 静的な値に加えて、保存と公開の層（`store` / `base64` / `sync-decide` / `github` / `sync`）、
 合言葉と暗号化の層（`crypto` / `auth` / `auth-form` / `load-error`）、
+持ち物リストの層（`packing-validate` / `packing-data` / `packing-render` / `packing-drag`）、
 編集フォームとエディタ、公開画面、3 ページの CSP を検証する。通信・`localStorage`・時刻は
 すべて差し替え可能にしてあるので、テストは外部と通信しない。
 カレンダー描画やレスポンシブ崩れなど、DOM に依存する部分はブラウザで目視・実測して確認する。
 
 ## プロジェクト構成
 
+ルート直下に置くのは、**サイト本体**（`*.html` / `assets/`）と**リポジトリ全体にかかる設定**、
+そして `README.md` / `CLAUDE.md` だけ。ドキュメントはすべて `docs/` に入れる。
+
 ```
 travel-plans/
-├── index.html            メニュー（合言葉の入力もここ）
+├── index.html             メニュー（合言葉の入力もここ）
 ├── schedule.html          旅程カレンダーと地図（編集・公開もここ）
-├── packing.html           持ち物リスト（Phase B2 の仮ページ）
+├── packing.html           持ち物リスト（編集・公開もここ）
 ├── assets/
 │   ├── css/
 │   │   ├── tokens.css     色・余白・角丸・モーションの唯一の定義場所
 │   │   ├── base.css       リセット、タイポグラフィ、共通レイアウト、reveal 演出
 │   │   ├── controls.css   ボタン・チップ・入力欄・詳細シート・編集フォーム・公開まわり
-│   │   └── calendar.css   schedule.html 専用（カレンダー・地図・レスポンシブ）
-│   ├── js/                menu.js / schedule.js / stub-page.js（各ページのエントリポイント）、
+│   │   ├── calendar.css   schedule.html 専用（カレンダー・地図・レスポンシブ）
+│   │   └── packing.css    packing.html 専用
+│   ├── js/                menu.js / schedule.js / packing.js（各ページのエントリポイント）、
 │   │                      countdown.js（メニューの出発カウントダウン）、
 │   │                      calendar.js / map.js / sheet.js / nav.js / reveal.js / icons.js、
-│   │                      categories.js / dom.js / validate.js（共通部品）、
+│   │                      categories.js / dom.js / validate.js / data-error.js（共通部品）、
 │   │                      time.js / events.js / lanes.js（node --test が対象にする純粋関数）、
 │   │                      store.js / base64.js / sync-decide.js / github.js / token.js /
 │   │                      sync.js（下書きの保存とリポジトリへの公開）、
 │   │                      event-form.js / event-editor.js / publish-ui.js（編集と公開の画面）、
 │   │                      crypto.js / auth.js / auth-form.js（合言葉と暗号化）、
-│   │                      load-error.js（読み込み失敗の分類）
+│   │                      load-error.js（読み込み失敗の分類）、
+│   │                      packing-validate.js / packing-data.js / packing-render.js /
+│   │                      packing-drag.js（持ち物リスト）
 │   ├── data/
-│   │   └── events.json    旅程データ（唯一のソース。表示用文字列は持たない）
+│   │   ├── events.json    旅程データ（唯一のソース。リポジトリ上は暗号文）
+│   │   └── packing.json   持ち物データ（同上）
 │   └── vendor/
 │       └── leaflet/       Leaflet 1.9.4 のセルフホスト版
 ├── tests/                 node --test 用のテスト
-├── DESIGN.md              デザインシステムのドキュメント
-├── CLAUDE.md
+├── docs/                  ドキュメント（サイトとしては配信しない）
+│   ├── README.md          docs の索引
+│   ├── spec/              設計書 — 食い違ったら常にこれが正
+│   ├── plans/             フェーズごとの実装計画（完了済みの記録）
+│   ├── design/            デザイン仕様と参照モック
+│   └── handoff/           セッションをまたぐ引き継ぎ
+├── _config.yml            Jekyll に docs/ と tests/ を読ませないための設定（消さないこと）
+├── .nojekyll              同上（消さないこと。詳細は「デプロイメント」）
+├── package.json           "type": "module" の宣言だけ。依存パッケージはゼロ
+├── CLAUDE.md              コードを書くときの規約
 └── README.md              このファイル
 ```
 
 ## デザインシステム
 
-詳細については [DESIGN.md](./DESIGN.md) を参照。出典は aman.com の computed style（2026-08-09 実測）。
+詳細については [docs/design/design-system.md](docs/design/design-system.md) を参照。
+出典は aman.com の computed style（2026-08-09 実測）。
 
 **カラーパレット**（`assets/css/tokens.css`）:
 
@@ -137,10 +167,11 @@ travel-plans/
 
 ## 保存と公開
 
-- **正はリポジトリの `assets/data/events.json`。** ただしリポジトリ上は暗号文（封筒 JSON）で、
-  合言葉が要る。同行者は合言葉を入れてページを開けば最新を受け取る
-- **編集は端末の `localStorage` に下書きとして入る**（平文。キーは `tp:events`、
-  最後にリモートと揃えた時刻が `tp:events-base`）
+- **正はリポジトリの `assets/data/events.json` と `assets/data/packing.json`。**
+  ただしリポジトリ上は暗号文（封筒 JSON）で、合言葉が要る。
+  同行者は合言葉を入れてページを開けば最新を受け取る
+- **編集は端末の `localStorage` に下書きとして入る**（平文。旅程は `tp:events`、
+  持ち物は `tp:packing`。最後にリモートと揃えた時刻がそれぞれ `-base` 付きのキー）
 - **「公開」を押した端末だけ**が GitHub Contents API でリポジトリへコミットする。
   トークンを設定していない端末には公開ボタン自体が出ない（閲覧と下書き編集はできる）
 - 新旧の判定はどちらも JSON トップレベルの `updatedAt`。公開の直前にもリモートを取り直して
@@ -245,7 +276,7 @@ CDN 経由で読み込むスクリプトが差し替えられた場合、その�
 読み込まず `assets/vendor/leaflet/` に自前で配置している。同じ理由で、3 ページすべてに
 `script-src 'self'` の Content-Security-Policy を置き、インライン script を排除している。
 トークンの具体的な保存先・扱いは
-`docs/superpowers/specs/2026-08-09-travel-plans-redesign-design.md` §5.4・§5.5 を参照。
+`docs/spec/travel-plans-redesign.md` §5.4・§5.5 を参照。
 
 ## デプロイメント
 
@@ -259,7 +290,18 @@ CDN 経由で読み込むスクリプトが差し替えられた場合、その�
 
 ### デプロイ方法:
 
-`main` ブランチにプッシュ。サイトは自動更新されます。
+`main` ブランチにプッシュ。サイトは自動更新されます（反映まで 1 分ほど）。
+
+### `_config.yml` と `.nojekyll` を消さないこと
+
+GitHub Pages は既定でリポジトリ全体を Jekyll に通す。このサイトは素の静的ファイルで
+Jekyll の機能を 1 つも使っていないので、通しても得るものが無い一方、
+**Markdown が Liquid テンプレートとして解釈される**。2026-08-10、実装計画に書いた
+JSDoc の型注記（波括弧 2 つで始まる形）が Liquid の構文エラーになり、
+サイト全体のデプロイが 3 回続けて失敗した。`.nojekyll` だけでは止められなかったため、
+`_config.yml` の `exclude` で `docs/` `tests/` `CLAUDE.md` `README.md` `package.json` を
+明示的に外してある。
+**`docs/` に置いたドキュメントに何を書いてもデプロイが壊れないのは、この設定のおかげ。**
 
 ## ブラウザサポート
 
@@ -277,4 +319,4 @@ y-shinozaki
 
 ---
 
-**最終更新**: 2026年8月9日
+**最終更新**: 2026年8月10日
