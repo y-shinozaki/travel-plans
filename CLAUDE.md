@@ -95,7 +95,7 @@ travel-plans/
 │   └── vendor/
 │       └── leaflet/        Leaflet 1.9.4 を自前で配置（理由は「外部ライブラリ」参照）
 ├── tests/                  node --test で実行する純粋関数・静的検証のテスト
-├── docs/                   ドキュメント（サイトとしては配信しない。docs/README.md が索引）
+├── docs/                   ドキュメント（docs/README.md が索引）
 │   ├── spec/               設計書。**食い違ったら常にこれが正**
 │   ├── plans/              フェーズごとの実装計画。完了後は歴史的記録であって正ではない
 │   ├── design/             デザイン仕様（design-system.md）と参照モック（aman-mock.html）
@@ -108,7 +108,13 @@ travel-plans/
 リポジトリ全体にかかる設定（`_config.yml` / `.nojekyll` / `package.json` /
 `.gitignore`）と `README.md` / `CLAUDE.md` だけ。** ドキュメントは `docs/` へ入れる ──
 `_config.yml` の `exclude` が `docs/` を 1 行で外しているので、そこに置く限り
-何を書いても GitHub Pages のデプロイを壊さない（後述「デプロイメント」）。
+何を書いても GitHub Pages の**デプロイを壊さない**（後述「デプロイメント」）。
+
+**ただし配信は止まらない。リポジトリ全体が素のまま公開されている** ── `docs/` も
+`tests/` も `_config.yml` も 200 を返し、リポジトリ自体も public。
+**合言葉・トークン・予約番号・パスポート番号をコミットしないこと。**
+「ここは配信されないから」と考えてよい場所はこのリポジトリに無い
+（理由と実測は README「デプロイメント」。ここには重複させない）。
 
 設計書（`docs/spec/travel-plans-redesign.md` §2.3）によると、
 残りのフェーズで以下が追加される予定:
@@ -635,10 +641,16 @@ Safari 15.5 で対応したため、これがサポート下限を決めてい�
 - `_` で始まるファイル・ディレクトリが黙って配信対象から外れる
 - `CLAUDE.md` や `docs/` 配下の md まで HTML ページとして生成される（誰も見ない）
 
-`.nojekyll` だけでは足りなかった（置いた状態でビルドが走り、同じエラーで落ちた）。
-`_config.yml` の `exclude` で `docs/` `tests/` `CLAUDE.md` `README.md` `package.json` を
-Jekyll から外してある。**この文書に波括弧を 2 つ続けて書いても安全なのは、その exclude のおかげ。**
-サイト本体（`*.html` / `assets/`）は exclude に入れていないので、これまでどおり配信される。
+**いま Jekyll を止めているのは `.nojekyll` のほうで、`exclude` は何もしていない**
+（2026-08-10 実測: `/_config.yml` も `/tests/time.test.js` も 200 を返す ── Jekyll が
+走っていれば 404 になる）。この文書に波括弧を 2 つ続けて書いても安全なのはそのおかげ。
+`exclude`（`docs/` `tests/` `CLAUDE.md` `README.md` `package.json`）は `.nojekyll` が
+効かなくなった日の二重の防御なので、**効いていないからと消さないこと。**
+片方を消すと、残った片方が外れた瞬間にデプロイが止まる。
+
+**この構成の帰結として、リポジトリ全体が素のまま配信されている。**
+`tests/` も `_config.yml` も `.gitignore` も URL で読める。詳細は
+README「デプロイメント」の「何が公開されているか」。
 
 ## 今後の開発に向けたノート
 
