@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { EventDataError } from "../assets/js/validate.js";
 import { DecryptError } from "../assets/js/crypto.js";
 import { DataFetchError, DataParseError, classifyLoadError } from "../assets/js/load-error.js";
+import { DataError } from "../assets/js/data-error.js";
 
 test("データ内容の不備は再読み込みを勧めない", () => {
   const { kind, message } = classifyLoadError(new EventDataError("ev-1 の startDay が範囲外です"));
@@ -71,4 +72,38 @@ test("どの分類でも合言葉や鍵の中身は文言に載らない", () =>
     const { message } = classifyLoadError(error);
     assert.ok(!/tp:key/.test(message));
   }
+});
+
+test("DataError を継承した別のデータ不備も data として分類する", () => {
+  class PackingDataError extends DataError {
+    constructor(message) {
+      super(message);
+      this.name = "PackingDataError";
+    }
+  }
+  const { kind, message } = classifyLoadError(new PackingDataError("項目が壊れています"), {
+    noun: "持ち物リスト",
+    path: "assets/data/packing.json",
+  });
+  assert.equal(kind, "data");
+  assert.match(message, /持ち物リスト/);
+  assert.match(message, /assets\/data\/packing\.json/);
+  assert.match(message, /項目が壊れています/);
+  assert.doesNotMatch(message, /旅程/);
+});
+
+test("noun / path を渡さなければ従来どおり旅程の文言になる", () => {
+  const { message } = classifyLoadError(new EventDataError("startDay が範囲外です"));
+  assert.match(message, /旅程/);
+  assert.match(message, /assets\/data\/events\.json/);
+});
+
+test("取得失敗の文言も noun / path に従う", () => {
+  const { kind, message } = classifyLoadError(new DataFetchError("HTTP 500"), {
+    noun: "持ち物リスト",
+    path: "assets/data/packing.json",
+  });
+  assert.equal(kind, "fetch");
+  assert.match(message, /持ち物リスト/);
+  assert.doesNotMatch(message, /旅程/);
 });
