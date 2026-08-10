@@ -130,7 +130,7 @@ test("withoutGroup は中身ごと消す", () => {
   assert.deepEqual(next.groups.map((g) => g.id), ["g-clothes", "g-empty"]);
 });
 
-test("moveItem は区分の中で入れ替える", () => {
+test("moveItem は区分の中で上へ入れ替える", () => {
   const data = clone();
   const next = moveItem(data, "cash", -1);
   assert.deepEqual(
@@ -139,13 +139,38 @@ test("moveItem は区分の中で入れ替える", () => {
   );
 });
 
-test("moveItem は区分の端で隣の区分へ送る", () => {
-  // 設計書 §7.3「↑↓ で端に達したとき隣の区分へ送る」
+test("moveItem は区分の中で下へも入れ替える", () => {
+  // 上下で分岐が対称なことを別々に確かめる（splice の挙動自体は向きを問わないが、
+  // ブリーフが 4 通りの境界の組み合わせを求めている）
+  const data = clone();
+  const next = moveItem(data, "passport", +1);
+  assert.deepEqual(
+    next.groups[0].items.map((i) => i.id),
+    ["cash", "passport", "insurance"]
+  );
+});
+
+test("moveItem は区分の端（下）で隣の区分の先頭へ送る", () => {
+  // 設計書 §7.3「↑↓ で端に達したとき隣の区分へ送る」。delta = +1 側
   const data = clone();
   const next = moveItem(data, "insurance", +1);
   assert.deepEqual(shape(next), [
     ["g-valuables", ["passport", "cash"]],
     ["g-clothes", ["insurance", "swimwear"]],
+    ["g-empty", []],
+  ]);
+});
+
+test("moveItem は区分の端（上）で隣の区分の末尾へ送る", () => {
+  // delta = -1 側。moveItem の push/unshift の分岐
+  // (`delta === -1 ? [...g.items, item] : [item, ...g.items]`) は、
+  // これまで delta = +1 の境界テストしか無く、unshift 側しか実行されていなかった
+  // （レビュー指摘）。swimwear は g-clothes の唯一（=先頭）の項目
+  const data = clone();
+  const next = moveItem(data, "swimwear", -1);
+  assert.deepEqual(shape(next), [
+    ["g-valuables", ["passport", "cash", "insurance", "swimwear"]],
+    ["g-clothes", []],
     ["g-empty", []],
   ]);
 });
@@ -192,6 +217,11 @@ test("moveGroup は末尾の区分を末尾より下へは動かさない", () =
 test("moveGroup は見つからない id では何もしない", () => {
   const data = clone();
   assert.equal(moveGroup(data, "g-does-not-exist", -1), data);
+  // delta = +1 も別に確かめる。ガードを外すと index=-1, target=0 が
+  // 境界チェックを素通りし、splice(-1,1) が実在する最後の区分を
+  // 存在しない id のために先頭へ動かしてしまう（レビュー指摘。delta=-1 側は
+  // target<0 の別ガードに偶然救われて検出できない）
+  assert.equal(moveGroup(data, "g-does-not-exist", +1), data);
 });
 
 test("moveGroup は ±1 以外の delta では何もしない", () => {
