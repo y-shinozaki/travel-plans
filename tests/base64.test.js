@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { toBase64Utf8, fromBase64Utf8 } from "../assets/js/base64.js";
+import { toBase64Utf8, fromBase64Utf8, toBase64Bytes, fromBase64Bytes } from "../assets/js/base64.js";
 import { readFileSync } from "node:fs";
 
 test("ASCII を base64 にできる", () => {
@@ -38,4 +38,35 @@ test("長い文字列でも落ちない", () => {
 test("文字列以外は拒否する", () => {
   assert.throws(() => toBase64Utf8(null), TypeError);
   assert.throws(() => toBase64Utf8({ a: 1 }), TypeError);
+});
+
+test("バイト列を base64 にして戻すと元に戻る", () => {
+  const bytes = new Uint8Array([0, 1, 127, 128, 255, 16, 42]);
+  assert.deepEqual(fromBase64Bytes(toBase64Bytes(bytes)), bytes);
+});
+
+test("空のバイト列も往復する", () => {
+  assert.deepEqual(fromBase64Bytes(toBase64Bytes(new Uint8Array(0))), new Uint8Array(0));
+});
+
+test("長いバイト列でも RangeError にならない", () => {
+  // String.fromCharCode(...bytes) だと引数が多すぎて落ちる長さ
+  const bytes = new Uint8Array(200_000).map((_, i) => i % 256);
+  assert.deepEqual(fromBase64Bytes(toBase64Bytes(bytes)), bytes);
+});
+
+test("toBase64Bytes は Uint8Array 以外を拒む", () => {
+  assert.throws(() => toBase64Bytes("あ"), TypeError);
+  assert.throws(() => toBase64Bytes([1, 2, 3]), TypeError);
+});
+
+test("fromBase64Bytes は文字列以外を拒む", () => {
+  assert.throws(() => fromBase64Bytes(new Uint8Array([1])), TypeError);
+  assert.throws(() => fromBase64Bytes(null), TypeError);
+});
+
+test("fromBase64Utf8 は文字列以外を拒む", () => {
+  // 設計書 §13 のテストの穴。toBase64Utf8 側にはあったが、こちらに無かった
+  assert.throws(() => fromBase64Utf8(123), TypeError);
+  assert.throws(() => fromBase64Utf8(null), TypeError);
 });
