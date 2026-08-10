@@ -3,6 +3,7 @@ import { icon } from "./icons.js";
 const PAGES = [
   { key: "schedule", href: "schedule.html", label: "旅程", ico: "i-calendar" },
   { key: "packing", href: "packing.html", label: "持ち物", ico: "i-luggage" },
+  { key: "souvenirs", href: "souvenirs.html", label: "お土産", ico: "i-shop" },
 ];
 
 export function renderNav(mount, current) {

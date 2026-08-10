@@ -28,6 +28,15 @@ const CARDS = [
     image:
       "https://www.thailandtravel.or.jp/wp-content/uploads/2017/03/01871-808x538.jpg",
   },
+  {
+    href: "souvenirs.html",
+    eyebrow: "Souvenirs",
+    title: "お土産リスト",
+    ico: "i-shop",
+    desc: "何を、誰に、どこで買うか。買ったものはチェックできます。",
+    image:
+      "https://www.thailandtravel.or.jp/wp-content/uploads/2017/03/01871-808x538.jpg",
+  },
 ];
 
 function cardHtml(card, index) {
