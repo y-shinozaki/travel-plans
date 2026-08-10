@@ -182,12 +182,22 @@ function deepFreeze(value) {
 // onPointerUp の try/catch は rebuildFromOrder と commit の両方を
 // 同じブロックで囲んでいるので、commit 側の例外で同じ配線を検証できる。
 
-/** テストに要る分だけの要素スタブ。closest はテストごとに個別に差し替える。 */
+/**
+ * テストに要る分だけの要素スタブ。closest はテストごとに個別に差し替える。
+ *
+ * style と getBoundingClientRect は、掴んだ行を指の下へ動かす follow()
+ * （packing-drag.js）が使う。**実 DOM が持つものは、使われるようになった時点で
+ * ここにも足すこと** ── 足さないと、このスタブを使うテストが
+ * 「TypeError: … is not a function」で落ちる。落ちてくれるのは good news で、
+ * 黙って通り抜けるより、噛み合っていないことがその場で分かる。
+ */
 function stubEl(dataset = {}) {
   return {
     dataset,
+    style: {},
     classList: { add() {}, remove() {} },
     setPointerCapture() {},
+    getBoundingClientRect: () => ({ top: 0, bottom: 0, height: 0, left: 0, right: 0, width: 0 }),
     closest() {
       return null;
     },
