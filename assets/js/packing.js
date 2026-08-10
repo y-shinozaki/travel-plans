@@ -141,9 +141,16 @@ const { safeDraw, scheduleDraw } = createDrawLoop({ page: "packing", draw, setNo
 /**
  * 変更を保存して描き直す。
  *
- * 順序が意味を持つ: 検査 → 下書きへ書く → 反映。saveLocal が投げたら
- * state も画面も動かない ── 保存できていないのに画面だけ新しい、という
- * 食い違いを作らない（schedule.js の commit と同じ）。
+ * 順序が意味を持つ: 検査 → 下書きへ書く → 反映。saveLocal が投げても state は
+ * 動かないが、**画面はすでに動いていることがある**（チェックボックスなど、
+ * ブラウザ自身が先に見た目を変えてしまう操作があるため）。catch では必ず
+ * safeDraw() で描き直し、画面を state（＝保存に失敗する前の値）へ揃え直す ──
+ * ここを飛ばすと、チェックは入ったまま・進捗は動かない・保存もされていない、
+ * という食い違った見た目が次の再描画まで残り続ける（schedule.js の commit と同じ）。
+ *
+ * **safeDraw() は必ず setNotice() より先に呼ぶ。** safeDraw() は成功時に
+ * setNotice(null) を呼ぶ副作用があるので、逆順にすると直後の setNotice が
+ * 書いたエラー文を safeDraw が消してしまう。
  *
  * validatePacking(next) を先に呼ぶのは、id の重複検出の網としてではない
  * （event-editor.js の applyChange とは違い、このファイルは 1 件ずつの検査を
@@ -164,6 +171,8 @@ function apply(next, focusKeyOverride) {
     state.data = sync.saveLocal(next);
   } catch (error) {
     console.error("packing: 保存できませんでした", error);
+    // 画面を state に揃え直してから知らせる。順序を逆にしないこと（上のコメント参照）
+    safeDraw("保存の失敗による表示の巻き戻し");
     setNotice(
       error instanceof DataError
         ? `この内容では保存できません。${error.message}`
