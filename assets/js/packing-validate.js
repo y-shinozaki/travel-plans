@@ -59,6 +59,31 @@ function checkIcon(icon, label, problems) {
 }
 
 /**
+ * id が空でない文字列であること、かつ渡された集合内で重複していないことを検査する。
+ * 通れば集合に加える。group と item の両方が同じ形の規則を持つのでここに集約する ──
+ * 重複時の文言だけは呼び出し側で変えられるようにしてある（区分は「区分の id が
+ * 重複しています」、項目は「id が重複しています」で、この違いは意図的に残す。
+ * 項目は複数の区分をまたいで同じ id 空間を共有するので、呼ばれる側が渡す
+ * `seenIds` がそのまま「どこまでが同じ名前空間か」を決める）。
+ */
+function checkUniqueId(node, seenIds, where, label, duplicateMessage, problems) {
+  if (!isNonEmptyString(node.id)) {
+    problems.push(`${where}: id が空でない文字列ではありません`);
+  } else if (seenIds.has(node.id)) {
+    problems.push(`${label}: ${duplicateMessage}`);
+  } else {
+    seenIds.add(node.id);
+  }
+}
+
+/** name が文字列であることを検査する。group と item で文言の形は同じ。 */
+function checkNameType(node, label, problems) {
+  if (typeof node.name !== "string") {
+    problems.push(`${label}: name が文字列ではありません（${show(node.name)}）`);
+  }
+}
+
+/**
  * 項目 1 件を検査して、不備の一覧を返す（空配列なら妥当）。
  *
  * 編集フォームからも呼べるよう公開している。**項目 1 件に対する規則の
@@ -81,18 +106,10 @@ export function validateItem(item, seenIds = new Set(), where = "項目") {
 
   const label = labelOf(item, where);
 
-  if (!isNonEmptyString(item.id)) {
-    problems.push(`${where}: id が空でない文字列ではありません`);
-  } else if (seenIds.has(item.id)) {
-    // 区分をまたいで一意。行の特定にも B3 のコメントの対象キーにも使う
-    problems.push(`${label}: id が重複しています`);
-  } else {
-    seenIds.add(item.id);
-  }
+  // 区分をまたいで一意。行の特定にも B3 のコメントの対象キーにも使う
+  checkUniqueId(item, seenIds, where, label, "id が重複しています", problems);
 
-  if (typeof item.name !== "string") {
-    problems.push(`${label}: name が文字列ではありません（${show(item.name)}）`);
-  }
+  checkNameType(item, label, problems);
 
   // note は省略できる
   if (item.note !== undefined && typeof item.note !== "string") {
@@ -119,17 +136,9 @@ function checkGroup(group, seenGroupIds, seenItemIds, where, problems) {
 
   const label = labelOf(group, where);
 
-  if (!isNonEmptyString(group.id)) {
-    problems.push(`${where}: id が空でない文字列ではありません`);
-  } else if (seenGroupIds.has(group.id)) {
-    problems.push(`${label}: 区分の id が重複しています`);
-  } else {
-    seenGroupIds.add(group.id);
-  }
+  checkUniqueId(group, seenGroupIds, where, label, "区分の id が重複しています", problems);
 
-  if (typeof group.name !== "string") {
-    problems.push(`${label}: name が文字列ではありません（${show(group.name)}）`);
-  }
+  checkNameType(group, label, problems);
 
   checkIcon(group.icon, label, problems);
 

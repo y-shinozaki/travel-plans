@@ -22,6 +22,14 @@ test("フィクスチャが検査の意味を保っている（番人）", () =>
     PACKING.groups.some((g) => g.items.some((i) => i.a !== i.b)),
     "a と b でチェックが違う項目が必要（進捗が別々に出ることのテストに要る）"
   );
+  assert.ok(
+    PACKING.groups.some((g) => g.items.some((i) => i.note)),
+    "note を持つ項目が必要（note 省略可のテストに要る）"
+  );
+  assert.ok(
+    PACKING.groups.some((g) => g.items.some((i) => i.note === "")),
+    "note が空の項目が必要（note 省略可のテストに要る）"
+  );
 });
 
 test("PackingDataError は DataError を継承している", () => {
@@ -101,4 +109,68 @@ test("不備は 1 件目で止めずにまとめて報告する", () => {
   } catch (error) {
     assert.match(error.message, /3 件の不備/);
   }
+});
+
+test("項目の id が空でない文字列でなければ、重複ではなく id 不備として投げる", () => {
+  const data = clone();
+  data.groups[0].items[0].id = "";
+  assert.throws(() => validatePacking(data), /id が空でない文字列ではありません/);
+
+  const data2 = clone();
+  delete data2.groups[0].items[0].id;
+  assert.throws(() => validatePacking(data2), /id が空でない文字列ではありません/);
+});
+
+test("区分の name が文字列でなければ、その区分を名指しして投げる", () => {
+  // 削除すると、他のテストを通したまま気付かれずに素通りする（自己レビューで発覚した穴）
+  const data = clone();
+  data.groups[0].name = 42;
+  assert.throws(() => validatePacking(data), /g-valuables/);
+  assert.throws(() => validatePacking(data), /name が文字列ではありません/);
+});
+
+test("区分の items が配列でなければ、クラッシュせず名指しした不備として投げる", () => {
+  // 削除すると group.items.forEach が生の TypeError を投げるようになる ──
+  // 「名指しして集めて報告する」という、このモジュールの核になる約束が壊れる
+  const data = clone();
+  data.groups[0].items = null;
+  try {
+    validatePacking(data);
+    assert.fail("投げていません");
+  } catch (error) {
+    assert.ok(error instanceof PackingDataError, "PackingDataError であるべき");
+    assert.ok(!(error instanceof TypeError), "生の TypeError ではないはず");
+    assert.match(error.message, /g-valuables/);
+    assert.match(error.message, /items が配列ではありません/);
+  }
+
+  const data2 = clone();
+  data2.groups[0].items = {};
+  assert.throws(() => validatePacking(data2), PackingDataError);
+});
+
+test("区分そのものがオブジェクトでなければ、位置で名指しして投げる", () => {
+  const data = clone();
+  data.groups[0] = null;
+  assert.throws(() => validatePacking(data), /groups\[0\]/);
+});
+
+test("項目そのものがオブジェクトでなければ、位置で名指しして投げる", () => {
+  const data = clone();
+  data.groups[0].items[0] = null;
+  assert.throws(() => validatePacking(data), /items\[0\]/);
+});
+
+test("note が文字列でなければ、その項目を名指しして投げる", () => {
+  const data = clone();
+  data.groups[0].items[1].note = 42; // cash
+  assert.throws(() => validatePacking(data), /cash/);
+  assert.throws(() => validatePacking(data), /note が文字列ではありません/);
+});
+
+test("b だけが真偽値でなくても、a 単独と同様に投げる", () => {
+  const data = clone();
+  data.groups[0].items[0].b = "true";
+  assert.throws(() => validatePacking(data), /passport/);
+  assert.throws(() => validatePacking(data), /b のチェック状態が真偽値ではありません/);
 });
