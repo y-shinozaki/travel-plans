@@ -31,8 +31,9 @@
 
 | ファイル | 責務 |
 |---|---|
-| `assets/js/page-notice.js` | `createNotices()` / `createSafeDraw()`。3 ページが共有する「失敗を画面に出す」経路 |
+| `assets/js/page-notice.js` | `createNotices()` / `createDrawLoop()`。3 ページが共有する「失敗を画面に出す」経路と再描画の予約制 |
 | `assets/js/focus-key.js` | フォーカスキーの書式。組み立てる側と `querySelector` する側が同じ関数を呼ぶための継ぎ目つぶし |
+| `assets/js/row-controls.js` | 一覧の行のボタン部品（`iconButton` / `armedIconButton` / `CHECK_MARK`）。持ち物とお土産が共有 |
 | `assets/js/souvenirs-data.js` | お土産データの純粋操作。DOM も store も知らない |
 | `assets/js/souvenirs-validate.js` | `validateSouvenirs()` と `SouvenirDataError` |
 | `assets/js/souvenirs-render.js` | 進捗と表の描画 |
@@ -40,7 +41,7 @@
 | `assets/css/souvenirs.css` | `souvenirs.html` 専用 |
 | `souvenirs.html` | ページ本体 |
 | `tests/fixtures/souvenirs.js` | テスト用の合成データ |
-| `tests/page-notice.test.js` / `focus-key.test.js` / `souvenirs-data.test.js` / `souvenirs-validate.test.js` / `souvenirs-render.test.js` | 上記のテスト |
+| `tests/page-notice.test.js` / `focus-key.test.js` / `row-controls.test.js` / `souvenirs-data.test.js` / `souvenirs-validate.test.js` / `souvenirs-render.test.js` | 上記のテスト |
 
 **変更**
 
@@ -49,7 +50,7 @@
 | `assets/js/load-error.js` | `toLoadError()` を追加 |
 | `assets/js/schedule.js` | 通知・`safeDraw`・失敗分類を共通部品へ差し替え |
 | `assets/js/packing.js` | 同上。フォーカスキーを `focus-key.js` 経由に |
-| `assets/js/packing-render.js` | フォーカスキーを `focus-key.js` 経由に |
+| `assets/js/packing-render.js` | フォーカスキーを `focus-key.js` 経由に。ボタン部品を `row-controls.js` へ移す |
 | `assets/js/menu.js` | カード 3 枚目 |
 | `assets/js/nav.js` | ページ 3 つ目 |
 | `tests/csp.test.js` | `PAGES` に `souvenirs.html` |
@@ -73,13 +74,15 @@
 **Interfaces:**
 - Produces:
   - `createNotices(anchor: Element) => { setNotice(message: string|null): void, setStampNotice(message: string|null): void }`
-  - `createSafeDraw({ page: string, draw: Function, setNotice: Function, details?: () => object }) => (context: string, ...args) => void`
+  - `createDrawLoop({ page: string, draw: Function, setNotice: Function, details?: () => object }) => { safeDraw(context, focusKeyOverride?), scheduleDraw(context, focusKeyOverride?) }`
   - `REDRAW_FAILED(context: string) => string`
   - `toLoadError(error: Error) => Error`（投げずに返す。呼び出し側が `throw toLoadError(e)` と書く）
 
 **背景（この抽出が必要な理由）**
 
-`setNotice` / `setStampNotice` は 2 ページに全文コピーされていて、**違うのはアンカー要素だけ**（`els.cal` / `els.table`）。失敗分類の 4 行は `EventDataError` か `DataError` かの違いしかなく、**`EventDataError` は `DataError` を継承しているので `DataError` 1 本で足りる**。`safeDraw` は console へ添える情報と予約の取り消しが各ページ固有だが、**画面に出す文言は完全に一致**しており、そこが割れると片方のページだけ違うことを言い出す。設計書 §13 を参照。
+`setNotice` / `setStampNotice` は 2 ページに全文コピーされていて、**違うのはアンカー要素だけ**（`els.cal` / `els.table`）。失敗分類の 4 行は `EventDataError` か `DataError` かの違いしかなく、**`EventDataError` は `DataError` を継承しているので `DataError` 1 本で足りる**。`safeDraw` は console へ添える情報が各ページ固有だが、**画面に出す文言は完全に一致**しており、そこが割れると片方のページだけ違うことを言い出す。設計書 §13 を参照。
+
+**予約制（`scheduleDraw`）も一緒に抱える**（2026-08-10、着手前のレビューで決定）。当初の計画は `safeDraw` だけを抜き、38 行の予約制の塊を `packing.js` と `souvenirs.js` に複製する形だった。あの塊のコメントは **`node --test` では絶対に捕まえられない不具合**の修正内容そのもの（入力欄の `change` が `mousedown` の処理中に発火する話。設計書 §13）で、複製すると次の人が片方だけ直して、もう片方が黙って壊れる。予約の取り消しを `safeDraw` の内側に閉じ込めれば、呼ぶ側は順序を気にしなくてよくなる。
 
 - [ ] **Step 1: `tests/page-notice.test.js` を書く（失敗する状態で）**
 
@@ -93,7 +96,7 @@
  */
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createNotices, createSafeDraw, REDRAW_FAILED } from "../assets/js/page-notice.js";
+import { createNotices, createDrawLoop, REDRAW_FAILED } from "../assets/js/page-notice.js";
 
 /** createElement だけを備えた最小スタブ。付けた属性と本文を読み出せる。 */
 function stubDocument() {
@@ -185,29 +188,29 @@ test("createNotices: 2 つは別の要素を使う（片方が他方を消さな
   assert.equal(inserted[0].hidden, false);
 });
 
-test("createSafeDraw: 成功したら draw を呼び、通知を消す", () => {
+test("createDrawLoop: safeDraw は draw を呼び、通知を消す", () => {
   const calls = [];
-  const safeDraw = createSafeDraw({
+  const { safeDraw } = createDrawLoop({
     page: "test",
     draw: (...args) => calls.push(["draw", ...args]),
     setNotice: (m) => calls.push(["notice", m]),
   });
 
-  safeDraw("なにかの操作", "extra-arg");
+  safeDraw("なにかの操作", "focus-key");
 
   assert.deepEqual(calls, [
-    ["draw", "extra-arg"],
+    ["draw", "focus-key"],
     ["notice", null],
   ]);
 });
 
-test("createSafeDraw: draw が投げても外へ出さず、文言を出す", () => {
+test("createDrawLoop: draw が投げても外へ出さず、文言を出す", () => {
   const notices = [];
   const errors = [];
   const original = console.error;
   console.error = (...a) => errors.push(a);
   try {
-    const safeDraw = createSafeDraw({
+    const { safeDraw } = createDrawLoop({
       page: "test",
       draw: () => {
         throw new Error("描画の中の失敗");
@@ -226,12 +229,12 @@ test("createSafeDraw: draw が投げても外へ出さず、文言を出す", ()
   assert.equal(errors.length, 1, "コンソールへ出していません");
 });
 
-test("createSafeDraw: details があれば console へ添える", () => {
+test("createDrawLoop: details があれば console へ添える", () => {
   const errors = [];
   const original = console.error;
   console.error = (...a) => errors.push(a);
   try {
-    const safeDraw = createSafeDraw({
+    const { safeDraw } = createDrawLoop({
       page: "schedule",
       draw: () => {
         throw new Error("boom");
@@ -247,12 +250,12 @@ test("createSafeDraw: details があれば console へ添える", () => {
   assert.deepEqual(errors[0][1], { viewStart: 6 }, "details が console に載っていません");
 });
 
-test("createSafeDraw: details が無ければ余分な引数を足さない", () => {
+test("createDrawLoop: details が無ければ余分な引数を足さない", () => {
   const errors = [];
   const original = console.error;
   console.error = (...a) => errors.push(a);
   try {
-    const safeDraw = createSafeDraw({
+    const { safeDraw } = createDrawLoop({
       page: "packing",
       draw: () => {
         throw new Error("boom");
@@ -265,6 +268,70 @@ test("createSafeDraw: details が無ければ余分な引数を足さない", ()
   }
 
   assert.equal(errors[0].length, 2, "メッセージとエラーの 2 つだけであるべきです");
+});
+
+test("createDrawLoop: scheduleDraw は 1 tick 送ってから描く", async () => {
+  const calls = [];
+  const { scheduleDraw } = createDrawLoop({
+    page: "test",
+    draw: () => calls.push("draw"),
+    setNotice: () => {},
+  });
+
+  scheduleDraw("保存");
+  assert.deepEqual(calls, [], "同期のうちに描いています（click より前に DOM が消える）");
+
+  await new Promise((r) => setTimeout(r, 0));
+  assert.deepEqual(calls, ["draw"]);
+});
+
+test("createDrawLoop: 連続した予約は 1 回の描画にまとめる", async () => {
+  let drawn = 0;
+  const { scheduleDraw } = createDrawLoop({
+    page: "test",
+    draw: () => drawn++,
+    setNotice: () => {},
+  });
+
+  scheduleDraw("1 回目");
+  scheduleDraw("2 回目");
+  scheduleDraw("3 回目");
+  await new Promise((r) => setTimeout(r, 0));
+
+  assert.equal(drawn, 1, "予約がまとまっていません");
+});
+
+test("createDrawLoop: あとから来たフォーカス指定を優先し、undefined で消さない", async () => {
+  const seen = [];
+  const { scheduleDraw } = createDrawLoop({
+    page: "test",
+    draw: (key) => seen.push(key),
+    setNotice: () => {},
+  });
+
+  scheduleDraw("追加", "sv:sv-001:name");
+  scheduleDraw("保存"); // 指定なし。前の指定を消してはいけない
+  await new Promise((r) => setTimeout(r, 0));
+
+  assert.deepEqual(seen, ["sv:sv-001:name"]);
+});
+
+test("createDrawLoop: safeDraw は予約を取り消してから描く", async () => {
+  // 取り消さないと、safeDraw のあとに予約分が走り、
+  // 成功時の setNotice(null) が直前に出した文言を消す（ドラッグ失敗の経路）
+  let drawn = 0;
+  const { safeDraw, scheduleDraw } = createDrawLoop({
+    page: "test",
+    draw: () => drawn++,
+    setNotice: () => {},
+  });
+
+  scheduleDraw("予約");
+  safeDraw("即時");
+  assert.equal(drawn, 1, "即時の描画が起きていません");
+
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(drawn, 1, "取り消したはずの予約が走りました");
 });
 ```
 
@@ -331,23 +398,57 @@ export const REDRAW_FAILED = (context) =>
   "直前の表示のまま止まっています。原因はブラウザのコンソールを確認してください。";
 
 /**
- * 初回描画のあとの再描画を包む。
+ * 初回描画のあとの再描画を、即時（safeDraw）と予約（scheduleDraw）の 2 つの口で包む。
  *
  * main() の try/catch が守るのは最初の draw() だけで、セレクトの change や
  * ボタンの click から呼ばれる draw() は素通しになる。そこで落ちると画面は
  * 前回の描画を半分だけ残した状態で止まり、利用者には何も伝わらない。
  *
+ * **なぜ予約が要るか（設計書 §13。node --test では捕まえられない不具合）**
+ *
+ * 入力欄の change は blur の最中に発火する ── つまり、利用者がボタンを押した
+ * mousedown の処理の**途中**で起きる。そこで表を replaceChildren すると:
+ *
+ * 1. 押しかけていたボタンが mouseup より前に文書から消え、**click が発火しない**。
+ *    名前を打ってすぐ「追加」を押しても増えず、画面には何も出ない
+ *    （2 度押せば動くので、かえって原因が分かりにくい）
+ * 2. ブラウザが移そうとしていたフォーカス先も消えるので document.activeElement は
+ *    <body> になり、描画側がキーを拾えずフォーカスが落ちたままになる
+ *
+ * 描画を 1 tick 送れば両方が消える。**microtask では足りない** ──
+ * blur → change は mousedown の既定動作の中なので、queueMicrotask は
+ * mouseup より前に走ってしまう。
+ *
+ * **予約の取り消しは safeDraw の内側に閉じ込めてある。** 呼ぶ側が順序を
+ * 気にしなくてよくするため ── 取り消さずに即時描画すると、そのあとに予約分が
+ * 走り、成功時の setNotice(null) が直前に出した文言を消す。
+ *
+ * 予約が要らないページ（schedule.html）は safeDraw だけを取り出して使う。
+ *
  * @param {object} args
  * @param {string} args.page console に出す接頭辞（"schedule" / "packing" / "souvenirs"）
- * @param {Function} args.draw 描画本体。safeDraw に渡した残りの引数がそのまま届く
+ * @param {Function} args.draw 描画本体。第 1 引数にフォーカスキーの指定が渡る
  * @param {Function} args.setNotice createNotices() の setNotice
  * @param {() => object} [args.details] 失敗時に console へ添える状態
- * @returns {(context: string, ...args: any[]) => void}
+ * @returns {{safeDraw: Function, scheduleDraw: Function}}
  */
-export function createSafeDraw({ page, draw, setNotice, details }) {
-  return (context, ...args) => {
+export function createDrawLoop({ page, draw, setNotice, details }) {
+  let timer = null;
+  let pendingContext = "";
+  let pendingOverride = null;
+
+  function cancelPending() {
+    if (timer === null) return;
+    clearTimeout(timer);
+    timer = null;
+    pendingOverride = null;
+  }
+
+  /** 今すぐ描く。予約があれば捨てる。 */
+  function safeDraw(context, focusKeyOverride) {
+    cancelPending();
     try {
-      draw(...args);
+      draw(focusKeyOverride);
       setNotice(null);
     } catch (error) {
       // details が無いときに undefined を足さない（テストが引数の本数を見ている）
@@ -355,14 +456,34 @@ export function createSafeDraw({ page, draw, setNotice, details }) {
       console.error(`${page}: 再描画に失敗しました（${context}）`, ...extra, error);
       setNotice(REDRAW_FAILED(context));
     }
-  };
+  }
+
+  /**
+   * 1 tick 送ってから描く。連続した変更（改名の直後に追加、など）は
+   * 1 回の描画にまとめる ── まとめないと、先に予約した描画が新しい
+   * フォーカス指定を上書きしてしまう。
+   */
+  function scheduleDraw(context, focusKeyOverride) {
+    pendingContext = context;
+    // あとから来た指定を優先する。undefined で上書きして消さないこと
+    if (focusKeyOverride) pendingOverride = focusKeyOverride;
+    if (timer !== null) return;
+    timer = setTimeout(() => {
+      timer = null;
+      const override = pendingOverride;
+      pendingOverride = null;
+      safeDraw(pendingContext, override);
+    }, 0);
+  }
+
+  return { safeDraw, scheduleDraw };
 }
 ```
 
 - [ ] **Step 4: 通ることを確かめる**
 
 Run: `node --test tests/page-notice.test.js`
-Expected: PASS（9 件）
+Expected: PASS（13 件）
 
 - [ ] **Step 5: `toLoadError()` のテストを `tests/load-error.test.js` の末尾に足す**
 
@@ -459,7 +580,7 @@ Expected: PASS
 `import` に足す:
 
 ```javascript
-import { createNotices, createSafeDraw } from "./page-notice.js";
+import { createNotices, createDrawLoop } from "./page-notice.js";
 import { classifyLoadError, toLoadError } from "./load-error.js";
 ```
 
@@ -479,7 +600,9 @@ const { setNotice, setStampNotice } = createNotices(els.cal);
  * 初回描画のあとの再描画。どの操作で、どの状態で失敗したかは console へ出す。
  * 文言は page-notice.js が持つ（3 ページで同じことを言うため）。
  */
-const safeDraw = createSafeDraw({
+// このページに予約は要らない（入力欄の change の最中に一覧を作り直す経路が
+// 無い ── 予定の編集はシートを開いて保存する形。設計書 §13）。safeDraw だけ取る
+const { safeDraw } = createDrawLoop({
   page: "schedule",
   draw,
   setNotice,
@@ -503,7 +626,7 @@ const safeDraw = createSafeDraw({
 `import` に足す:
 
 ```javascript
-import { createNotices, createSafeDraw } from "./page-notice.js";
+import { createNotices, createDrawLoop } from "./page-notice.js";
 ```
 
 `classifyLoadError, DataFetchError, DataParseError` の import を `classifyLoadError, toLoadError` に変える。`DataError` / `DecryptError` の import は `apply()` が `DataError` を使っているので **`DataError` は残す**。`DecryptError` が他で使われていなければ外す（`grep -n "DecryptError" assets/js/packing.js` で確認）。
@@ -518,38 +641,32 @@ import { createNotices, createSafeDraw } from "./page-notice.js";
 const { setNotice, setStampNotice } = createNotices(els.table);
 ```
 
-`safeDraw` の関数定義を、**予約の取り消しだけを自分で持つ形**に変える。共通部分は `createSafeDraw` に任せる:
+**`safeDraw` と `scheduleDraw` の両方を削除する。** `let drawTimer` / `let drawContext` / `let drawOverride` の 3 つの宣言と、`/* ── 再描画の予約 ── */` から始まるコメントブロックごと消し、次の 2 行に置き換える:
 
 ```javascript
-/** 文言と console の形は page-notice.js が持つ。予約の取り消しだけがこのページ固有。 */
-const baseSafeDraw = createSafeDraw({ page: "packing", draw, setNotice });
-
 /**
- * 再描画の失敗を画面に出す。
- *
- * 予約済みの描画があれば取り消してから描く。残すと、この呼び出しのあとに
- * 予約分が走り、成功時の setNotice(null) が直前に出した文言を消してしまう
- * （ドラッグの onError がまさにそれを出している）。
+ * 即時（safeDraw）と予約（scheduleDraw）の 2 つの口。予約が要る理由と、
+ * 予約の取り消しが safeDraw の内側にある理由は page-notice.js を参照
+ * （設計書 §13。node --test では捕まえられない不具合の修正なので、
+ * あの記述を消さないこと）。
  */
-function safeDraw(context, focusKeyOverride) {
-  if (drawTimer !== null) {
-    clearTimeout(drawTimer);
-    drawTimer = null;
-    drawOverride = null;
-  }
-  baseSafeDraw(context, focusKeyOverride);
-}
+const { safeDraw, scheduleDraw } = createDrawLoop({ page: "packing", draw, setNotice });
 ```
+
+**移したコメントを捨てないこと。** 予約制の理由（`mousedown` の途中で `change` が
+発火する話）は `page-notice.js` の `createDrawLoop` の JSDoc に全文が入っている。
+このタスクで `packing.js` から消える 38 行は、**移動であって削除ではない**。
 
 **ファイル内の順序を確かめること。** `const` は関数宣言と違って巻き上がらないので、次の順に並んでいる必要がある:
 
-1. `const { setNotice, setStampNotice } = createNotices(els.table);`（`els` の定義より後ろ）
-2. `function draw(...)` の宣言（関数宣言なので巻き上がるが、読む順として）
-3. `let drawTimer` / `let drawContext` / `let drawOverride` と `scheduleDraw`
-4. `const baseSafeDraw = createSafeDraw({ page: "packing", draw, setNotice });`
-5. `function safeDraw(...)`
+1. `const els = { ... }`
+2. `const { setNotice, setStampNotice } = createNotices(els.table);`
+3. `function draw(...)` の宣言（関数宣言なので巻き上がるが、読む順として）
+4. `const { safeDraw, scheduleDraw } = createDrawLoop({ ... });`
 
-`baseSafeDraw` が `setNotice` より前にあると `ReferenceError`（TDZ）で**ページが真っ白**になる。`node --test` では捕まらないので、Step 12 のブラウザ確認が唯一の網。
+`createDrawLoop` の呼び出しが `setNotice` の宣言より前にあると `ReferenceError`（TDZ）で**ページが真っ白**になる。`node --test` では捕まらないので、Step 12 のブラウザ確認が唯一の網。
+
+`draw()` の中のドラッグの `onError` が `safeDraw(...)` → `setNotice(...)` の順で呼んでいる箇所はそのまま残す（順序に意味がある。`safeDraw` の成功時 `setNotice(null)` を、あとから上書きしている）。
 
 失敗分類の 4 行を 1 行にする:
 
@@ -560,7 +677,7 @@ function safeDraw(context, focusKeyOverride) {
 - [ ] **Step 11: 全テストを流す**
 
 Run: `node --test`
-Expected: PASS。**件数は 489 + 15 = 504**（page-notice 9 件、load-error 6 件）
+Expected: PASS。**件数は 489 + 19 = 508**（page-notice 13 件、load-error 6 件）
 
 - [ ] **Step 12: ブラウザで 2 ページの退行が無いことを確かめる**
 
@@ -584,12 +701,14 @@ git commit -m "Give the two pages one place to say that something broke"
 
 ---
 
-## Task 2: フォーカスキーの継ぎ目をつぶす
+## Task 2: 2 つ目のページが写すことになる継ぎ目をつぶす（フォーカスキーと行コントロール）
 
 **Files:**
 - Create: `assets/js/focus-key.js`
+- Create: `assets/js/row-controls.js`
 - Create: `tests/focus-key.test.js`
-- Modify: `assets/js/packing-render.js`（キー文字列を作っている 10 か所）
+- Create: `tests/row-controls.test.js`
+- Modify: `assets/js/packing-render.js`（キー文字列 12 か所と、ボタン部品の定義 3 つ）
 - Modify: `assets/js/packing.js`（`onAddItem` / `addGroup` の 2 か所）
 
 **Interfaces:**
@@ -597,10 +716,21 @@ git commit -m "Give the two pages one place to say that something broke"
   - `itemFocusKey(id: string, field: string) => string` — `item:<id>:<field>`
   - `groupFocusKey(id: string, field: string) => string` — `group:<id>:<field>`
   - `souvenirFocusKey(id: string, field: string) => string` — `sv:<id>:<field>`
+  - `iconButton(cls: string, iconId: string, label: string) => HTMLButtonElement`
+  - `armedIconButton({ cls, armedCls, iconId, label, armedLabel, onConfirm }) => HTMLButtonElement`
+  - `CHECK_MARK: string`（生の SVG。定数）
 
-**背景**
+**このタスクが 2 つを一緒に扱う理由**
+
+どちらも「2 つ目のページが書き写すことになる小さな共有物」で、写した瞬間に**片方だけ直せてしまう**状態が生まれる。3 つ目ができてから直すより安い、という Task 1 と同じ判断（2026-08-10、着手前のレビューで `row-controls.js` を追加）。
+
+**背景 1: フォーカスキー**
 
 `item:<id>:name` という書式が `packing-render.js`（組み立てる側）と `packing.js`（`querySelector` する側）に独立して書かれている。**片方だけ書式を変えても例外は出ない** ── `querySelector` が何も見つけず、フォーカスが静かに `<body>` へ落ちるだけになる。まさにこの逸脱を潰すために足した仕掛けが、同じ壊れ方で無効になる（設計書 §13）。お土産ページも同じ経路を持つので、いま潰さないと 3 か所目ができる。
+
+**背景 2: 行コントロール**
+
+`iconButton` と `armedIconButton` は `packing-render.js` にしかない。お土産ページも「✕ を 1 度目で身構え、2 度目で実行する」削除ボタンを持つので、写すと**「`confirm()` を使わない」という規約の実体が 2 か所に分かれる**。`CHECK_MARK`（生の SVG）はさらに悪く、**すでに 3 か所**（`packing-render.js` / `event-form.js:126` / `aman-mock.html:2487`）にあり、`packing-render.js` のコメント自身がそれを問題として記録している。4 か所目を作らない。
 
 - [ ] **Step 1: `tests/focus-key.test.js` を書く**
 
@@ -709,18 +839,234 @@ import { itemFocusKey, groupFocusKey } from "./focus-key.js";
 
 `onAddItem` の `` `item:${id}:name` `` を `itemFocusKey(id, "name")` に、`addGroup` の click ハンドラの `` `group:${id}:name` `` を `groupFocusKey(id, "name")` に置き換える。
 
+- [ ] **Step 6b: `tests/row-controls.test.js` を書く**
+
+```javascript
+/**
+ * row-controls.js。packing-render.test.js と同じ最小 DOM スタブを使う。
+ *
+ * 見るのは「2 度押しで初めて実行する」ことと、値が innerHTML に流れないこと。
+ * どちらも規約（alert/confirm を使わない・値を innerHTML に入れない）の実体。
+ */
+import test from "node:test";
+import assert from "node:assert/strict";
+import { iconButton, armedIconButton, CHECK_MARK } from "../assets/js/row-controls.js";
+
+function stubDocument() {
+  const htmlSink = [];
+  globalThis.document = {
+    createElement: (tag) => ({
+      tagName: tag.toUpperCase(),
+      children: [],
+      dataset: {},
+      style: {},
+      attrs: {},
+      listeners: {},
+      className: "",
+      set innerHTML(v) {
+        htmlSink.push(String(v));
+        this._html = String(v);
+      },
+      get innerHTML() {
+        return this._html ?? "";
+      },
+      set textContent(v) {
+        this._text = String(v);
+      },
+      get textContent() {
+        return this._text ?? "";
+      },
+      setAttribute(k, v) {
+        this.attrs[k] = String(v);
+      },
+      appendChild(c) {
+        this.children.push(c);
+        return c;
+      },
+      addEventListener(type, fn) {
+        (this.listeners[type] ??= []).push(fn);
+      },
+      dispatch(type) {
+        for (const fn of this.listeners[type] ?? []) fn();
+      },
+    }),
+  };
+  return htmlSink;
+}
+
+test("iconButton: type=button と aria-label / title を付ける", () => {
+  stubDocument();
+  const b = iconButton("rowbtn", "i-x", "削除");
+  assert.equal(b.type, "button");
+  assert.equal(b.attrs["aria-label"], "削除");
+  assert.equal(b.title, "削除");
+  assert.equal(b.className, "rowbtn");
+});
+
+test("iconButton: ラベルは innerHTML に流れない（アイコンの定数だけ）", () => {
+  const htmlSink = stubDocument();
+  const payload = '<img src=x onerror="window.__pwned=1">';
+  iconButton("rowbtn", "i-x", payload);
+  for (const html of htmlSink) {
+    assert.ok(!html.includes(payload), `innerHTML にラベルが流れました: ${html}`);
+  }
+});
+
+test("armedIconButton: 1 度目は実行しない", () => {
+  stubDocument();
+  let fired = 0;
+  const b = armedIconButton({
+    cls: "rowbtn rowbtn--del",
+    armedCls: "rowbtn rowbtn--confirm",
+    iconId: "i-x",
+    label: "削除",
+    armedLabel: "もう一度で削除",
+    onConfirm: () => fired++,
+  });
+  b.dispatch("click");
+  assert.equal(fired, 0, "1 度目で実行されました");
+});
+
+test("armedIconButton: 1 度目で見た目と読み上げが変わる", () => {
+  stubDocument();
+  const b = armedIconButton({
+    cls: "rowbtn rowbtn--del",
+    armedCls: "rowbtn rowbtn--confirm",
+    iconId: "i-x",
+    label: "削除",
+    armedLabel: "もう一度で削除",
+    onConfirm: () => {},
+  });
+  b.dispatch("click");
+  assert.equal(b.className, "rowbtn rowbtn--confirm");
+  assert.equal(b.attrs["aria-label"], "もう一度で削除", "読み上げが変わっていません");
+  assert.equal(b.title, "もう一度で削除");
+});
+
+test("armedIconButton: 2 度目で実行する", () => {
+  stubDocument();
+  let fired = 0;
+  const b = armedIconButton({
+    cls: "a",
+    armedCls: "b",
+    iconId: "i-x",
+    label: "削除",
+    armedLabel: "もう一度で削除",
+    onConfirm: () => fired++,
+  });
+  b.dispatch("click");
+  b.dispatch("click");
+  assert.equal(fired, 1);
+});
+
+test("CHECK_MARK: use ではなく生の path を持つ", () => {
+  // icon("i-check") が返す <use> だと controls.css の
+  // `.check__box svg path` が届かず、印の出ないボックスになる
+  assert.match(CHECK_MARK, /<path/);
+  assert.ok(!CHECK_MARK.includes("<use"), "use を使うとチェックの印が出ません");
+});
+```
+
+- [ ] **Step 6c: 落ちることを確かめる**
+
+Run: `node --test tests/row-controls.test.js`
+Expected: FAIL（`Cannot find module`）
+
+- [ ] **Step 6d: `assets/js/row-controls.js` を書く**
+
+`packing-render.js` から `iconButton` / `armedIconButton` / `CHECK_MARK` を**コメントごと**移す（複製ではなく移動）。
+
+```javascript
+/**
+ * 一覧の行に置くコントロール。持ち物とお土産の両方が使う。
+ *
+ * ここに集めてあるのは、**写すと規約の実体が 2 か所に分かれるもの**:
+ * 「1 度目で身構え、2 度目で実行する」は `confirm()` を使わないという規約
+ * （CLAUDE.md）の実体そのもので、片方だけ直せてしまう状態を作らない。
+ *
+ * 値は必ず textContent で入れる。innerHTML に入るのは icon() が返す定数と
+ * CHECK_MARK だけ（CLAUDE.md の規約）。
+ */
+
+import { el } from "./dom.js";
+import { icon } from "./icons.js";
+
+/** 文字は textContent、アイコンだけ定数の innerHTML。値は絶対に混ぜない。 */
+export function iconButton(cls, iconId, label) {
+  const button = el("button", cls);
+  button.type = "button";
+  button.innerHTML = icon(iconId, "ico--sm");
+  button.setAttribute("aria-label", label);
+  button.title = label;
+  return button;
+}
+
+/**
+ * 1 度目で身構え、2 度目で実行するボタン。`confirm()` は使わない（CLAUDE.md）。
+ * 見た目だけでなく aria-label と title も変える ── 読み上げだけを使う人にも
+ * 「次で消える」ことが伝わらないと、身構える意味が無い。
+ */
+export function armedIconButton({ cls, armedCls, iconId, label, armedLabel, onConfirm }) {
+  const button = iconButton(cls, iconId, label);
+  let armed = false;
+  button.addEventListener("click", () => {
+    if (!armed) {
+      armed = true;
+      button.className = armedCls;
+      button.setAttribute("aria-label", armedLabel);
+      button.title = armedLabel;
+      return;
+    }
+    onConfirm();
+  });
+  return button;
+}
+
+/**
+ * チェックの印。**icon("i-check") を使わないこと。**
+ *
+ * controls.css の `.check__box svg path` が stroke-dashoffset を遷移させて
+ * チェックを描くアニメーションを持っている。icon() が返すのは
+ * `<svg><use href="#i-check"/></svg>` で、path はシャドウツリーの中に入るため
+ * このセレクタが届かない ── チェックを入れても印が出ないボックスになる。
+ *
+ * event-form.js:126 と aman-mock.html:2487 にも同じ生の SVG がある。
+ * そちらは今回のフェーズの範囲外だが、**新しく 4 か所目を作らないために**
+ * ここへ集約した（設計書 §13 の「小さいもの」）。
+ */
+export const CHECK_MARK =
+  '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+  '<path d="m4.5 12.6 5.2 5.2L19.5 6.6"/></svg>';
+```
+
+- [ ] **Step 6e: `packing-render.js` を import に切り替える**
+
+`iconButton` / `armedIconButton` / `CHECK_MARK` の**定義を削除**し、import に置き換える:
+
+```javascript
+import { iconButton, armedIconButton, CHECK_MARK } from "./row-controls.js";
+```
+
+`el` と `icon` の import は他でも使っているので残す（`grep -n "icon(" assets/js/packing-render.js` で確認）。
+
+- [ ] **Step 6f: 通ることを確かめる**
+
+Run: `node --test tests/row-controls.test.js tests/packing-render.test.js`
+Expected: PASS（row-controls 6 件、packing-render は既存の件数のまま）
+
 - [ ] **Step 7: 生の書式が残っていないことを確かめる**
 
 Run:
 ```bash
 grep -rn '"item:\|`item:\|"group:\|`group:' assets/js/packing-render.js assets/js/packing.js
+grep -n "function iconButton\|function armedIconButton\|const CHECK_MARK" assets/js/packing-render.js
 ```
-Expected: 出力なし（`focus-key.js` の中だけが書式を知っている状態）
+Expected: どちらも出力なし（書式は `focus-key.js`、ボタン部品は `row-controls.js` だけが持っている状態）
 
 - [ ] **Step 8: 全テストを流す**
 
 Run: `node --test`
-Expected: PASS。**504 + 4 = 508**
+Expected: PASS。**508 + 10 = 518**（focus-key 4 件、row-controls 6 件）
 
 - [ ] **Step 9: ブラウザでフォーカスの退行が無いことを確かめる**
 
@@ -729,8 +1075,8 @@ Expected: PASS。**504 + 4 = 508**
 - [ ] **Step 10: コミット**
 
 ```bash
-git add assets/js/focus-key.js assets/js/packing-render.js assets/js/packing.js tests/focus-key.test.js
-git commit -m "Let both sides of the focus handoff read the format from one place"
+git add assets/js/focus-key.js assets/js/row-controls.js assets/js/packing-render.js assets/js/packing.js tests/focus-key.test.js tests/row-controls.test.js
+git commit -m "Move the shared row pieces somewhere a second page can reach them"
 ```
 
 ---
@@ -1335,7 +1681,7 @@ Expected: PASS（20 件）
 - [ ] **Step 5: 全テストを流す**
 
 Run: `node --test`
-Expected: PASS。**508 + 15 + 20 = 543**
+Expected: PASS。**518 + 15 + 20 = 553**
 
 - [ ] **Step 6: コミット**
 
@@ -1353,7 +1699,7 @@ git commit -m "Check the souvenir list before anything tries to draw it"
 - Create: `tests/souvenirs-render.test.js`
 
 **Interfaces:**
-- Consumes: `progressOf` / `shopSuggestions`（Task 3）、`souvenirFocusKey`（Task 2）、`el`（`dom.js`）、`icon`（`icons.js`）
+- Consumes: `progressOf` / `shopSuggestions`（Task 3）、`souvenirFocusKey` / `armedIconButton` / `CHECK_MARK`（Task 2）、`el`（`dom.js`）
 - Produces:
   - `renderProgress({ mount, data }) => void`
   - `renderTable({ mount, data, editing, handlers }) => void`
@@ -1363,7 +1709,7 @@ git commit -m "Check the souvenir list before anything tries to draw it"
 
 - **「買った」チェックは editing に関わらず出す**（設計書 §4.5）。旅行中いちばん使う操作なので、編集モードの内側に置くと店先で毎回 2 手増える
 - 値は必ず `el()`（`textContent`）で入れる。`innerHTML` に入るのは `icon()` が返す定数と `CHECK_MARK` だけ
-- チェックの印は `icon("i-check")` を**使わない**。`controls.css` の `.check__box svg path` が届かず、印の出ないボックスになる（`packing-render.js` に同じ注意書きがある）
+- ボタン部品とチェックの印は `row-controls.js`（Task 2）から import する。**このファイルで定義し直さないこと**
 - 並べ替えは無いので ↑↓ もドラッグハンドルも作らない
 
 - [ ] **Step 1: `tests/souvenirs-render.test.js` を書く**
@@ -1614,50 +1960,12 @@ Expected: FAIL（`Cannot find module`）
  */
 
 import { el } from "./dom.js";
-import { icon } from "./icons.js";
 import { souvenirFocusKey } from "./focus-key.js";
+import { armedIconButton, CHECK_MARK } from "./row-controls.js";
 import { progressOf, shopSuggestions } from "./souvenirs-data.js";
 
 /** 店名の候補をぶら下げる datalist の id。input の list 属性から引く。 */
 const SHOP_LIST_ID = "sv-shops";
-
-/**
- * チェックの印。**icon("i-check") を使わないこと。**
- * controls.css の `.check__box svg path` が stroke-dashoffset を遷移させて
- * チェックを描く。icon() が返す <use> では path がシャドウツリーに入り、
- * このセレクタが届かない ── チェックを入れても印が出ないボックスになる
- * （packing-render.js に同じ注意書きがある）。
- */
-const CHECK_MARK =
-  '<svg viewBox="0 0 24 24" aria-hidden="true">' +
-  '<path d="m4.5 12.6 5.2 5.2L19.5 6.6"/></svg>';
-
-/** 文字は textContent、アイコンだけ定数の innerHTML。値は絶対に混ぜない。 */
-function iconButton(cls, iconId, label) {
-  const button = el("button", cls);
-  button.type = "button";
-  button.innerHTML = icon(iconId, "ico--sm");
-  button.setAttribute("aria-label", label);
-  button.title = label;
-  return button;
-}
-
-/** 1 度目で身構え、2 度目で実行するボタン。confirm() は使わない。 */
-function armedIconButton({ cls, armedCls, iconId, label, armedLabel, onConfirm }) {
-  const button = iconButton(cls, iconId, label);
-  let armed = false;
-  button.addEventListener("click", () => {
-    if (!armed) {
-      armed = true;
-      button.className = armedCls;
-      button.setAttribute("aria-label", armedLabel);
-      button.title = armedLabel;
-      return;
-    }
-    onConfirm();
-  });
-  return button;
-}
 
 /**
  * 買った数と細いバー（設計書 §7.6）。
@@ -1839,7 +2147,7 @@ Expected: PASS（12 件）
 - [ ] **Step 5: 全テストを流す**
 
 Run: `node --test`
-Expected: PASS。**543 + 12 = 555**
+Expected: PASS。**553 + 12 = 565**
 
 - [ ] **Step 6: コミット**
 
@@ -2079,7 +2387,7 @@ const PAGES = ["index.html", "schedule.html", "packing.html", "souvenirs.html"];
 - [ ] **Step 5: 全テストを流す**
 
 Run: `node --test`
-Expected: PASS。**CSP の 5 件が 4 ページを見るようになり、色リテラル検査が 1 ファイル増える。件数は 555 のまま**（テストの本数ではなくループの中身が増えるため）
+Expected: PASS。**CSP の 5 件が 4 ページを見るようになり、色リテラル検査が 1 ファイル増える。件数は 565 のまま**（テストの本数ではなくループの中身が増えるため）
 
 - [ ] **Step 6: 色リテラル検査が実際に効いていることを確かめる**
 
@@ -2138,7 +2446,7 @@ import { createPublishUI } from "./publish-ui.js";
 import { classifyLoadError, toLoadError } from "./load-error.js";
 import { hasKey, loadCodec, clearKey } from "./auth.js";
 import { DataError } from "./data-error.js";
-import { createNotices, createSafeDraw } from "./page-notice.js";
+import { createNotices, createDrawLoop } from "./page-notice.js";
 import { souvenirFocusKey } from "./focus-key.js";
 import { validateSouvenirs } from "./souvenirs-validate.js";
 import {
@@ -2202,49 +2510,18 @@ function draw(focusKeyOverride) {
   restoreFocus(focusKey);
 }
 
-/* ── 再描画の予約 ────────────────────────────────────────
- *
- * 入力欄の change は blur の最中に発火する ── つまり、利用者がボタンを押した
- * mousedown の処理の**途中**で起きる。そこで表を replaceChildren すると、
- * 押しかけていたボタンが mouseup より前に文書から消え、click が発火しない
- * （「お土産を追加」が 1 度目で効かない）。フォーカス先も一緒に消える。
- *
- * 描画を 1 tick 送れば、click まで済んでから描ける。microtask では足りない ──
- * blur → change は mousedown の既定動作の中なので、mouseup より前に走ってしまう。
- * 詳しくは設計書 §13 と packing.js の同じコメント。
- */
-let drawTimer = null;
-let drawContext = "";
-let drawOverride = null;
-
-function scheduleDraw(context, focusKeyOverride) {
-  drawContext = context;
-  // あとから来た指定を優先する。undefined で上書きして消さないこと
-  if (focusKeyOverride) drawOverride = focusKeyOverride;
-  if (drawTimer !== null) return;
-  drawTimer = setTimeout(() => {
-    drawTimer = null;
-    const override = drawOverride;
-    drawOverride = null;
-    safeDraw(drawContext, override);
-  }, 0);
-}
-
-/** 文言と console の形は page-notice.js が持つ。予約の取り消しだけがこのページ固有。 */
-const baseSafeDraw = createSafeDraw({ page: "souvenirs", draw, setNotice });
-
 /**
- * 予約済みの描画があれば取り消してから描く。残すと、この呼び出しのあとに
- * 予約分が走り、成功時の setNotice(null) が直前に出した文言を消してしまう。
+ * 即時（safeDraw）と予約（scheduleDraw）の 2 つの口。
+ *
+ * **予約が要る理由と、予約の取り消しが safeDraw の内側にある理由は
+ * page-notice.js の createDrawLoop を読むこと**（設計書 §13）── 入力欄の
+ * change は利用者が押したボタンの mousedown の処理中に発火するので、
+ * そこで表を作り直すと click が発火せず「お土産を追加」が 1 度目で効かない。
+ *
+ * `const` は巻き上がらない。この行は `els` と `createNotices` の後ろ、
+ * かつ最初に safeDraw が呼ばれる前になければ TDZ でページが真っ白になる。
  */
-function safeDraw(context, focusKeyOverride) {
-  if (drawTimer !== null) {
-    clearTimeout(drawTimer);
-    drawTimer = null;
-    drawOverride = null;
-  }
-  baseSafeDraw(context, focusKeyOverride);
-}
+const { safeDraw, scheduleDraw } = createDrawLoop({ page: "souvenirs", draw, setNotice });
 
 /**
  * 変更を保存して描き直す。
@@ -2447,7 +2724,7 @@ Expected: `assets/js/souvenirs.js` の `createSync()` の `config` だけ（2 �
 - [ ] **Step 3: 全テストを流す**
 
 Run: `node --test`
-Expected: PASS。**555 のまま**（エントリポイントにはテストが無いのが規約）
+Expected: PASS。**565 のまま**（エントリポイントにはテストが無いのが規約）
 
 - [ ] **Step 4: コミット**
 
@@ -2535,7 +2812,7 @@ Expected: PASS
 - [ ] **Step 6: 全テストを流す**
 
 Run: `node --test`
-Expected: PASS。**555 のまま**（テストの本数は変わらず、中身が 3 ページ分になる）
+Expected: PASS。**565 のまま**（テストの本数は変わらず、中身が 3 ページ分になる）
 
 - [ ] **Step 7: ブラウザで通しで確かめる**
 
@@ -2616,7 +2893,7 @@ B5 の行の状態を `**次はここ**（2026-08-10 追加）` から `**完了
 
 ```markdown
   **→ B5 で解消した。** `assets/js/page-notice.js` に `createNotices()` と
-  `createSafeDraw()` を置き、`toLoadError()` を `load-error.js` へ足して、
+  `createDrawLoop()` を置き、`toLoadError()` を `load-error.js` へ足して、
   3 ページがそれを呼ぶ形にした（YYYY-MM-DD）。
 ```
 
@@ -2647,7 +2924,7 @@ Expected: `MISSING:` が出ない（`assets/js/comments.js` と `assets/data/com
 - [ ] **Step 7: 全テストを流す**
 
 Run: `node --test`
-Expected: PASS（555）
+Expected: PASS（565）
 
 - [ ] **Step 8: コミット**
 
@@ -2660,7 +2937,7 @@ git commit -m "Record what B5 changed, and mark the two debts it paid off"
 
 ## 完了の定義
 
-- [ ] `node --test` が **555 pass / 0 fail**
+- [ ] `node --test` が **565 pass / 0 fail**
 - [ ] ブラウザで Task 8 Step 7 の 11 項目すべてを通した
 - [ ] **旅程ページと持ち物ページが壊れていない**（Task 1 Step 12 と Task 8 Step 7-11）
 - [ ] `grep` で `souvenirs` の `localStorage` キーが `souvenirs.js` の 1 か所だけにある
