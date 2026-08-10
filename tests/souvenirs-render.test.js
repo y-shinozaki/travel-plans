@@ -108,15 +108,41 @@ test("renderTable: 何を・誰に・どこで・メモを textContent で出す
   }
 });
 
-test("renderTable: 値が innerHTML に流れない", () => {
+test("renderTable: 値が innerHTML に流れない（読み取りモード。実際に描かれたことも確認する）", () => {
   const payload = '<img src=x onerror="window.__pwned=1">';
-  const { make, htmlSink } = stubDocument();
+  const { make, htmlSink, textSink } = stubDocument();
   const mount = mountNode(make);
   renderTable({
     mount,
     data: { items: [{ id: "sv-1", name: payload, recipient: payload, shop: payload, note: payload, bought: false }] },
     editing: false,
   });
+  // 何も描かれていない（renderTable が早期リターンした等）だけでは
+  // htmlSink が空になり、以下の否定条件が意味なく通ってしまう。
+  // 行が実際に描かれたこと・値が textContent として出たことを先に確かめる
+  const ids = walk(mount)
+    .map((n) => n.dataset?.itemId)
+    .filter(Boolean);
+  assert.deepEqual(ids, ["sv-1"], "行が描かれていません");
+  assert.ok(textSink.includes(payload), "値が textContent としても出ていません");
+  for (const html of htmlSink) {
+    assert.ok(!html.includes(payload), `innerHTML に値が流れました: ${html}`);
+  }
+});
+
+test("renderTable: 値が innerHTML に流れない（編集モード。value / placeholder に渡る 4 つの入力欄）", () => {
+  const payload = '<img src=x onerror="window.__pwned=1">';
+  const { make, htmlSink } = stubDocument();
+  const mount = mountNode(make);
+  renderTable({
+    mount,
+    data: { items: [{ id: "sv-1", name: payload, recipient: payload, shop: payload, note: payload, bought: false }] },
+    editing: true,
+  });
+  const ids = walk(mount)
+    .map((n) => n.dataset?.itemId)
+    .filter(Boolean);
+  assert.deepEqual(ids, ["sv-1"], "行が描かれていません");
   for (const html of htmlSink) {
     assert.ok(!html.includes(payload), `innerHTML に値が流れました: ${html}`);
   }
