@@ -1387,7 +1387,7 @@ export function classifyLoadError(error) {
 
 ```js
 import { classifyLoadError, DataFetchError, DataParseError } from "./load-error.js";
-import { hasKey, loadCodec } from "./auth.js";
+import { hasKey, loadCodec, clearKey } from "./auth.js";
 import { DEFAULT_CONFIG } from "./sync.js";
 ```
 
@@ -1409,16 +1409,26 @@ async function main() {
   const store = createStore();
 
   // 鍵が無ければ旅程は復号できない。合言葉を入れてもらうため入口へ戻す。
-  // これは防御ではなく案内（設計書 §6.1）── 防御は鍵が無ければ復号できないこと
-  if (!hasKey(store)) {
+  // これは防御ではなく案内（設計書 §6.1）── 防御は鍵が無ければ復号できないこと。
+  //
+  // hasKey() ではなく loadCodec() の結果で判断する。**この 2 つは一致しない。**
+  // hasKey() が見るのは形（`salt.iter.key` の 3 つが揃っているか）だけで、
+  // salt や key が base64 として壊れていても true を返す。その場合
+  // loadCodec() は null を返すので、hasKey() で通してしまうと codec が null のまま
+  // createSync へ流れ込み、最初に codec.encode / decode を呼んだところで
+  // 「Cannot read properties of null」が無関係な場所から出る ──
+  // 原因が壊れた tp:key であることは画面からもコンソールからも読み取れない。
+  //
+  // 壊れていた鍵素材はここで捨てる。残しておくと戻った先の index.html が
+  // 「鍵は設定済み」と判断して合言葉の欄を出さず、入口が塞がったまま堂々巡りになる。
+  const codec = hasKey(store) ? await loadCodec(store) : null;
+  if (codec === null) {
+    clearKey(store);
     location.replace("index.html");
     return;
   }
 
-  const sync = createSync({
-    store,
-    config: { ...DEFAULT_CONFIG, codec: await loadCodec(store) },
-  });
+  const sync = createSync({ store, config: { ...DEFAULT_CONFIG, codec } });
 ```
 
 `renderNav(...)` の直後、`await sync.load()` の**前**に `publishUI` の組み立てを移す（今は 341〜356 行目にある）。
@@ -1484,7 +1494,11 @@ python3 -m http.server 8000
 `http://localhost:8000/schedule.html` を開き、DevTools のコンソールで確認する。
 
 1. `localStorage.setItem("tp:key", "こわれた値")` → リロード → `index.html` へ飛ぶこと
-2. 鍵を正しく入れた状態で `localStorage.setItem("tp:events", '{"days":[]}')` → リロード → 旅程はエラーになるが、**公開ボタンとトークン設定の導線が画面に出ていること**（これが今回の眼目）
+   （形からして違う値。`hasKey()` が false になる経路）
+2. `localStorage.setItem("tp:key", "!!!not-base64.600000.also-bad")` → リロード →
+   **`index.html` へ飛び、かつ `tp:key` が消えていること**（`hasKey()` は true だが
+   `loadCodec()` が null を返す経路。捨てないと入口が塞がったまま堂々巡りになる）
+3. 鍵を正しく入れた状態で `localStorage.setItem("tp:events", '{"days":[]}')` → リロード → 旅程はエラーになるが、**公開ボタンとトークン設定の導線が画面に出ていること**（これが今回の眼目）
 
 - [ ] **Step 6: commit**
 
