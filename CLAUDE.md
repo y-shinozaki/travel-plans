@@ -15,20 +15,25 @@ python3 -m http.server 8000
 
 ## アーキテクチャ概要
 
-### ファイル構成（Phase B4 時点）
+### ファイル構成（Phase B2 時点）
 
 ```
 travel-plans/
-├── index.html / schedule.html   実装済み（メニュー〈合言葉の入力〉／旅程カレンダー・地図・編集・公開）
-├── packing.html                 Phase B2 の仮ページ（リンクのみ、中身は未実装）
+├── index.html / schedule.html / packing.html
+│                             実装済み（メニュー〈合言葉の入力〉／旅程カレンダー・地図・
+│                             編集・公開／持ち物リストとエディタ）
 ├── assets/
 │   ├── css/
 │   │   ├── tokens.css      色・余白・角丸・モーションの唯一の定義場所
 │   │   ├── base.css        リセット、タイポグラフィ、共通レイアウト、reveal 演出、
 │   │   │                   メニューとセクション見出しのレスポンシブ
 │   │   ├── controls.css    ボタン・チップ・チェックボックス・入力欄・詳細シート・
-│   │   │                   編集フォーム・公開まわり（パネル／状態表示／同期バー）
-│   │   └── calendar.css    schedule.html 専用（カレンダー・地図・レスポンシブ）
+│   │   │                   編集フォーム・公開まわり（パネル／状態表示／同期バー）・
+│   │   │                   ツールバー（`.toolbar` 系。Phase B2 で calendar.css から移設）
+│   │   ├── calendar.css    schedule.html 専用（カレンダー・地図・レスポンシブ）。
+│   │   │                   `.toolbar select` だけは schedule 専用なのでここに残る
+│   │   └── packing.css     packing.html 専用（Phase B2）。色リテラル検査
+│   │                       （tokens.test.js）の対象ファイルにも入っている
 │   ├── js/
 │   │   ├── time.js         10進時間 ⇔ HH:MM 変換、timeLabel()
 │   │   ├── events.js       expandEvents()（複数日イベントを日単位セグメントに展開）
@@ -38,7 +43,8 @@ travel-plans/
 │   │   │                   accentToken() / accentColor()。カテゴリの JS 側の定義
 │   │   │                   （色の実体は tokens.css と calendar.css。後述の3ファイル）
 │   │   ├── validate.js     validateEvent()（1件）と validateEvents()（全体）。
-│   │   │                   イベント1件の規則の置き場所はここ1か所だけ
+│   │   │                   イベント1件の規則の置き場所はここ1か所だけ。EventDataError は
+│   │   │                   Phase B2 で追加した data-error.js の DataError を継承する
 │   │   ├── countdown.js    index.html の「出発まで あと N 日」（DOM に触らない）
 │   │   ├── dom.js          el() / makeSelectable() / escapeHtml() / safeHttpUrl()
 │   │   ├── calendar.js     renderCalendar()、HOUR_H
@@ -53,22 +59,40 @@ travel-plans/
 │   │   ├── github.js       GitHub Contents API の呼び出し（createGitHub / GitHubError）
 │   │   ├── token.js        公開用トークンの置き場所（tp:gh-token の唯一の出入口）
 │   │   ├── sync.js         下書きとリモートを束ねる層（load / saveLocal /
-│   │   │                   adoptRemote / publish / hasUnpublishedChanges）
+│   │   │                   adoptRemote / publish / hasUnpublishedChanges）。config は
+│   │   │                   6 つの注入口を持つ（後述「保存と公開」）
 │   │   ├── event-form.js   編集フォームの HTML・入力の読み取り・formProblems()
 │   │   ├── event-editor.js 採番・併合・保存・削除。シートにフォームを載せる
-│   │   ├── publish-ui.js   トークン設定・公開ボタン・起動時の案内バー
+│   │   ├── publish-ui.js   トークン設定・公開ボタン・起動時の案内バー。content（validate
+│   │   │                   と noun の組）を必須で受け取り、旅程・持ち物の両方から使う
 │   │   │  ── ここから下が Phase B4 で追加した合言葉と暗号化の層 ──
 │   │   ├── crypto.js       同期する JSON の暗号化と復号（封筒 codec、AES-GCM。DOM も
 │   │   │                   store も fetch も知らない）
 │   │   ├── auth.js         合言葉から導いた鍵の置き場所（`tp:key` の唯一の出入口）
 │   │   ├── auth-form.js    合言葉フォームの組み立て（index.html。DOM は menu.js から
 │   │   │                   注入で受け取り、自分では document を触らない）
-│   │   ├── load-error.js   旅程の読み込み失敗の分類と文言（純粋関数）
+│   │   ├── load-error.js   読み込み失敗の分類と文言（純粋関数）。classifyLoadError() は
+│   │   │                   Phase B2 で { noun, path } を取る一般形になった（既定は旅程）
 │   │   ├── menu.js         index.html のエントリポイント
 │   │   ├── schedule.js     schedule.html のエントリポイント
-│   │   └── stub-page.js    packing.html のエントリポイント
+│   │   ├── stub-page.js    仮ページ用の共通エントリポイント。参照していた packing.html が
+│   │   │                   Phase B2 で実装されたため、現在は参照するページが無い
+│   │   │  ── ここから下が Phase B2 で追加した持ち物リストの層 ──
+│   │   ├── data-error.js       DataError。EventDataError（validate.js）と
+│   │   │                       PackingDataError（packing-validate.js）に共通の基底
+│   │   ├── packing-validate.js validatePacking()。validate.js と同じ方針（不備は
+│   │   │                       1 件目で止めず全部集めて名指しする）
+│   │   ├── packing-data.js     持ち物リストの純粋なデータ操作（追加・移動・区分を
+│   │   │                       またぐ移動・併合）。DOM も store も知らない
+│   │   ├── packing-render.js   持ち物リストの描画。通常時は読むだけ、編集モードで
+│   │   │                       操作コントロールが増える
+│   │   ├── packing-drag.js     Pointer Events による並べ替え。DOM を正として、
+│   │   │                       指を離した時点で配列を組み直す
+│   │   └── packing.js          packing.html のエントリポイント
 │   ├── data/
-│   │   └── events.json     旅程データの唯一のソース（表示用文字列は持たない）
+│   │   └── events.json     旅程データの唯一のソース（表示用文字列は持たない）。
+│   │                       packing.json は同じ場所に無い ── 最初の「公開」まで
+│   │                       リポジトリに存在せず、それまでは 404 を空のリストとして扱う
 │   └── vendor/
 │       └── leaflet/        Leaflet 1.9.4 を自前で配置（理由は「外部ライブラリ」参照）
 ├── tests/                  node --test で実行する純粋関数・静的検証のテスト
@@ -79,14 +103,20 @@ travel-plans/
 設計書（`docs/superpowers/specs/2026-08-09-travel-plans-redesign-design.md` §2.3）によると、
 残りのフェーズで以下が追加される予定:
 
-- **Phase B2**（持ち物リストとエディタ）: `assets/css/packing.css`、`assets/data/packing.json` など
 - **Phase B3**（コメント機能）: `assets/js/comments.js`、`assets/data/comments.json` など
 
 **Phase B4（合言葉と暗号化）は完了した。** `assets/js/auth.js` `crypto.js` `auth-form.js`、
 `index.html` の合言葉入力、`sync.js` の暗号化対応を追加した。**同期する JSON は
-暗号文になる**（現時点で同期しているのは `events.json` だけだが、B2/B3 で足す
-`packing.json` / `comments.json` も同じ鍵・同じソルトで暗号化する設計になっている）。
+暗号文になる**（現時点で同期しているのは `events.json` と B2 で足した `packing.json` だが、
+B3 で足す `comments.json` も同じ鍵・同じソルトで暗号化する設計になっている）。
 仮ページ `archive.html` の削除もここで行った（後述「暗号化（Phase B4）」参照）。
+
+**Phase B2（持ち物リストとエディタ）は完了した。** `assets/css/packing.css`、
+`assets/js/packing.js` / `packing-data.js` / `packing-validate.js` / `packing-render.js` /
+`packing-drag.js`、共通の `data-error.js` を追加し、`packing.html` を実装済みページに
+した。旅程用に作られていた `createSync()` の `config`（後述「保存と公開」）と
+`createPublishUI()` の `content` を、2 つ目の JSON（`packing.json`）が実際に使う形で
+検証できたのはこのフェーズが初めて。経緯は設計書 §13 を参照。
 
 **旧 Phase C（Gmail / LINE の検索アーカイブ）は 2026-08-09 に取りやめた。**
 `archive.enc`・`tools/build-archive.mjs`・`assets/css/archive.css` は作らない。
@@ -158,26 +188,40 @@ map.js の createMap() → 座標を持つイベントからマーカーと位�
 - **「公開」を押した端末だけが**、GitHub Contents API 経由でリポジトリへコミットする。
   トークンを持たない端末は閲覧と下書き編集のみ（公開ボタン自体が置かれない）
 
-`localStorage` のキーは `store.js` が `tp:` を前置する。使うのは 4 つ:
+`localStorage` のキーは `store.js` が `tp:` を前置する。使うのは 6 つ:
 
 | キー | 中身 | 書く場所 |
 |---|---|---|
-| `tp:events` | 下書き（`events.json` と同じ形＋`updatedAt`。**平文のまま**保存する） | `sync.js` の `DEFAULT_CONFIG.draftKey` |
-| `tp:events-base` | 最後にリモートと揃えた時点の `updatedAt` 文字列 | `sync.js` の `DEFAULT_CONFIG.baseKey` |
+| `tp:events` | 旅程の下書き（`events.json` と同じ形＋`updatedAt`。**平文のまま**保存する） | `sync.js` の `DEFAULT_CONFIG.draftKey` |
+| `tp:events-base` | 旅程を最後にリモートと揃えた時点の `updatedAt` 文字列 | `sync.js` の `DEFAULT_CONFIG.baseKey` |
+| `tp:packing` | 持ち物リストの下書き（`packing.json` と同じ形＋`updatedAt`。平文のまま） | `packing.js` が `createSync()` に渡す `config`（Phase B2 で追加） |
+| `tp:packing-base` | 持ち物リストを最後にリモートと揃えた時点の `updatedAt` 文字列 | 同上 |
 | `tp:gh-token` | 公開用トークン（平文） | `token.js` |
 | `tp:key` | 合言葉から導いた鍵素材（`salt.iter.key` を `.` 区切りで連結） | `auth.js` |
 
 キー名を他のファイルに書き写さないこと。`tp:events` / `tp:events-base` を知っているのは
-`sync.js`、`tp:gh-token` は `token.js`、`tp:key` は `auth.js`（唯一の出入口）だけ。
-（この 4 つのほかに `publish-ui.js` が `tp:write-probe` を一瞬だけ書いて消す。
+`sync.js`（の既定 `DEFAULT_CONFIG`）、`tp:packing` / `tp:packing-base` を知っているのは
+`packing.js` が組み立てる `config` だけ、`tp:gh-token` は `token.js`、`tp:key` は
+`auth.js`（唯一の出入口）だけ。
+（この 6 つのほかに `publish-ui.js` が `tp:write-probe` を一瞬だけ書いて消す。
 保存領域に書けるかを実際に試すためで、残さない。）
 
-**`createSync()` は旅程専用。** `config` は owner / repo / branch / path に加えて
-`draftKey` / `baseKey` / `validate` / `commitMessage` / `codec` の 5 つを持つ
-（既定値は旅程用: `sync.js` の `DEFAULT_CONFIG` 参照）。2 つ目の JSON
-（B2 の `packing.json`）を同期させる前に、設計書 §13 の
-「`createSync()` は旅程専用。2 つ目の JSON には使えない」を読むこと ──
-**5 つのうち一部だけを差し替えると、旅程の下書きが黙って消える。**
+**`createSync()` の `config` は owner / repo / branch / path に加えて
+`draftKey` / `baseKey` / `validate` / `commitMessage` / `codec` / `noun` の 6 つを持つ**
+（既定値は旅程用: `sync.js` の `DEFAULT_CONFIG` 参照）。5 つだったところへ Phase B2 で
+`noun`（画面の文言に使う名詞。「最新の◯◯を確認できませんでした」の◯◯）が 6 つ目として
+加わった。2 つ目の JSON（B2 で実装した `packing.json`。`packing.js` 参照）を実際に
+動かして確認済みなので、B3 で 3 つ目（`comments.json`）を足すときは `packing.js` の
+`createSync()` の呼び出しを写すこと。**6 つのうち一部だけを差し替えると、旅程の下書きが
+黙って消える**（`noun` だけは表示専用で取り違えてもデータは壊れないが、「危険なものだけ」
+に絞ると毎回どれが危険かを思い出す必要が生じるため、同じ組に入れてある。詳しい経緯は
+設計書 §13）。
+
+`createPublishUI()` にも同じ形の旅程専用の依存が残っていたが、B2 で発見して解消した
+（`content: { validate, noun }` を必須の組で受け取るようにした。片方だけ渡せてしまうと
+「持ち物データが旅程の検証に落ちて公開が必ず失敗する」か「持ち物ページの通知が
+旅程の話をする」のどちらかが起きるため、あえて別々の任意引数にしなかった。経緯は
+設計書 §13）。
 
 ### `updatedAt` がすべての比較の軸
 
@@ -362,6 +406,11 @@ validateEvents → 暗号化 → GET で sha と本文 → updatedAt の突き�
 （写すと 1 だけ足して CSS を忘れた状態が素通りする）。
 新しいカテゴリは `tests/categories.test.js` の `CATEGORIES`（Phase A の想定一覧）にも足す。
 
+`tokens.test.js` の色リテラル検査（次項）は対象ファイルをハードコードしたリストで持っている。
+Phase B2 で `packing.css` をそのリストへ足した。**リストがハードコードのままなので、
+次に新しい CSS ファイルを足すときも同じ手順（このリストへの追加）が要る** ──
+忘れても検査は何も言わずに素通りする（設計書 §13「小さいもの」）。
+
 ### データの検査（`assets/js/validate.js`）
 
 `sync.load()` は、リモートから取った `events.json` も `localStorage` の下書きも、
@@ -456,9 +505,12 @@ node --test
   列の高さによるクランプ、時刻ラベルを出す 36px の境界）
 - `validate.test.js` — `validateEvents()`。不備が例外になり、かつイベントを名指しすること
 - `countdown.test.js` — 出発カウントダウンの日付計算と境界
-- `data.test.js` — **実データ**（`assets/data/events.json`）を検査とパイプラインに通す。
-  件数・セグメント数・地点数の実測値を固定しているので、旅程を編集すると落ちる。
-  意図した変更なら期待値を更新すること
+- `data.test.js` — パイプライン（検査 → `expandEvents` → `assignLanes`）を
+  `tests/fixtures/itinerary.js` の合成データに通す（Phase B4 で `events.json` が
+  暗号文になり、実データを直接読んで検査できなくなったため）。件数・セグメント数・
+  地点数の実測値はこの合成データに対する固定値で、フィクスチャを変えると更新が要る。
+  リポジトリの `events.json` が封筒の形をしていること（中身までは見られない）も
+  同じファイルで検査する
 - `renderers.test.js` — エスケープ、URL スキームの許可リスト、カテゴリ絞り込み、`renderNav`
 - `tokens.test.js` — 色のコントラストと、下記の CSS 側の約束
 
@@ -489,10 +541,32 @@ Phase B4 で追加したもの:
 - `load-error.test.js` — `classifyLoadError()` が失敗の種類（データ不備・鍵違い・破損・
   取得失敗）ごとに違う文言を出すこと
 
+Phase B2 で追加したもの:
+
+- `data-error.js` に専用のテストファイルは無い。`DataError` を継承していることは
+  `validate.test.js`（`EventDataError`）と `packing-validate.test.js`（`PackingDataError`）が
+  それぞれ `instanceof DataError` で確認する
+- `packing-validate.test.js` — `validatePacking()`。持ち物データの不備を 1 件目で
+  止めずに全部集め、どの項目の何が悪いか名指しすること
+- `packing-data.test.js` — `packing-data.js` の純粋関数（追加・移動・区分をまたぐ移動・
+  併合）。`event-editor.js` と同じ方針で、失われ方が静かな操作を 1 つずつ確認する
+- `packing-render.test.js` — 描画される文字列、`data-focus-key` / `data-item-id` /
+  `data-group-id` の付与、`editing` による表示の分岐
+- `packing-drag.test.js` — `rebuildFromOrder()`。order に無い区分・項目を
+  黙って落とさないこと
+- `tests/fixtures/packing.js` — 持ち物側のテストが使う合成データ
+  （`tests/fixtures/itinerary.js` の持ち物版）
+- `load-error.test.js` は `classifyLoadError({ noun, path })` の一般形（既定は旅程、
+  持ち物向けに差し替えた場合の両方）を検査するようになった
+- `publish-ui.test.js` は `content`（`validate` / `noun` の組）が必須であること、
+  `MESSAGES` が旅程固定ではなく `messagesFor(noun)` から作られることを検査する
+- `sync.test.js` は `noun` を含む 6 つの注入口を、注入した `draftKey` で実際に
+  `saveLocal()` を回すところまで検査する
+
 `tokens.test.js` は色そのものに加えて次の約束も機械的に守らせている:
 
 - `--hour-h`（tokens.css）と `HOUR_H`（calendar.js）が同じ値であること
-- `base.css` / `controls.css` / `calendar.css` に色リテラルを書かないこと
+- `base.css` / `controls.css` / `calendar.css` / `packing.css` に色リテラルを書かないこと
   （半透明が必要なら `rgb(var(--ink-rgb) / 0.14)` のようにチャンネルトークンを使う）
 - `CAT_META` の各カテゴリに `tokens.css` の 3 値と `calendar.css` の `.cat-xxx` が揃っていること
   （「新しいカテゴリを追加」参照。カテゴリ一覧は `CAT_META` から導いている）
@@ -561,8 +635,9 @@ Safari 15.5 で対応したため、これがサポート下限を決めてい�
   飛ばすとページが真っ白になる）。初回描画のあとの再描画（`schedule.js` の `safeDraw()`）も
   同様に守ること
 - **`localStorage` のキー名を書き写さないこと。** `tp:events` / `tp:events-base` は
-  `sync.js`、`tp:gh-token` は `token.js`、`tp:key` は `auth.js` だけが知っている。
-  別のファイルに書き写すと、キーを変えたときに片方だけが古い名前を読み、
+  `sync.js`（の既定 `DEFAULT_CONFIG`）、`tp:packing` / `tp:packing-base` は `packing.js` が
+  `createSync()` に渡す `config`、`tp:gh-token` は `token.js`、`tp:key` は `auth.js` だけが
+  知っている。別のファイルに書き写すと、キーを変えたときに片方だけが古い名前を読み、
   「変更が無い」と黙って答え続ける
 - **トークンも合言葉（から導いた鍵）も画面にも例外文にも出さないこと。** `store.read` は
   壊れた値を `JSON.parse` に掛けるので、`SyntaxError` の文言に中身の先頭が埋め込まれて
