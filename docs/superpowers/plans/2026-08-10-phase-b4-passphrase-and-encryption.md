@@ -1824,12 +1824,29 @@ git commit -m "Add the passphrase form and drop the cancelled archive page"
 - テストの一覧に `crypto.test.js` / `auth.test.js` / `load-error.test.js` を足す
 - CSP の節の「4 ページ」を 3 ページに直す
 
-- [ ] **Step 2: `README.md` を直す**
+- [ ] **Step 2: 設計書 §13 に、B4 で見つけた残存する穴を書き足す**
+
+`docs/superpowers/specs/2026-08-09-travel-plans-redesign-design.md` の §13
+「Phase B1 からの繰り越し（保存と公開）」に次を足す。Task 5 のレビューが見つけたもので、
+**B4 の範囲では直さないと決めた**（直すには 409 の判断そのものを設計し直す必要がある）。
+
+> - **壊れたリモートを「下書きを持つ端末から公開して直す」経路が、409 で塞がることがある。**
+>   B4 で `publish-ui` を `load()` より前に組み、`sync.readDraft()` で下書きを
+>   `state` に載せるようにしたので、リモートの `days` / `events` が壊れていても
+>   公開ボタンは出て押せる。ただし**壊れたリモートが「JSON としては読めて
+>   `updatedAt` が `tp:events-base` より新しい」形**だと、`assertRemoteNotAhead()` が
+>   PUT の前に 409 で止める。409 の画面が示す唯一の逃げ道（「取り込む」→
+>   `adoptRemote()`）も `validate` で落ちるので、その端末では直せない。
+>   `events.json` の手編集は廃止したので、この場合の復旧はリポジトリへの
+>   git コミットに戻る。直すなら「リモートが検証を通らないと分かっている回に限り
+>   突き合わせを飛ばす」を sync 層に入れることになる
+
+- [ ] **Step 3: `README.md` を直す**
 
 - ファイル構成から `archive.html` を削除
 - 現在実装済みの説明に、合言葉が要ることを足す
 
-- [ ] **Step 3: 記述と実態が合っているか確かめる**
+- [ ] **Step 4: 記述と実態が合っているか確かめる**
 
 ```bash
 grep -rn "archive" CLAUDE.md README.md
@@ -1838,10 +1855,10 @@ node --test
 
 Expected: `archive` の残存が 0 件（取りやめの経緯を説明している箇所を除く）。テストは全件 pass
 
-- [ ] **Step 4: commit**
+- [ ] **Step 5: commit**
 
 ```bash
-git add CLAUDE.md README.md
+git add CLAUDE.md README.md docs/superpowers/specs/2026-08-09-travel-plans-redesign-design.md
 git commit -m "Drop the hand-editing procedure now that the itinerary is encrypted"
 ```
 
