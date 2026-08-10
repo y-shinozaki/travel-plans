@@ -1660,17 +1660,37 @@ function buildAuthForm(store) {
     submit.disabled = true;
     status.textContent = "鍵を作っています（数秒かかります）…";
     try {
-      let kdf = null;
+      let body = null;
       try {
         const response = await fetch(DEFAULT_CONFIG.path, { cache: "no-store" });
-        const body = await response.json();
-        if (isEnvelope(body)) kdf = body.kdf;
+        body = await response.json();
       } catch (error) {
         // 取れなくても止めない。新しいソルトで鍵を作り、次の公開で確定させる
         console.warn("menu: 既存のソルトを取得できませんでした", error);
       }
 
-      await unlock(store, passphrase, kdf);
+      const encrypted = isEnvelope(body);
+      const codec = await unlock(store, passphrase, encrypted ? body.kdf : null);
+
+      // 合言葉が正しいかは、ここで実際に復号して確かめる。**この確認を省かないこと。**
+      //
+      // ソルトは 3 つの JSON で共有する（設計書 §6.3）ので、合言葉を打ち間違えても
+      // 封筒の kdf は一致する。確かめずに鍵を保存すると、間違った鍵を持ったまま
+      // schedule.html へ進み、そこでは kdf が一致するために GCM の失敗が
+      // 「データが壊れています」と表示される ── 実際は打ち間違いなのに、
+      // 画面は直し方の違うことを言う。crypto.js の kdf 比較が捕まえられるのは
+      // 「別のソルトで暗号化されている」場合だけで、いちばん起きやすい
+      // 打ち間違いはここでしか捕まえられない（設計書 §9）。
+      if (encrypted) {
+        try {
+          await codec.decode(body);
+        } catch (error) {
+          clearKey(store);
+          status.textContent = "合言葉が違います。";
+          return;
+        }
+      }
+
       form.hidden = true;
       status.textContent = "";
       location.reload();
@@ -1710,6 +1730,7 @@ Expected: PASS（全件）
 
 1. 鍵が無い状態で合言葉の欄が出ること。入れると欄が消え、リロード後も出ないこと
 2. **入力欄が `type="password"` で、送信後に空になること**
+3. **`events.json` が封筒のとき、わざと違う合言葉を入れると「合言葉が違います。」と出て、鍵が保存されないこと**（`localStorage.getItem("tp:key")` が `null` のまま）。この確認だけは Task 8 の切り替え後にしか実地でできないので、ここでは `assets/data/events.json` を一時的に封筒で置き換えて試し、**確認後に必ず戻すこと**
 3. DevTools の Elements で `auth-form` の中に合言葉が残っていないこと
 4. ナビに「データ検索」が無いこと、カードが 2 枚であること
 5. `archive.html` を直接開くと 404 になること
