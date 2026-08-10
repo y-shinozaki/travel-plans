@@ -2,6 +2,9 @@ import { injectSprite, icon } from "./icons.js";
 import { initReveal } from "./reveal.js";
 import { renderNav } from "./nav.js";
 import { countdownHtml } from "./countdown.js";
+import { createStore } from "./store.js";
+import { createAuthForm } from "./auth-form.js";
+import { DEFAULT_CONFIG } from "./sync.js";
 
 const DEPARTURE = new Date("2026-08-12T00:00:00+09:00");
 const SUBTITLE = "依田家・篠崎家 合同";
@@ -18,18 +21,8 @@ const CARDS = [
       "https://www.thailandtravel.or.jp/wp-content/uploads/2017/07/241531199_1074098326727081_2405869266411881148_nSNSre.jpg",
   },
   {
-    href: "archive.html",
-    num: "02",
-    eyebrow: "Archive",
-    title: "データ検索",
-    ico: "i-search",
-    desc: "Gmail と LINE から集めた予約・やりとりを横断検索。",
-    image:
-      "https://enjoy-bkk.com/wp-content/uploads/2016/10/EmQuartier-1200-628.jpg",
-  },
-  {
     href: "packing.html",
-    num: "03",
+    num: "02",
     eyebrow: "Packing",
     title: "持ち物リスト",
     ico: "i-luggage",
@@ -64,9 +57,32 @@ function need(id) {
   return node;
 }
 
+/**
+ * 合言葉の欄の配線。判断（鍵を保存してよいか・どの文言を出すか）は一切ここに
+ * 持たず、すべて auth-form.js に任せる ── menu.js はモジュール冒頭で document を
+ * 触るため node --test から import できず、ロジックをここに置いたままでは
+ * 「decode() の確かめを省く」ような壊れ方を CI が検出できない（レビューで
+ * 見つかった Important 2）。
+ */
+function buildAuthForm(store) {
+  createAuthForm({
+    els: {
+      state: need("auth-state"),
+      actions: need("auth-actions"),
+      form: need("auth-form"),
+      input: need("auth-pass"),
+      status: need("auth-status"),
+      submit: need("auth-submit"),
+    },
+    store,
+    path: DEFAULT_CONFIG.path,
+  });
+}
+
 function main() {
   injectSprite();
   renderNav(need("nav"), null);
+  buildAuthForm(createStore());
   need("menu").innerHTML = CARDS.map(cardHtml).join("");
   need("countdown").innerHTML = countdownHtml(DEPARTURE, SUBTITLE);
 }

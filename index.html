@@ -44,6 +44,20 @@
         <p class="micro" id="countdown"></p>
       </div>
 
+      <div class="pubpanel reveal" id="auth-panel">
+        <p class="pubpanel__state" id="auth-state"></p>
+        <div class="pubpanel__acts" id="auth-actions"></div>
+        <form class="pubpanel__form" id="auth-form" hidden>
+          <p class="micro">
+            旅程は暗号化して公開しています。合言葉を入れると、この端末で旅程と持ち物リストを開けるようになります。
+          </p>
+          <label class="pubpanel__state" for="auth-pass">合言葉</label>
+          <input class="inp" type="password" id="auth-pass" autocomplete="current-password" />
+          <p class="micro" id="auth-status" role="status"></p>
+          <button class="btn" type="submit" id="auth-submit">開く</button>
+        </form>
+      </div>
+
       <div class="menu__grid" id="menu"></div>
     </main>
 

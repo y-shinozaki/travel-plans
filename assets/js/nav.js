@@ -2,7 +2,6 @@ import { icon } from "./icons.js";
 
 const PAGES = [
   { key: "schedule", href: "schedule.html", label: "旅程", ico: "i-calendar" },
-  { key: "archive", href: "archive.html", label: "データ検索", ico: "i-search" },
   { key: "packing", href: "packing.html", label: "持ち物", ico: "i-luggage" },
 ];
 

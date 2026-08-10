@@ -15,13 +15,12 @@ python3 -m http.server 8000
 
 ## アーキテクチャ概要
 
-### ファイル構成（Phase B1 時点）
+### ファイル構成（Phase B4 時点）
 
 ```
 travel-plans/
-├── index.html / schedule.html   実装済み（メニュー／旅程カレンダー・地図・編集・公開）
+├── index.html / schedule.html   実装済み（メニュー〈合言葉の入力〉／旅程カレンダー・地図・編集・公開）
 ├── packing.html                 Phase B2 の仮ページ（リンクのみ、中身は未実装）
-├── archive.html                 取りやめた検索アーカイブの仮ページ。B4 で削除する
 ├── assets/
 │   ├── css/
 │   │   ├── tokens.css      色・余白・角丸・モーションの唯一の定義場所
@@ -58,9 +57,16 @@ travel-plans/
 │   │   ├── event-form.js   編集フォームの HTML・入力の読み取り・formProblems()
 │   │   ├── event-editor.js 採番・併合・保存・削除。シートにフォームを載せる
 │   │   ├── publish-ui.js   トークン設定・公開ボタン・起動時の案内バー
+│   │   │  ── ここから下が Phase B4 で追加した合言葉と暗号化の層 ──
+│   │   ├── crypto.js       同期する JSON の暗号化と復号（封筒 codec、AES-GCM。DOM も
+│   │   │                   store も fetch も知らない）
+│   │   ├── auth.js         合言葉から導いた鍵の置き場所（`tp:key` の唯一の出入口）
+│   │   ├── auth-form.js    合言葉フォームの組み立て（index.html。DOM は menu.js から
+│   │   │                   注入で受け取り、自分では document を触らない）
+│   │   ├── load-error.js   旅程の読み込み失敗の分類と文言（純粋関数）
 │   │   ├── menu.js         index.html のエントリポイント
 │   │   ├── schedule.js     schedule.html のエントリポイント
-│   │   └── stub-page.js    packing.html / archive.html の共通エントリポイント
+│   │   └── stub-page.js    packing.html のエントリポイント
 │   ├── data/
 │   │   └── events.json     旅程データの唯一のソース（表示用文字列は持たない）
 │   └── vendor/
@@ -73,16 +79,17 @@ travel-plans/
 設計書（`docs/superpowers/specs/2026-08-09-travel-plans-redesign-design.md` §2.3）によると、
 残りのフェーズで以下が追加される予定:
 
-- **Phase B4**（合言葉と暗号化。**次はここ**）: `assets/js/auth.js` `crypto.js`、
-  `index.html` の合言葉入力、`sync.js` の暗号化対応。**同期する JSON 全部
-  （`events` / `packing` / `comments`）が暗号文になる**。仮ページ `archive.html` の
-  削除もここで行う
 - **Phase B2**（持ち物リストとエディタ）: `assets/css/packing.css`、`assets/data/packing.json` など
 - **Phase B3**（コメント機能）: `assets/js/comments.js`、`assets/data/comments.json` など
 
+**Phase B4（合言葉と暗号化）は完了した。** `assets/js/auth.js` `crypto.js` `auth-form.js`、
+`index.html` の合言葉入力、`sync.js` の暗号化対応を追加した。**同期する JSON は
+暗号文になる**（現時点で同期しているのは `events.json` だけだが、B2/B3 で足す
+`packing.json` / `comments.json` も同じ鍵・同じソルトで暗号化する設計になっている）。
+仮ページ `archive.html` の削除もここで行った（後述「暗号化（Phase B4）」参照）。
+
 **旧 Phase C（Gmail / LINE の検索アーカイブ）は 2026-08-09 に取りやめた。**
 `archive.enc`・`tools/build-archive.mjs`・`assets/css/archive.css` は作らない。
-暗号化だけが B4 として残り、対象が検索データから同期する JSON 全部に変わっている。
 
 いずれもこの CLAUDE.md ではなく設計書を正とする。
 
@@ -139,7 +146,7 @@ map.js の createMap() → 座標を持つイベントからマーカーと位�
 （すべて schedule.js の safeDraw を通す）
 ```
 
-## 保存と公開（Phase B1）
+## 保存と公開（Phase B1 / B4）
 
 設計書 §5 に対応する。**この節の記述と設計書が食い違ったら設計書を正とする。**
 
@@ -151,23 +158,26 @@ map.js の createMap() → 座標を持つイベントからマーカーと位�
 - **「公開」を押した端末だけが**、GitHub Contents API 経由でリポジトリへコミットする。
   トークンを持たない端末は閲覧と下書き編集のみ（公開ボタン自体が置かれない）
 
-`localStorage` のキーは `store.js` が `tp:` を前置する。B1 で使うのは 3 つ:
+`localStorage` のキーは `store.js` が `tp:` を前置する。使うのは 4 つ:
 
 | キー | 中身 | 書く場所 |
 |---|---|---|
-| `tp:events` | 下書き（`events.json` と同じ形＋`updatedAt`） | `sync.js` の `DRAFT_KEY` |
-| `tp:events-base` | 最後にリモートと揃えた時点の `updatedAt` 文字列 | `sync.js` の `BASE_KEY` |
+| `tp:events` | 下書き（`events.json` と同じ形＋`updatedAt`。**平文のまま**保存する） | `sync.js` の `DEFAULT_CONFIG.draftKey` |
+| `tp:events-base` | 最後にリモートと揃えた時点の `updatedAt` 文字列 | `sync.js` の `DEFAULT_CONFIG.baseKey` |
 | `tp:gh-token` | 公開用トークン（平文） | `token.js` |
+| `tp:key` | 合言葉から導いた鍵素材（`salt.iter.key` を `.` 区切りで連結） | `auth.js` |
 
-キー名を他のファイルに書き写さないこと。`sync.js` と `token.js` だけが知っている。
-（この 3 つのほかに `publish-ui.js` が `tp:write-probe` を一瞬だけ書いて消す。
+キー名を他のファイルに書き写さないこと。`tp:events` / `tp:events-base` を知っているのは
+`sync.js`、`tp:gh-token` は `token.js`、`tp:key` は `auth.js`（唯一の出入口）だけ。
+（この 4 つのほかに `publish-ui.js` が `tp:write-probe` を一瞬だけ書いて消す。
 保存領域に書けるかを実際に試すためで、残さない。）
 
-**`createSync()` は旅程専用。** 保存キー（`DRAFT_KEY` / `BASE_KEY`）も検証器
-（`validateEvents`）もコミットメッセージも `config` の外にある。2 つ目の JSON
+**`createSync()` は旅程専用。** `config` は owner / repo / branch / path に加えて
+`draftKey` / `baseKey` / `validate` / `commitMessage` / `codec` の 5 つを持つ
+（既定値は旅程用: `sync.js` の `DEFAULT_CONFIG` 参照）。2 つ目の JSON
 （B2 の `packing.json`）を同期させる前に、設計書 §13 の
 「`createSync()` は旅程専用。2 つ目の JSON には使えない」を読むこと ──
-**3 つのうち一部だけを注入可能にすると、旅程の下書きが黙って消える。**
+**5 つのうち一部だけを差し替えると、旅程の下書きが黙って消える。**
 
 ### `updatedAt` がすべての比較の軸
 
@@ -202,6 +212,33 @@ map.js の createMap() → 座標を持つイベントからマーカーと位�
   トークンを持たない端末の編集は git 履歴にも残らないので、そのまま消える。
   `hasUnpublishedChanges()` が一致で見ているのと同じ理由
 
+### 暗号化（Phase B4）
+
+設計書 §6 に対応する。
+
+- **リモートのファイルは封筒 JSON。** `updatedAt` を暗号文の外に複製し、
+  `kdf`（`salt` / `iter`）・`iv`・`ct` を持つ（`assets/js/crypto.js` の `createCodec()`）。
+  **外側を暗号文の外に置いたのは、`assertRemoteNotAhead()` が競合検出のために
+  復号せずとも `updatedAt` を読めるようにするため**（前述「競合検出は sha ではなく
+  `updatedAt`」）。外側は GCM の認証タグの外にあるため改竄・破損を検知できず、
+  中身の `updatedAt` と食い違うことがある。読み込みは中身を正として表示しつつ、
+  食い違いを画面に警告として出す（`schedule.js` の `outerStampMismatch`）
+- **下書きは平文のまま `localStorage` に置く。** `tp:events` は暗号化しない ──
+  鍵を失っても手元の未公開の編集は読める
+- **導出鍵は `localStorage["tp:key"]`。知っているのは `auth.js` だけ。** 合言葉から
+  PBKDF2（600,000 回）で導いた鍵を保存し、以降は保存済みの鍵を読むだけで済ませる
+  （端末ごとに PBKDF2 が走るのは最初の 1 回だけ）
+- **ソルトは同期する JSON（`events` / 将来の `packing` / `comments`）で共有する。**
+  ファイルごとにソルトを引くと、2 つ目の JSON を足した時点で別の鍵になり、
+  ページを移動するたびに PBKDF2 600,000 回が走る（設計書 §6.3）
+- **読み込みの順序**（`sync.js` の `load()`）: fetch → 復号 → 検証。復号は
+  `codec.decode()` が担い、封筒でない値（`ct` を持たない平文）はそのまま素通しする
+  （移行当日に 1 回だけ通る経路）。検証はそのあとの `validateEvents()`
+- **公開の順序**（`sync.js` の `publish()`）: 検証 → 暗号化 → GET で sha と本文 →
+  `updatedAt` の突き合わせ → PUT → `tp:events-base` を更新（詳細は次項「公開の順序」）
+- **合言葉を忘れると復旧できない。** git 履歴に残るのも暗号文で、合言葉以外に
+  鍵を再現する手段はない。**控えをパスワードマネージャに残すこと**
+
 ### 競合検出は sha ではなく `updatedAt`（設計書 §5.3）
 
 GET の直後に PUT するので **sha はほぼ常に最新**であり、409 が返るのは GET と PUT の間の
@@ -215,11 +252,15 @@ A が公開する」という形で起きる。この場合 PUT の直前に取�
 ### 公開の順序（`sync.js` の `publish()`）
 
 ```
-validateEvents → GET で sha と本文 → updatedAt の突き合わせ → PUT → tp:events-base を更新
+validateEvents → 暗号化 → GET で sha と本文 → updatedAt の突き合わせ → PUT → tp:events-base を更新
 ```
 
 順序に意味がある。検証を後ろへ回すと壊れたデータがリポジトリに入り、同行者のページが
 起動しなくなる。base を PUT より前に進めると、失敗した公開が「同期済み」に見える。
+暗号化は検証と GET の間に固定の位置を持つ ── 検証より前に回すと壊れたデータを暗号文に
+してしまい誰も中身を確かめられなくなる。突き合わせ（`assertRemoteNotAhead()`）は
+暗号化しても無改造で効く ── 読むのは封筒の外側の `updatedAt` で、GCM の認証タグの中を
+復号する必要が無いため。
 
 `publish()` は `{ commitUrl, conflictChecked }` を返す。`conflictChecked` が `false` なら
 リモートの `updatedAt` が読めず**突き合わせを省いて公開している** — `publish-ui.js` が
@@ -267,19 +308,19 @@ validateEvents → GET で sha と本文 → updatedAt の突き合わせ → PU
 
 ## Content-Security-Policy
 
-4 ページすべての `<head>` に `<meta http-equiv="Content-Security-Policy">` を置いている
-（内容は 4 ページで同一）。要点:
+3 ページすべての `<head>` に `<meta http-equiv="Content-Security-Policy">` を置いている
+（内容は 3 ページで同一）。要点:
 
 - **`script-src 'self'`** — `'unsafe-inline'` を入れていないので、インライン `<script>` も
   `javascript:` URL も実行されない。**インライン script を書かないこと**
-  （`packing.html` / `archive.html` のエントリポイントを `stub-page.js` に出したのはこのため）
+  （`packing.html` のエントリポイントを `stub-page.js` に出したのはこのため）
 - `connect-src 'self' https://api.github.com` — 公開フローが叩く先だけを許可
 - `style-src` に `'unsafe-inline'` が要る（Leaflet と自前コードが `style` 属性を使うため）。
   狙いはスクリプト実行の遮断であって、スタイルではない
 - `img-src` が `https:` のワイルドカードなのは、`events.json` と `menu.js` が
   複数の外部ホストから画像を直リンクしているため（設計書 §13 の負債）
 
-`tests/csp.test.js` の 6 件が機械的に検査している。4 ページすべてを見るのが
+`tests/csp.test.js` の 6 件が機械的に検査している。3 ページすべてを見るのが
 「CSP がある」「`script-src` が `'self'` のみ」「インライン script が 1 つも無い」
 「`on*` 属性が 1 つも無い」「`connect-src` に GitHub API がある」の 5 件で、
 6 件目（`img-src` に地図タイル、`font-src` にフォント）だけは `schedule.html` しか
@@ -295,20 +336,14 @@ validateEvents → GET で sha と本文 → updatedAt の突き合わせ → PU
 
 ### 新しいイベントを追加
 
-**通常は画面から追加する** — 旅程ページの「予定を追加」。下書きは `localStorage` に入り、
-「公開」を押すとリポジトリの `events.json` にコミットされる（前述「保存と公開」）。
+**画面から追加する** — 旅程ページの「予定を追加」。下書きは `localStorage` に入り、
+「公開」を押すとリポジトリの `events.json`（暗号化した封筒 JSON）にコミットされる
+（前述「保存と公開」）。
 
-`events.json` を手で編集する場合（初期データの投入、まとめての書き換えなど）:
-
-1. `assets/data/events.json` の `events` 配列にオブジェクトを追加する
-2. `id` は一意な文字列、`cat` は `cat-move` / `cat-sight` / `cat-food` / `cat-hotel` / `cat-shop` のいずれか
-3. 単日・時間指定なら `startDay` と `endDay` を同じ値にし、`start` / `end` を10進時間で設定
-4. 複数日にまたがる場合は `endDay` を `startDay` より後ろにする
-5. 終日イベント（ホテルなど）は `allDay: true` にする。地図に出さない場合は `lat` / `lng` を `null` にする
-6. トップレベルの `updatedAt` も新しくすること。ここを進めないと、既に下書きを持っている
-   端末は「リモートは進んでいない」と判断して手元の下書きを見せ続ける
-7. 保存後、ブラウザをリロードすれば反映される（ビルドステップなし）。
-   ただし**未公開の変更を持つ端末**では黙って置き換えず、取り込むかどうかを聞くバーが出る
+**`events.json` はリポジトリ上では暗号文なので、テキストエディタで開いて手編集することは
+できない。** 初期データの投入やまとめての書き換えが必要な場合も、画面からの操作
+（追加・編集・削除・公開）を通すこと。手編集を復活させるなら、暗号化・`updatedAt` の
+更新・検証をエディタの外で再現する手段が要る。
 
 ### 新しいカテゴリを追加
 
@@ -429,7 +464,7 @@ node --test
 
 Phase B1 で追加したもの:
 
-- `csp.test.js` — 4 ページの CSP（前述「Content-Security-Policy」）
+- `csp.test.js` — 3 ページの CSP（前述「Content-Security-Policy」）
 - `store.test.js` — 読みは既定値へ落とし、書きは必ず `StoreWriteError` で知らせること
 - `base64.test.js` — 日本語・絵文字・長い入力の往復
 - `sync-decide.test.js` — `decideSync()` の全分岐
@@ -442,6 +477,17 @@ Phase B1 で追加したもの:
 - `event-editor.test.js` — 採番・併合（`image` を落とさない）・配列の差し替え・配線
 - `publish-ui.test.js` — トークンが DOM に出ないこと、公開ボタンの出し分け、
   失敗の見せ分け、2 度押しの確認
+
+Phase B4 で追加したもの:
+
+- `crypto.test.js` — 封筒 codec（`createCodec()`）の暗号化・復号の往復（日本語・絵文字を含む）、
+  `isEnvelope()`、鍵違い（`wrong-key`）と中身の破損（`corrupt`）の見分け
+- `auth.test.js` — 鍵素材の保存・読み出し・`kdfMatches()`、`hasKey()` と `loadCodec()` が
+  一致しない壊れ方（形は正しいが base64 として壊れた鍵）
+- `auth-form.test.js` — 合言葉フォームの配線、`decode()` による確認を省いていないこと、
+  形は正しいが中身が違う鍵でも「入れ直す」導線が常に出ること、合言葉を DOM に残さないこと
+- `load-error.test.js` — `classifyLoadError()` が失敗の種類（データ不備・鍵違い・破損・
+  取得失敗）ごとに違う文言を出すこと
 
 `tokens.test.js` は色そのものに加えて次の約束も機械的に守らせている:
 
@@ -515,11 +561,12 @@ Safari 15.5 で対応したため、これがサポート下限を決めてい�
   飛ばすとページが真っ白になる）。初回描画のあとの再描画（`schedule.js` の `safeDraw()`）も
   同様に守ること
 - **`localStorage` のキー名を書き写さないこと。** `tp:events` / `tp:events-base` は
-  `sync.js`、`tp:gh-token` は `token.js` だけが知っている。別のファイルに書き写すと、
-  キーを変えたときに片方だけが古い名前を読み、「変更が無い」と黙って答え続ける
-- **トークンを画面にも例外文にも出さないこと。** `store.read` は壊れた値を `JSON.parse` に
-  掛けるので、`SyntaxError` の文言に中身の先頭が埋め込まれて `console.warn` に出る。
-  トークンは `readText` / `writeText`（JSON を通さない）で扱う
+  `sync.js`、`tp:gh-token` は `token.js`、`tp:key` は `auth.js` だけが知っている。
+  別のファイルに書き写すと、キーを変えたときに片方だけが古い名前を読み、
+  「変更が無い」と黙って答え続ける
+- **トークンも合言葉（から導いた鍵）も画面にも例外文にも出さないこと。** `store.read` は
+  壊れた値を `JSON.parse` に掛けるので、`SyntaxError` の文言に中身の先頭が埋め込まれて
+  `console.warn` に出る。トークンと鍵素材は `readText` / `writeText`（JSON を通さない）で扱う
 - Leaflet MarkerCluster は未実装。イベント密度が大幅に増加した場合に追加検討
 - Dancing Script（旧デザインの筆記体タイトル）は Aman 由来のデザインへの刷新に伴い廃止した。
   現在の見出しフォントは `--serif`（Newsreader / Noto Serif JP）

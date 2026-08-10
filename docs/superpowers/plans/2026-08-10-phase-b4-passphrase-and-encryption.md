@@ -528,7 +528,7 @@ export const passthroughCodec = {
 - [ ] **Step 4: 通ることを確認する**
 
 Run: `node --test tests/crypto.test.js`
-Expected: PASS（15 件）
+Expected: PASS（14 件）
 
 - [ ] **Step 5: commit**
 
@@ -1203,8 +1203,16 @@ git commit -m "Make createSync take the keys, validator, message, and codec toge
 
 **Files:**
 - Create: `assets/js/load-error.js`
-- Modify: `assets/js/schedule.js`
-- Test: `tests/load-error.test.js`
+- Modify: `assets/js/schedule.js`, `assets/js/publish-ui.js`
+- Test: `tests/load-error.test.js`, `tests/publish-ui.test.js`
+
+> **2026-08-10 追記（レビューの Critical を受けて）**: 当初この計画は
+> 「`createPublishUI()` の呼び出しを `load()` より前へ移す」とだけ書いていたが、
+> **それでは何も変わらない。** `createPublishUI()` は要素を組み立てるだけで DOM に
+> 挿入せず、実際にマウントするのは `start()` の中の `replaceChildren` だけ。
+> その `start()` は `load()` の後ろにあるので、リモートが壊れた端末では
+> 公開ボタンもトークン設定も現れないまま ── このタスクが存在する理由が未達だった。
+> **マウントを `start()` から出すこと**（下記）。
 
 **Interfaces:**
 - Consumes: Task 2 の `DecryptError`、既存の `EventDataError`
@@ -1387,7 +1395,7 @@ export function classifyLoadError(error) {
 
 ```js
 import { classifyLoadError, DataFetchError, DataParseError } from "./load-error.js";
-import { hasKey, loadCodec } from "./auth.js";
+import { hasKey, loadCodec, clearKey } from "./auth.js";
 import { DEFAULT_CONFIG } from "./sync.js";
 ```
 
@@ -1409,16 +1417,26 @@ async function main() {
   const store = createStore();
 
   // 鍵が無ければ旅程は復号できない。合言葉を入れてもらうため入口へ戻す。
-  // これは防御ではなく案内（設計書 §6.1）── 防御は鍵が無ければ復号できないこと
-  if (!hasKey(store)) {
+  // これは防御ではなく案内（設計書 §6.1）── 防御は鍵が無ければ復号できないこと。
+  //
+  // hasKey() ではなく loadCodec() の結果で判断する。**この 2 つは一致しない。**
+  // hasKey() が見るのは形（`salt.iter.key` の 3 つが揃っているか）だけで、
+  // salt や key が base64 として壊れていても true を返す。その場合
+  // loadCodec() は null を返すので、hasKey() で通してしまうと codec が null のまま
+  // createSync へ流れ込み、最初に codec.encode / decode を呼んだところで
+  // 「Cannot read properties of null」が無関係な場所から出る ──
+  // 原因が壊れた tp:key であることは画面からもコンソールからも読み取れない。
+  //
+  // 壊れていた鍵素材はここで捨てる。残しておくと戻った先の index.html が
+  // 「鍵は設定済み」と判断して合言葉の欄を出さず、入口が塞がったまま堂々巡りになる。
+  const codec = hasKey(store) ? await loadCodec(store) : null;
+  if (codec === null) {
+    clearKey(store);
     location.replace("index.html");
     return;
   }
 
-  const sync = createSync({
-    store,
-    config: { ...DEFAULT_CONFIG, codec: await loadCodec(store) },
-  });
+  const sync = createSync({ store, config: { ...DEFAULT_CONFIG, codec } });
 ```
 
 `renderNav(...)` の直後、`await sync.load()` の**前**に `publishUI` の組み立てを移す（今は 341〜356 行目にある）。
@@ -1470,6 +1488,43 @@ async function main() {
 
 元の位置にあった `publishUI = createPublishUI({...})` のブロックを削除し、`publishUI.start(loaded.source)` は `draw()` の直前に残す。
 
+**そのうえで `assets/js/publish-ui.js` のマウントを `start()` から出す。** これをしないと、上の並べ替えは何の効果も持たない（`createPublishUI()` は要素を組み立てるだけで DOM に挿入しない）。
+
+`createPublishUI()` の本体の末尾で、**store しか読まない初期化**をすべて済ませる:
+
+```js
+  // ここまでで DOM への挿入を終える。**start() まで待たないこと。**
+  // これらが読むのは store だけで（refreshDirty → sync.hasUnpublishedChanges() は
+  // localStorage を見る、getData はクリックされるまで呼ばれない）、旅程データを
+  // 必要としない。start() に残すと、load() が投げた端末では replaceChildren が
+  // 一度も走らず、公開ボタンもトークン設定も DOM に現れない ──
+  // events.json の手編集を廃止した以上、それは復旧手段がゼロになるということ。
+  buildPanel();
+  setPanelOpen(false);
+  clearStatus();
+  refreshDirty();
+  renderControls();
+```
+
+`start(source)` に残すのは **`source` に依存する同期バーだけ**にする（`use-remote` / `remote-is-newer` / `offline` の案内）。`start()` から上の 5 行を削除すること。
+
+`tests/publish-ui.test.js` に 1 件足す ── **`start()` を呼ばなくても公開の導線が DOM に入っていること**。これが今回の眼目を機械的に守る唯一のテストになる（`schedule.js` は `node --test` から import できないため）。
+
+```js
+test("start() を呼ぶ前に、公開の導線が DOM に入っている", () => {
+  // load() が投げた端末でも復旧手段が残ることの機械的な保証。
+  // createPublishUI が要素を組み立てるだけで挿入しないと、
+  // リモートが壊れた端末には公開ボタンもトークン設定も現れない
+  const els = makeEls();            // 既存のヘルパーに合わせて読み替えること
+  const store = createStore(fakeBackend());
+  writeToken(store, "ghp_test");
+
+  createPublishUI({ els, store, sync: fakeSync(), getData: () => null, onAdopt: () => {} });
+
+  assert.ok(els.controls.childNodes.length > 0, "start() 前に controls が空のまま");
+});
+```
+
 - [ ] **Step 4: 通ることを確認する**
 
 Run: `node --test`
@@ -1484,7 +1539,11 @@ python3 -m http.server 8000
 `http://localhost:8000/schedule.html` を開き、DevTools のコンソールで確認する。
 
 1. `localStorage.setItem("tp:key", "こわれた値")` → リロード → `index.html` へ飛ぶこと
-2. 鍵を正しく入れた状態で `localStorage.setItem("tp:events", '{"days":[]}')` → リロード → 旅程はエラーになるが、**公開ボタンとトークン設定の導線が画面に出ていること**（これが今回の眼目）
+   （形からして違う値。`hasKey()` が false になる経路）
+2. `localStorage.setItem("tp:key", "!!!not-base64.600000.also-bad")` → リロード →
+   **`index.html` へ飛び、かつ `tp:key` が消えていること**（`hasKey()` は true だが
+   `loadCodec()` が null を返す経路。捨てないと入口が塞がったまま堂々巡りになる）
+3. 鍵を正しく入れた状態で `localStorage.setItem("tp:events", '{"days":[]}')` → リロード → 旅程はエラーになるが、**公開ボタンとトークン設定の導線が画面に出ていること**（これが今回の眼目）
 
 - [ ] **Step 6: commit**
 
@@ -1660,17 +1719,37 @@ function buildAuthForm(store) {
     submit.disabled = true;
     status.textContent = "鍵を作っています（数秒かかります）…";
     try {
-      let kdf = null;
+      let body = null;
       try {
         const response = await fetch(DEFAULT_CONFIG.path, { cache: "no-store" });
-        const body = await response.json();
-        if (isEnvelope(body)) kdf = body.kdf;
+        body = await response.json();
       } catch (error) {
         // 取れなくても止めない。新しいソルトで鍵を作り、次の公開で確定させる
         console.warn("menu: 既存のソルトを取得できませんでした", error);
       }
 
-      await unlock(store, passphrase, kdf);
+      const encrypted = isEnvelope(body);
+      const codec = await unlock(store, passphrase, encrypted ? body.kdf : null);
+
+      // 合言葉が正しいかは、ここで実際に復号して確かめる。**この確認を省かないこと。**
+      //
+      // ソルトは 3 つの JSON で共有する（設計書 §6.3）ので、合言葉を打ち間違えても
+      // 封筒の kdf は一致する。確かめずに鍵を保存すると、間違った鍵を持ったまま
+      // schedule.html へ進み、そこでは kdf が一致するために GCM の失敗が
+      // 「データが壊れています」と表示される ── 実際は打ち間違いなのに、
+      // 画面は直し方の違うことを言う。crypto.js の kdf 比較が捕まえられるのは
+      // 「別のソルトで暗号化されている」場合だけで、いちばん起きやすい
+      // 打ち間違いはここでしか捕まえられない（設計書 §9）。
+      if (encrypted) {
+        try {
+          await codec.decode(body);
+        } catch (error) {
+          clearKey(store);
+          status.textContent = "合言葉が違います。";
+          return;
+        }
+      }
+
       form.hidden = true;
       status.textContent = "";
       location.reload();
@@ -1710,6 +1789,7 @@ Expected: PASS（全件）
 
 1. 鍵が無い状態で合言葉の欄が出ること。入れると欄が消え、リロード後も出ないこと
 2. **入力欄が `type="password"` で、送信後に空になること**
+3. **`events.json` が封筒のとき、わざと違う合言葉を入れると「合言葉が違います。」と出て、鍵が保存されないこと**（`localStorage.getItem("tp:key")` が `null` のまま）。この確認だけは Task 8 の切り替え後にしか実地でできないので、ここでは `assets/data/events.json` を一時的に封筒で置き換えて試し、**確認後に必ず戻すこと**
 3. DevTools の Elements で `auth-form` の中に合言葉が残っていないこと
 4. ナビに「データ検索」が無いこと、カードが 2 枚であること
 5. `archive.html` を直接開くと 404 になること
@@ -1744,12 +1824,29 @@ git commit -m "Add the passphrase form and drop the cancelled archive page"
 - テストの一覧に `crypto.test.js` / `auth.test.js` / `load-error.test.js` を足す
 - CSP の節の「4 ページ」を 3 ページに直す
 
-- [ ] **Step 2: `README.md` を直す**
+- [ ] **Step 2: 設計書 §13 に、B4 で見つけた残存する穴を書き足す**
+
+`docs/superpowers/specs/2026-08-09-travel-plans-redesign-design.md` の §13
+「Phase B1 からの繰り越し（保存と公開）」に次を足す。Task 5 のレビューが見つけたもので、
+**B4 の範囲では直さないと決めた**（直すには 409 の判断そのものを設計し直す必要がある）。
+
+> - **壊れたリモートを「下書きを持つ端末から公開して直す」経路が、409 で塞がることがある。**
+>   B4 で `publish-ui` を `load()` より前に組み、`sync.readDraft()` で下書きを
+>   `state` に載せるようにしたので、リモートの `days` / `events` が壊れていても
+>   公開ボタンは出て押せる。ただし**壊れたリモートが「JSON としては読めて
+>   `updatedAt` が `tp:events-base` より新しい」形**だと、`assertRemoteNotAhead()` が
+>   PUT の前に 409 で止める。409 の画面が示す唯一の逃げ道（「取り込む」→
+>   `adoptRemote()`）も `validate` で落ちるので、その端末では直せない。
+>   `events.json` の手編集は廃止したので、この場合の復旧はリポジトリへの
+>   git コミットに戻る。直すなら「リモートが検証を通らないと分かっている回に限り
+>   突き合わせを飛ばす」を sync 層に入れることになる
+
+- [ ] **Step 3: `README.md` を直す**
 
 - ファイル構成から `archive.html` を削除
 - 現在実装済みの説明に、合言葉が要ることを足す
 
-- [ ] **Step 3: 記述と実態が合っているか確かめる**
+- [ ] **Step 4: 記述と実態が合っているか確かめる**
 
 ```bash
 grep -rn "archive" CLAUDE.md README.md
@@ -1758,10 +1855,10 @@ node --test
 
 Expected: `archive` の残存が 0 件（取りやめの経緯を説明している箇所を除く）。テストは全件 pass
 
-- [ ] **Step 4: commit**
+- [ ] **Step 5: commit**
 
 ```bash
-git add CLAUDE.md README.md
+git add CLAUDE.md README.md docs/superpowers/specs/2026-08-09-travel-plans-redesign-design.md
 git commit -m "Drop the hand-editing procedure now that the itinerary is encrypted"
 ```
 

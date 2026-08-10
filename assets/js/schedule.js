@@ -8,25 +8,12 @@ import { createSheet } from "./sheet.js";
 import { el, escapeHtml } from "./dom.js";
 import { EventDataError } from "./validate.js";
 import { createStore } from "./store.js";
-import { createSync } from "./sync.js";
+import { createSync, DEFAULT_CONFIG } from "./sync.js";
 import { createEventEditor } from "./event-editor.js";
 import { createPublishUI } from "./publish-ui.js";
-
-/** HTTP エラー・通信断。取りに行けなかった、という種類の失敗。 */
-class DataFetchError extends Error {
-  constructor(message) {
-    super(message);
-    this.name = "DataFetchError";
-  }
-}
-
-/** 取れたが JSON として読めなかった。404 が HTML で返る場合もここに来る。 */
-class DataParseError extends Error {
-  constructor(message, cause) {
-    super(message, { cause });
-    this.name = "DataParseError";
-  }
-}
+import { classifyLoadError, DataFetchError, DataParseError } from "./load-error.js";
+import { hasKey, loadCodec, clearKey } from "./auth.js";
+import { DecryptError } from "./crypto.js";
 
 /**
  * data が正で、days / events はその一部を指すだけの控え。
@@ -74,9 +61,10 @@ const els = {
 };
 
 /**
- * 公開の導線。旅程を読み終えるまで作れない（公開するものが無い）ので、
- * main() の後半で入る。保存のたびに refreshDirty() を呼ぶ必要があるが、
- * editor は load() より前に組み立てるため、参照は後から差し込む。
+ * 公開の導線。load() より前、renderNav の直後で組み立てる（main() 参照）。
+ * リモートが壊れていても公開ボタンとトークン設定を画面に出すのが目的なので、
+ * 旅程の読み込みを待たない。editor はさらに前に組み立てるため、参照は
+ * ここではモジュールスコープの変数越しに後から差し込む。
  */
 let publishUI = null;
 
@@ -126,6 +114,11 @@ function safeDraw(context) {
  * カレンダーの上に出す一行の通知。message が null なら消す。
  * カレンダー本体（els.cal）を潰さないので、再描画に失敗しても
  * 直前まで見えていた内容はそのまま残る。
+ *
+ * safeDraw が成功のたびに setNotice(null) で消す ── 表示時間帯の変更などの
+ * 操作が「直った」ことを伝えるための一時的な通知だから。次に出す
+ * outerStampMismatch の警告は性質が違う（操作の成否とは無関係に、公開し直す
+ * まで出続けるべき）ので、同じ要素を共有せず setStampNotice を別に持つ。
  */
 let noticeEl = null;
 function setNotice(message) {
@@ -138,6 +131,30 @@ function setNotice(message) {
   }
   noticeEl.textContent = message ?? "";
   noticeEl.hidden = !message;
+}
+
+/**
+ * 封筒の外側の updatedAt と中身が食い違っていたときの警告（outerStampMismatch）。
+ *
+ * setNotice とは別の要素にする。safeDraw は再描画に成功するたびに
+ * setNotice(null) を呼ぶので、同じ要素を使うと表示時間帯を変える・予定を
+ * 保存するといった最初の操作でこの警告が黙って消える。GCM の認証タグの外に
+ * ある値の食い違いは操作の成否とは無関係な事実なので、次に公開して
+ * 外側が正しい値に上書きされるまで出続けるべきもの ── ここでは message に
+ * null 以外を渡す呼び出しが 1 か所（load 直後）しかなく、setStampNotice(null)
+ * を呼ぶ場所を作っていないのはそのため（消す理由がまだ無い）。
+ */
+let stampNoticeEl = null;
+function setStampNotice(message) {
+  if (!message && !stampNoticeEl) return;
+  if (!stampNoticeEl) {
+    stampNoticeEl = document.createElement("p");
+    stampNoticeEl.className = "ferror";
+    stampNoticeEl.setAttribute("role", "status");
+    els.cal.parentNode.insertBefore(stampNoticeEl, els.cal);
+  }
+  stampNoticeEl.textContent = message ?? "";
+  stampNoticeEl.hidden = !message;
 }
 
 function fillHourOptions(select, { min, max }, selected) {
@@ -207,57 +224,41 @@ function buildEditorToolbar(editor) {
 }
 
 /**
- * 失敗の種類ごとに違う案内を出す。
- *
- * 以前は 1 つの文言ですべてを説明しようとしていた。だが JSON の書き間違いや
- * データ内容の不備に対して「通信状況を確認して再読み込み」は端的に嘘で、
- * 何度再読み込みしても直らないものを再読み込みさせることになる。
- * 直し方が違う失敗は、違う文言で言う。
+ * 失敗の種類ごとに違う案内を出す。分類と文言そのものは load-error.js に切り出した
+ * （schedule.js はモジュール冒頭で document を触るため Node から import できず、
+ * ここに置いたままでは node --test で検査できなかった）。
  */
-function loadErrorMessage(error) {
-  if (error instanceof EventDataError) {
-    return (
-      "旅程データ（assets/data/events.json）の内容に問題があります。\n" +
-      "再読み込みでは直りません。下記を直してから読み込み直してください。\n\n" +
-      error.message
-    );
-  }
-  if (error instanceof DataParseError) {
-    return (
-      "旅程データ（assets/data/events.json）を JSON として読めませんでした。\n" +
-      "ファイルの書式（末尾のカンマ、閉じ括弧、クォート）を確認してください。\n" +
-      "サーバーが JSON の代わりに HTML のエラーページを返している場合も" +
-      "これになります。\n\n" +
-      error.message
-    );
-  }
-  if (error instanceof DataFetchError) {
-    return (
-      "旅程データ（assets/data/events.json）を取得できませんでした。\n" +
-      "通信状況を確認してページを再読み込みするか、" +
-      "手元で開いている場合は file:// ではなくローカルサーバー" +
-      "（python3 -m http.server）経由でアクセスしてください。\n\n" +
-      error.message
-    );
-  }
-  // データは読めたが、描画・地図の初期化などで落ちたケース
-  return (
-    "旅程の表示中に想定外のエラーが発生しました。\n" +
-    "データの読み込み自体は完了している可能性があります。" +
-    "詳細はブラウザのコンソールを確認してください。\n\n" +
-    `${error?.name ?? "Error"}: ${error?.message ?? String(error)}`
-  );
-}
-
 function showLoadError(error) {
-  els.cal.innerHTML = `<p class="ferror ferror--block">${escapeHtml(loadErrorMessage(error))}</p>`;
+  const { message } = classifyLoadError(error);
+  els.cal.innerHTML = `<p class="ferror ferror--block">${escapeHtml(message)}</p>`;
 }
 
 async function main() {
   injectSprite();
 
   const store = createStore();
-  const sync = createSync({ store });
+
+  // 鍵が無ければ旅程は復号できない。合言葉を入れてもらうため入口へ戻す。
+  // これは防御ではなく案内（設計書 §6.1）── 防御は鍵が無ければ復号できないこと。
+  //
+  // hasKey() ではなく loadCodec() の結果で判断する。**この 2 つは一致しない。**
+  // hasKey() が見るのは形（`salt.iter.key` の 3 つが揃っているか）だけで、
+  // salt や key が base64 として壊れていても true を返す。その場合
+  // loadCodec() は null を返すので、hasKey() で通してしまうと codec が null のまま
+  // createSync へ流れ込み、最初に codec.encode / decode を呼んだところで
+  // 「Cannot read properties of null」が無関係な場所から出る ──
+  // 原因が壊れた tp:key であることは画面からもコンソールからも読み取れない。
+  //
+  // 壊れていた鍵素材はここで捨てる。残しておくと戻った先の index.html が
+  // 「鍵は設定済み」と判断して合言葉の欄を出さず、入口が塞がったまま堂々巡りになる。
+  const codec = hasKey(store) ? await loadCodec(store) : null;
+  if (codec === null) {
+    clearKey(store);
+    location.replace("index.html");
+    return;
+  }
+
+  const sync = createSync({ store, config: { ...DEFAULT_CONFIG, codec } });
 
   // シートと editor は同じ本文要素を見る。editor は sheet.open() が入れた
   // HTML から入力欄を引き直すので、別の要素を渡すと黙って何も見つからなくなる。
@@ -296,6 +297,27 @@ async function main() {
 
   renderNav(document.getElementById("nav"), "schedule");
 
+  // 公開の導線は load() より前に組み立てる。
+  // events.json の手編集は廃止したので（設計書 §6.5）、リモートが壊れたときの
+  // 復旧手段は「正しい下書きを持つ端末から公開し直す」1 本しかない。
+  // load() のあとに組むと、リモートが壊れている端末では公開ボタンも
+  // トークン設定も DOM に現れず、直す手段がゼロになる（設計書 §13）。
+  publishUI = createPublishUI({
+    els: {
+      controls: els.pubControls,
+      panel: els.pubPanel,
+      status: els.pubStatus,
+      bar: els.syncbar,
+    },
+    store,
+    sync,
+    getData: () => state.data,
+    onAdopt: (data) => {
+      setData(data);
+      safeDraw("リモートの取り込み");
+    },
+  });
+
   // 下書き（localStorage）とリモートを突き合わせて、見せるほうを受け取る。
   // 検証は sync.load() が両方に対して済ませている。
   // source（use-remote / remote-is-newer …）に応じた案内は Task 9 で出す。
@@ -303,15 +325,46 @@ async function main() {
   try {
     loaded = await sync.load();
   } catch (error) {
+    // リモートが壊れていても、手元に正しい下書きがあれば公開で直せる。
+    // state.data を埋めておかないと、画面に出ている公開ボタンが
+    // validateEvents(null) で必ず失敗する ── 直せる導線があるように見えて
+    // 実際には押せない、という一番悪い状態になる（設計書 §6.5）。
+    // 画面には引き続きエラーを出す。下書きは「公開して直す」ためだけに載せる。
+    // ここで旅程を描いてしまうと「読めているのにエラーが出ている」という
+    // 別の混乱になるので、draw() は呼ばない ── 描画は showLoadError に任せる。
+    const draft = sync.readDraft();
+    if (draft) {
+      setData(draft);
+      publishUI?.refreshDirty();
+    }
+
     // sync.load() の失敗は「取りに行けなかった」「JSON として読めなかった」
-    // 「中身が旅程の形になっていない」の 3 種類で、直し方がそれぞれ違う。
-    // 案内を出し分けられるよう、ここで種別を付け直す
+    // 「中身が旅程の形になっていない」「復号できなかった」の 4 種類で、
+    // 直し方がそれぞれ違う。案内を出し分けられるよう、ここで種別を付け直す
     // （JSON の解釈失敗だけは cause が SyntaxError になる）。
     if (error instanceof EventDataError) throw error;
+    if (error instanceof DecryptError) throw error;
     if (error?.cause instanceof SyntaxError) throw new DataParseError(error.message, error.cause);
     throw new DataFetchError(error?.message ?? String(error));
   }
   setData(loaded.data);
+
+  if (loaded.outerStampMismatch) {
+    // 封筒の外側は認証されないので、改竄も破損も GCM は気付かない。
+    // 内側を正として表示しているが、黙って直すと誰も気付かないまま進む。
+    // setNotice ではなく setStampNotice を使う ── safeDraw の setNotice(null) で
+    // 最初の操作のあと消えてしまわないように（上のコメント参照）
+    // 「公開し直すと揃います」と言い切らない。外側の updatedAt が
+    // tp:events-base より進んでいる場合は assertRemoteNotAhead() が PUT の前に
+    // 409 で止める。409 の逃げ道である adoptRemote() は通るが、base に入るのは
+    // 復号した**内側**の updatedAt なので（storeAdopted → stampOf は内側を見る）、
+    // 進んでいる外側は base を上回ったままになり、次の公開も同じ 409 になる
+    // ── 常に揃うとは限らない（B4 最終レビュー Minor 4）
+    setStampNotice(
+      "リモートのファイルの更新時刻が中身と食い違っています。" +
+        "中身の時刻を正として表示しています。公開し直すと揃うことがあります。"
+    );
+  }
 
   fillHourOptions(els.viewStart, START_HOUR_CHOICES, state.viewStart);
   fillHourOptions(els.viewEnd, END_HOUR_CHOICES, state.viewEnd);
@@ -335,24 +388,8 @@ async function main() {
   buildCategoryFilters();
   buildEditorToolbar(editor);
 
-  // 公開の導線。source（use-remote / remote-is-newer / offline …）に応じた
-  // 案内はここが出す。取り込みは画面のデータごと差し替わるので、
-  // setData と再描画をこちらから渡す。
-  publishUI = createPublishUI({
-    els: {
-      controls: els.pubControls,
-      panel: els.pubPanel,
-      status: els.pubStatus,
-      bar: els.syncbar,
-    },
-    store,
-    sync,
-    getData: () => state.data,
-    onAdopt: (data) => {
-      setData(data);
-      safeDraw("リモートの取り込み");
-    },
-  });
+  // source（use-remote / remote-is-newer / offline …）に応じた案内はここで出す。
+  // publishUI 自体は load() より前、renderNav の直後で組み立て済み。
   publishUI.start(loaded.source);
 
   draw();

@@ -544,6 +544,23 @@
   margin: 0;
 }
 
+/* .pubpanel の grid は直下の子（この form 自体）にしか効かない。form の中の
+   要素（説明・ラベル・入力・状態文言・ボタン）を縦に並べるには、form 自身にも
+   同じ grid/gap を付ける必要がある。.pubpanel を form に付け直すと padding と
+   border が二重になるので、別クラスにしてある（B4 最終レビュー Minor 6）。 */
+.pubpanel__form {
+  display: grid;
+  gap: var(--s2);
+}
+/* display: grid は作者スタイルなので UA の [hidden] { display: none } に勝つ。
+   打ち消さないと、鍵を設定済みの端末でも合言葉フォームが出っぱなしになり、
+   解錠に成功した直後も残るので「開けなかった」ように見える
+   （auth-form.js の els.form.hidden と closeForm() が両方とも効かなくなる）。
+   .syncbar / .pubpanel / .pubstat が同じ理由で同じ打ち消しを持っている。 */
+.pubpanel__form[hidden] {
+  display: none;
+}
+
 /* 公開・取り込みの結果。tone で地色だけ変える */
 .pubstat {
   display: grid;

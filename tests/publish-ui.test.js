@@ -250,6 +250,60 @@ function mount({
 }
 
 /* ══════════════════════════════════════════════════════════
+   起動直後の DOM 挿入（start() を呼ぶ前）
+
+   sync.load() が投げる端末（リモートが壊れている、復号できない…）では
+   schedule.js は publishUI.start() まで到達しない。events.json の手編集を
+   廃止した以上、そこで公開ボタンとトークン設定が画面に無いと復旧手段が
+   ゼロになる（Task 5 レビューの Critical）。createPublishUI() 自身が
+   これらを組み立てて DOM へ挿入することを確かめる。
+   ══════════════════════════════════════════════════════════ */
+
+test("start() を呼ぶ前に、公開の導線が DOM に入っている", () => {
+  const els = {
+    controls: makeNode("div"),
+    panel: makeNode("div"),
+    status: makeNode("div"),
+    bar: makeNode("div"),
+  };
+  els.panel.id = "pub-panel";
+  const store = createStore(memoryBackend({ "tp:gh-token": TOKEN }));
+  const sync = createSync({
+    store,
+    fetchImpl: fakeFetch(() => jsonResponse(200, plan(REMOTE_STAMP))),
+    config: CONFIG,
+    now,
+  });
+
+  createPublishUI({
+    els,
+    store,
+    sync,
+    getData: () => plan(REMOTE_STAMP),
+    onAdopt: () => {},
+  });
+  // ui.start(source) を意図的に呼んでいない
+
+  // findButton は部分一致なので "公開用トークンを設定"（トークン未設定時のラベル）にも
+  // マッチしてしまう。ここではトークンを先に入れてあるので「公開」ボタンの厳密一致で見る
+  // ── そうしないと、このテストは「本当に公開ボタンが出ている」ことではなく
+  // 「何か "公開" を含むボタンがある」ことしか確かめない
+  assert.equal(
+    buttonsIn(els.controls).some((b) => textOf(b) === "公開"),
+    true,
+    "start() を呼ぶ前に公開ボタンがありません"
+  );
+  assert.equal(
+    els.panel.children.length > 0,
+    true,
+    "start() を呼ぶ前にトークン設定パネルが組み立てられていません"
+  );
+  // 早く組み立てても、トークンを画面に出す約束は変わらない
+  const dom = [els.controls, els.panel, els.status, els.bar].map(serialize).join("");
+  assert.equal(dom.includes(TOKEN), false, "start() を呼ぶ前の DOM にトークンが出ています");
+});
+
+/* ══════════════════════════════════════════════════════════
    トークン設定
    ══════════════════════════════════════════════════════════ */
 
@@ -457,15 +511,19 @@ test("保存領域に書けない端末の 409 には、取り込みボタンを
   // base を残せない端末では公開が必ず 409 になり、取り込みも同じ理由で失敗する。
   // 「取り込んでから公開し直してください」だけを出すと、押しても直らない
   // ボタンを押させ続けることになる
+  //
+  // トークンは書けないので直接 readText を差し替える代わりに、getItem 側に
+  // 先に入れておく（前のセッションで保存済みだが、以後は書けなくなった端末）。
+  // createPublishUI() は構築時に一度だけ hasToken(store) を読むので、
+  // getItem の差し替えは mount() より前に済ませること ── あとから差し替えても
+  // 構築済みの controls は再読みしない（本物のページでは、トークンは
+  // 前のセッションで保存され、読み込み時には既に読める値として store にある）。
   const backend = memoryBackend();
+  backend.getItem = (k) => (k === "tp:gh-token" ? TOKEN : null);
   backend.setItem = () => {
     throw new Error("quota");
   };
-  const h = mount({ backend, handler: github() });
-  // トークンは書けないので直接 readText を差し替える代わりに、
-  // getItem 側にだけ入れておく（保存済みだが以後は書けない端末）
-  backend.getItem = (k) => (k === "tp:gh-token" ? TOKEN : null);
-  h.ui.start("use-local");
+  const h = mount({ backend, handler: github(), source: "use-local" });
 
   await click(findButton(h.els.controls, "公開"));
 
