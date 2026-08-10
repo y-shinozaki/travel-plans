@@ -106,7 +106,7 @@ travel-plans/
 │   └── vendor/
 │       └── leaflet/       Leaflet 1.9.4 のセルフホスト版
 ├── tests/                 node --test 用のテスト
-├── docs/                  ドキュメント（サイトとしては配信しない）
+├── docs/                  ドキュメント（Jekyll には読ませない。配信は止まらない）
 │   ├── README.md          docs の索引
 │   ├── spec/              設計書 — 食い違ったら常にこれが正
 │   ├── plans/             フェーズごとの実装計画（完了済みの記録）
@@ -302,6 +302,12 @@ JSDoc の型注記（波括弧 2 つで始まる形）が Liquid の構文エラ
 `_config.yml` の `exclude` で `docs/` `tests/` `CLAUDE.md` `README.md` `package.json` を
 明示的に外してある。
 **`docs/` に置いたドキュメントに何を書いてもデプロイが壊れないのは、この設定のおかげ。**
+
+**`exclude` が守るのはビルドであって、秘密ではない。** Jekyll に読ませないだけで、
+配信は止まらない ── `.nojekyll` があるいまは Jekyll 自体が動かず、リポジトリの中身が
+そのまま配信される（`…/travel-plans/docs/README.md` も `…/CLAUDE.md` も 200 を返す）。
+リポジトリも public なので、**`docs/` に置いたものは誰でも読める。**
+合言葉・トークン・予約番号のたぐいを書かないこと。
 
 ## ブラウザサポート
 

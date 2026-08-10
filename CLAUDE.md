@@ -95,7 +95,7 @@ travel-plans/
 │   └── vendor/
 │       └── leaflet/        Leaflet 1.9.4 を自前で配置（理由は「外部ライブラリ」参照）
 ├── tests/                  node --test で実行する純粋関数・静的検証のテスト
-├── docs/                   ドキュメント（サイトとしては配信しない。docs/README.md が索引）
+├── docs/                   ドキュメント（docs/README.md が索引）
 │   ├── spec/               設計書。**食い違ったら常にこれが正**
 │   ├── plans/              フェーズごとの実装計画。完了後は歴史的記録であって正ではない
 │   ├── design/             デザイン仕様（design-system.md）と参照モック（aman-mock.html）
@@ -108,7 +108,14 @@ travel-plans/
 リポジトリ全体にかかる設定（`_config.yml` / `.nojekyll` / `package.json` /
 `.gitignore`）と `README.md` / `CLAUDE.md` だけ。** ドキュメントは `docs/` へ入れる ──
 `_config.yml` の `exclude` が `docs/` を 1 行で外しているので、そこに置く限り
-何を書いても GitHub Pages のデプロイを壊さない（後述「デプロイメント」）。
+何を書いても GitHub Pages の**デプロイを壊さない**（後述「デプロイメント」）。
+
+**ただし `exclude` は配信を止めない。** Jekyll に読ませないだけで、`.nojekyll` があるいまは
+Jekyll 自体が動かず、リポジトリの中身がそのまま配信される
+（`…/travel-plans/docs/README.md` も `…/CLAUDE.md` も実際に 200 を返す）。
+リポジトリも public なので、**`docs/` に置いたものは誰でも読める** ──
+合言葉・トークン・予約番号のたぐいを書かないこと。`exclude` が守るのはビルドであって、
+秘密ではない。
 
 設計書（`docs/spec/travel-plans-redesign.md` §2.3）によると、
 残りのフェーズで以下が追加される予定:
