@@ -528,7 +528,7 @@ export const passthroughCodec = {
 - [ ] **Step 4: 通ることを確認する**
 
 Run: `node --test tests/crypto.test.js`
-Expected: PASS（15 件）
+Expected: PASS（14 件）
 
 - [ ] **Step 5: commit**
 
