@@ -3,8 +3,7 @@ import { initReveal } from "./reveal.js";
 import { renderNav } from "./nav.js";
 import { countdownHtml } from "./countdown.js";
 import { createStore } from "./store.js";
-import { hasKey, unlock, clearKey } from "./auth.js";
-import { isEnvelope } from "./crypto.js";
+import { createAuthForm } from "./auth-form.js";
 import { DEFAULT_CONFIG } from "./sync.js";
 
 const DEPARTURE = new Date("2026-08-12T00:00:00+09:00");
@@ -59,80 +58,24 @@ function need(id) {
 }
 
 /**
- * 合言葉の欄。鍵を持っていれば出さない（毎回入れさせない）。
- *
- * 画面は合言葉を一切表示し直さない ── 入力欄は type="password"、
- * 送信後に必ず空にし、状態は「設定済み／未設定」だけを出す（設計書 §5.4 と同じ規約）。
- *
- * ソルトはリモートの封筒から取る。まだ平文なら kdf が無いので null を渡し、
- * unlock が新しいソルトを生成する（切り替え当日の 1 回だけ通る経路）。
+ * 合言葉の欄の配線。判断（鍵を保存してよいか・どの文言を出すか）は一切ここに
+ * 持たず、すべて auth-form.js に任せる ── menu.js はモジュール冒頭で document を
+ * 触るため node --test から import できず、ロジックをここに置いたままでは
+ * 「decode() の確かめを省く」ような壊れ方を CI が検出できない（レビューで
+ * 見つかった Important 2）。
  */
 function buildAuthForm(store) {
-  const form = need("auth-form");
-  const input = need("auth-pass");
-  const status = need("auth-status");
-  const submit = need("auth-submit");
-
-  if (hasKey(store)) {
-    form.hidden = true;
-    return;
-  }
-  form.hidden = false;
-
-  form.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const passphrase = input.value;
-    if (!passphrase) {
-      status.textContent = "合言葉を入力してください。";
-      return;
-    }
-
-    submit.disabled = true;
-    status.textContent = "鍵を作っています（数秒かかります）…";
-    try {
-      let body = null;
-      try {
-        const response = await fetch(DEFAULT_CONFIG.path, { cache: "no-store" });
-        body = await response.json();
-      } catch (error) {
-        // 取れなくても止めない。新しいソルトで鍵を作り、次の公開で確定させる
-        console.warn("menu: 既存のソルトを取得できませんでした", error);
-      }
-
-      const encrypted = isEnvelope(body);
-      const codec = await unlock(store, passphrase, encrypted ? body.kdf : null);
-
-      // 合言葉が正しいかは、ここで実際に復号して確かめる。**この確認を省かないこと。**
-      //
-      // ソルトは 3 つの JSON で共有する（設計書 §6.3）ので、合言葉を打ち間違えても
-      // 封筒の kdf は一致する。確かめずに鍵を保存すると、間違った鍵を持ったまま
-      // schedule.html へ進み、そこでは kdf が一致するために GCM の失敗が
-      // 「データが壊れています」と表示される ── 実際は打ち間違いなのに、
-      // 画面は直し方の違うことを言う。crypto.js の kdf 比較が捕まえられるのは
-      // 「別のソルトで暗号化されている」場合だけで、いちばん起きやすい
-      // 打ち間違いはここでしか捕まえられない（設計書 §9）。
-      if (encrypted) {
-        try {
-          await codec.decode(body);
-        } catch (error) {
-          clearKey(store);
-          status.textContent = "合言葉が違います。";
-          return;
-        }
-      }
-
-      form.hidden = true;
-      status.textContent = "";
-      location.reload();
-    } catch (error) {
-      console.error(error);
-      clearKey(store);
-      status.textContent = "鍵を作れませんでした。もう一度お試しください。";
-    } finally {
-      // 合言葉を DOM に残さない
-      input.value = "";
-      submit.disabled = false;
-    }
+  createAuthForm({
+    els: {
+      state: need("auth-state"),
+      actions: need("auth-actions"),
+      form: need("auth-form"),
+      input: need("auth-pass"),
+      status: need("auth-status"),
+      submit: need("auth-submit"),
+    },
+    store,
+    path: DEFAULT_CONFIG.path,
   });
 }
 
