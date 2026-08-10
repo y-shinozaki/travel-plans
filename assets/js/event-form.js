@@ -41,7 +41,7 @@ function requireDayCount(fname, dayCount) {
 
 /**
  * 新規作成の初期値。id は保存時に採番するので持たせない。
- * 時刻の既定は 9:00 → 10:00（mock-aman.html の #evSheet と同じ）。
+ * 時刻の既定は 9:00 → 10:00（aman-mock.html の #evSheet と同じ）。
  */
 export function emptyEvent(dayCount) {
   // 1 日も無いデータでは、どの日にも置けない予定ができてしまう

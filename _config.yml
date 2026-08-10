@@ -13,11 +13,11 @@
 # exclude に挙げたものは Jekyll が読みもしないので、中に何を書いても安全になる。
 # サイト本体（*.html / assets/）はここに挙げていないため、これまでどおり配信される
 # ── front matter を持たない .html は Jekyll がそのまま複製する。
+# ドキュメントは docs/ に集約してあるので、1 行で全部が外れる
+# （旧 DESIGN.md も docs/design/design-system.md へ移した）。
 exclude:
   - docs/
   - tests/
   - CLAUDE.md
-  - DESIGN.md
   - README.md
   - package.json
-  - .superpowers/

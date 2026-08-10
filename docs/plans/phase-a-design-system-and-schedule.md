@@ -9,8 +9,8 @@
 **Tech Stack:** バニラ JS（ES モジュール）、CSS カスタムプロパティ、Leaflet 1.9.4（セルフホスト）、Google Fonts（Newsreader / Inter / Noto Sans JP / Noto Serif JP）、Node 26 の `node --test`
 
 **参照資料:**
-- 設計書: `docs/superpowers/specs/2026-08-09-travel-plans-redesign-design.md`
-- デザインモック（検証済み・実装の見本）: `docs/design-reference/mock-aman.html`
+- 設計書: `docs/spec/travel-plans-redesign.md`
+- デザインモック（検証済み・実装の見本）: `docs/design/aman-mock.html`
 
 このモックは実データを流し込んで動作確認済みのものです。CSS はここから抜き出して使います。行番号は本計画で指定します。
 
@@ -1039,7 +1039,7 @@ Expected: PASS。9 件すべて成功。
 7. **Radius** — Aman が 0px であることと、本プロジェクトで意図的に逸脱したこと、5段階の使い分け
 8. **Motion** — 各演出の対象・時間・イージング、`prefers-reduced-motion` 対応
 9. **Icons** — インライン SVG、線幅 1.0〜1.4px、`currentColor` 追従
-10. **参照実装** — `docs/design-reference/mock-aman.html`
+10. **参照実装** — `docs/design/aman-mock.html`
 
 冒頭に次の一文を入れること:
 
@@ -1073,7 +1073,7 @@ EOF
 - Create: `assets/css/base.css`
 - Create: `assets/css/controls.css`
 - Create: `assets/js/reveal.js`
-- Reference: `docs/design-reference/mock-aman.html`
+- Reference: `docs/design/aman-mock.html`
 
 **Interfaces:**
 - Consumes: `tokens.css` の変数
@@ -1083,7 +1083,7 @@ EOF
 
 - [ ] **Step 1: `assets/css/base.css` を作る**
 
-`docs/design-reference/mock-aman.html` の次のブロックをそのまま写す。
+`docs/design/aman-mock.html` の次のブロックをそのまま写す。
 
 | 元の行 | 内容 |
 |---|---|
@@ -1208,7 +1208,7 @@ EOF
 **Files:**
 - Create: `assets/js/icons.js`
 - Test: `tests/icons.test.js`
-- Reference: `docs/design-reference/mock-aman.html` 2164–2299 行
+- Reference: `docs/design/aman-mock.html` 2164–2299 行
 
 **Interfaces:**
 - Consumes: なし
@@ -1312,7 +1312,7 @@ Expected: FAIL。`Cannot find module .../assets/js/icons.js`。
 
 - [ ] **Step 3: 実装する**
 
-`assets/js/icons.js`。`<symbol>` の中身は `docs/design-reference/mock-aman.html` の 2164–2299 行から、下の一覧にある 17 個を写す。
+`assets/js/icons.js`。`<symbol>` の中身は `docs/design/aman-mock.html` の 2164–2299 行から、下の一覧にある 17 個を写す。
 
 ```js
 /**
@@ -1461,7 +1461,7 @@ EOF
 - Create: `packing.html`（スタブ）
 - Create: `archive.html`（スタブ）
 - Modify: `index.html`（全面差し替え）
-- Reference: `docs/design-reference/mock-aman.html` 2564–2651 行（メニューの HTML）、807–876 行（メニューの CSS）
+- Reference: `docs/design/aman-mock.html` 2564–2651 行（メニューの HTML）、807–876 行（メニューの CSS）
 
 **Interfaces:**
 - Consumes: `icons.js` の `injectSprite` / `icon`、`reveal.js` の `initReveal`
@@ -1656,7 +1656,7 @@ initReveal();
 
 - [ ] **Step 5: メニューの CSS を `base.css` に足す**
 
-`docs/design-reference/mock-aman.html` の 807–876 行（`.menu__head` `.menu__grid` `.card` `.card__img` `.card__num` `.card__body` `.card__arrow`）をそのまま写す。
+`docs/design/aman-mock.html` の 807–876 行（`.menu__head` `.menu__grid` `.card` `.card__img` `.card__num` `.card__body` `.card__arrow`）をそのまま写す。
 
 - [ ] **Step 6: スタブページを 2 つ作る**
 
@@ -1725,7 +1725,7 @@ EOF
 - Create: `assets/js/calendar.js`
 - Create: `assets/js/schedule.js`
 - Create: `schedule.html`
-- Reference: `docs/design-reference/mock-aman.html` 877–1223 行（カレンダー CSS）、2652–2696 行（HTML）
+- Reference: `docs/design/aman-mock.html` 877–1223 行（カレンダー CSS）、2652–2696 行（HTML）
 
 **Interfaces:**
 - Consumes: `expandEvents`（Task 3）、`assignLanes`（Task 4）、`timeLabel`（Task 1）、`icon` / `CATEGORY_ICON`（Task 7）
@@ -1737,7 +1737,7 @@ EOF
 
 - [ ] **Step 1: `assets/css/calendar.css` を作る**
 
-`docs/design-reference/mock-aman.html` の 877–1223 行を写す。ただし次を守ること。
+`docs/design/aman-mock.html` の 877–1223 行を写す。ただし次を守ること。
 
 1. `44px` / `43px` のハードコードを `var(--hour-h)` / `calc(var(--hour-h) - 1px)` に置き換える。`.cal__col` の `repeating-linear-gradient` も同様
 2. `.toolbar` `.cal` `.cal__row` `.cal__days` `.cal__dayhdr` `.cal__dow` `.cal__date` `.cal__allday-*` `.cal__slot` `.cal__col` `.ev*` `.cat-*` `.mapsec` `#leaflet-map` `.loclist` `.loc*` `.pin` を含める
@@ -2367,7 +2367,7 @@ EOF
 - Create: `assets/js/sheet.js`
 - Modify: `schedule.html`（シートの器を足す）
 - Modify: `assets/js/schedule.js`（結線）
-- Reference: `docs/design-reference/mock-aman.html` 3022–3043 行（HTML）、1224–1406 行（CSS、Task 6 で導入済み）
+- Reference: `docs/design/aman-mock.html` 3022–3043 行（HTML）、1224–1406 行（CSS、Task 6 で導入済み）
 
 **Interfaces:**
 - Consumes: `timeLabel`（Task 1）、`icon` / `CATEGORY_ICON`（Task 7）、`CAT_META`（Task 9）
@@ -2606,7 +2606,7 @@ EOF
 - [ ] **Step 0: 残りのレスポンシブ指定を `base.css` に写す**
 
 Task 6 は BASE / MOTION / CONTROLS を、Task 9 はカレンダーと地図の指定を写した。
-モックの RESPONSIVE ブロック（`docs/design-reference/mock-aman.html` 2072〜2163 行）の
+モックの RESPONSIVE ブロック（`docs/design/aman-mock.html` 2072〜2163 行）の
 うち、**それ以外がまだどのタスクにも入っていない**。ここで `base.css` の末尾に写す。
 
 対象:
@@ -2737,12 +2737,12 @@ Expected: PASS。Task 1・3・4・5・7 の 40 件前後がすべて成功。
 ```bash
 grep -rn "Fraunces\|DM Sans\|006241\|1E3932\|f2f0eb\|Material+Symbols\|unpkg.com" \
   --include="*.html" --include="*.css" --include="*.js" --include="*.md" . \
-  | grep -v "docs/design-reference/" | grep -v "docs/superpowers/"
+  | grep -v "docs/design/" | grep -v "docs/"
 ```
 
 Expected: 何も出ない。出た場合はその箇所を直す。
 
-`docs/design-reference/mock-aman.html` は参照用なので対象外。
+`docs/design/aman-mock.html` は参照用なので対象外。
 
 - [ ] **Step 8: コミット**
 
@@ -2805,7 +2805,7 @@ python3 -m http.server 8000
 
 Phase A の対象外（意図的に含めない）: 5 章の保存と公開、6.1〜6.3 の認証と暗号化、7.2 の予定エディタ、7.3 持ち物、7.4 検索、7.5 コメント、8 章の変換スクリプト。
 
-**Placeholder scan**: 「適切なエラー処理を追加」「詳細は後で」のような記述はなし。CSS の一部は `docs/design-reference/mock-aman.html` の行番号を指定して参照させているが、これは実在する検証済みファイルであり、変更点は各タスクに明記してある。
+**Placeholder scan**: 「適切なエラー処理を追加」「詳細は後で」のような記述はなし。CSS の一部は `docs/design/aman-mock.html` の行番号を指定して参照させているが、これは実在する検証済みファイルであり、変更点は各タスクに明記してある。
 
 **Type consistency**: `expandEvents(events, dayCount)` の戻り値 `Segment` は Task 3 で定義し、Task 4 の `assignLanes` と Task 9 の `renderCalendar` が同じ形（`ref` / `day` / `start` / `end` / `lane` / `laneCount`）で受けている。`CAT_META` は Task 9 で定義し Task 10・11 が import。`icon(id, extraClass)` の引数順は全タスクで統一。`CATEGORY_ICON` は Task 7 で定義し Task 9・10・11 が使用。
 

@@ -2542,7 +2542,7 @@ export function renderProgress({ mount, data }) {
  * チェックを描くアニメーションを持っている。icon() が返すのは
  * `<svg><use href="#i-check"/></svg>` で、path はシャドウツリーの中に入るため
  * このセレクタが届かない ── チェックを入れても印が出ないボックスになる。
- * event-form.js:126 と mock-aman.html:2487 も同じ生の SVG を書いている。
+ * event-form.js:126 と aman-mock.html:2487 も同じ生の SVG を書いている。
  */
 const CHECK_MARK =
   '<svg viewBox="0 0 24 24" aria-hidden="true">' +
@@ -3135,8 +3135,8 @@ git commit -m "Wire the packing page up, starting from nothing"
 
 **Files:**
 - Modify: `CLAUDE.md`
-- Modify: `docs/superpowers/specs/2026-08-09-travel-plans-redesign-design.md`（§2.3 の表、§13）
-- Modify: `docs/HANDOFF-2026-08-10.md`
+- Modify: `docs/spec/travel-plans-redesign.md`（§2.3 の表、§13）
+- Modify: `docs/handoff/2026-08-10.md`
 
 - [ ] **Step 1: `CLAUDE.md` を直す**
 
@@ -3173,7 +3173,7 @@ git commit -m "Wire the packing page up, starting from nothing"
 無検査になる）」→ 足したので解消。ただし**ハードコードしている事実は残る**ので、
 「次に CSS を足すときも同じ穴が開く」と書き換えること（消さない）。
 
-- [ ] **Step 4: `docs/HANDOFF-2026-08-10.md` を更新する**
+- [ ] **Step 4: `docs/handoff/2026-08-10.md` を更新する**
 
 第 1 群を完了に。第 2 群（B3）を次に。**第 0 群（人の作業）が終わっているかは
 勝手に決めないこと** ── トークンの失効も開通確認も、私からは確かめようがない。
@@ -3227,7 +3227,7 @@ Task 1 → 2 → 3 → 4 は順に依存する（`DataError` が 3 の `showPubl
 
 **4. 着手前に読むもの**
 
-- `docs/HANDOFF-2026-08-10.md`（B2 の地雷をまとめてある）
+- `docs/handoff/2026-08-10.md`（B2 の地雷をまとめてある）
 - 設計書 §13 の「Phase B1 からの繰り越し（保存と公開）」の先頭項目
   （`createSync()` が旅程専用だった話。**B2 が最初に踏むはずだった罠**で、
   B4 で解消済みだが、危険の性質は `publish-ui` 側にそのまま残っていた）

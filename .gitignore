@@ -29,25 +29,21 @@ build/
 *.log
 npm-debug.log*
 
-# Screenshots & Playwright
-*.png
-*.jpg
+# 作業用スクリーンショット。**リポジトリ直下だけ**を対象にする。
+# かつては `*.png` / `*.jpg` と全階層を除外していたが、それだと
+# assets/ に画像を 1 枚置いた瞬間に黙って追跡対象から外れる
+# （実際、セルフホストした Leaflet のマーカー画像を通すために
+# `!assets/vendor/leaflet/images/*.png` という例外が要っていた）。
+/*.png
+/*.jpg
 .playwright-mcp/
-
-# Leaflet はセルフホストするベンダーファイルなので *.png の対象外にする
-!assets/vendor/leaflet/images/*.png
 
 # Temp
 .tmp/
 
-# 手元にだけ置く元データ（LINE のトーク履歴、メールの控えなど）。
-# 設計書 §2.2 は当初からここを対象外と書いていたが、実際には入っていなかった。
+# 手元にだけ置く元データ（LINE のトーク履歴、メールの控えなど）
 private/
 
-# Local development (but keep .claude/settings.json for project config)
-
-# Superpowers subagent-driven-development の作業領域（コミット対象外）
+# Claude Code / Superpowers の作業領域（どちらも自動生成される）
 .superpowers/
-
-# Claude Code の worktree 置き場（作業用。リポジトリには入れない）
 .claude/worktrees/

@@ -85,7 +85,7 @@ export function renderProgress({ mount, data }) {
  * チェックを描くアニメーションを持っている。icon() が返すのは
  * `<svg><use href="#i-check"/></svg>` で、path はシャドウツリーの中に入るため
  * このセレクタが届かない ── チェックを入れても印が出ないボックスになる。
- * event-form.js:126 と mock-aman.html:2487 も同じ生の SVG を書いている。
+ * event-form.js:126 と aman-mock.html:2487 も同じ生の SVG を書いている。
  */
 const CHECK_MARK =
   '<svg viewBox="0 0 24 24" aria-hidden="true">' +

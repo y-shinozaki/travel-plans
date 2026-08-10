@@ -1910,7 +1910,7 @@ git commit -m "Add the passphrase form and drop the cancelled archive page"
 
 - [ ] **Step 2: 設計書 §13 に、B4 で見つけた残存する穴を書き足す**
 
-`docs/superpowers/specs/2026-08-09-travel-plans-redesign-design.md` の §13
+`docs/spec/travel-plans-redesign.md` の §13
 「Phase B1 からの繰り越し（保存と公開）」に次を足す。Task 5 のレビューが見つけたもので、
 **B4 の範囲では直さないと決めた**（直すには 409 の判断そのものを設計し直す必要がある）。
 
@@ -1942,7 +1942,7 @@ Expected: `archive` の残存が 0 件（取りやめの経緯を説明してい
 - [ ] **Step 5: commit**
 
 ```bash
-git add CLAUDE.md README.md docs/superpowers/specs/2026-08-09-travel-plans-redesign-design.md
+git add CLAUDE.md README.md docs/spec/travel-plans-redesign.md
 git commit -m "Drop the hand-editing procedure now that the itinerary is encrypted"
 ```
 
