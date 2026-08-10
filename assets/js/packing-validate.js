@@ -19,6 +19,7 @@
 
 import { DataError } from "./data-error.js";
 import { ICON_IDS } from "./icons.js";
+import { PLACE_META } from "./packing-data.js";
 
 /** 持ち物データ内容の不備。通信・パース失敗とは呼び出し側で区別する。 */
 export class PackingDataError extends DataError {
@@ -114,6 +115,20 @@ export function validateItem(item, seenIds = new Set(), where = "項目") {
   // note は省略できる
   if (item.note !== undefined && typeof item.note !== "string") {
     problems.push(`${label}: note が文字列ではありません（${show(item.note)}）`);
+  }
+
+  // where（入れる場所）は省略できる。指定されているときだけ、知っている値かを見る。
+  // 未知の値を通すと、画面はラベルを引けず空のチップが出るだけで、
+  // 「設定したのに何も出ない」という静かな壊れ方になる（icon と同じ理由）
+  if (item.where !== undefined && item.where !== "") {
+    if (typeof item.where !== "string") {
+      problems.push(`${label}: where が文字列ではありません（${show(item.where)}）`);
+    } else if (!Object.hasOwn(PLACE_META, item.where)) {
+      problems.push(
+        `${label}: 未知の入れる場所です（${item.where} / ` +
+          `有効な値は ${Object.keys(PLACE_META).join(", ")}）`
+      );
+    }
   }
 
   for (const member of ["a", "b"]) {

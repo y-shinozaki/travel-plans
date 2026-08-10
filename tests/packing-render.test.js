@@ -649,3 +649,110 @@ test("data-focus-key は位置ではなく id から作る（並べ替えても�
   );
   assert.ok(after, "並べ替え後に item:passport:up が見つからない（キーが位置依存になっている）");
 });
+
+/* ── 入れる場所（where）── */
+
+/** where を仕込んだフィクスチャの複製。 */
+const withPlaces = () => {
+  const d = JSON.parse(JSON.stringify(PACKING));
+  d.groups[0].items[0].where = "hand"; // passport
+  d.groups[0].items[1].where = "checked"; // cash
+  // insurance は未設定のまま（ラベルを出さないことの検査に使う）
+  return d;
+};
+
+test("読み取りモードでは、設定された入れる場所がラベルとして出る", () => {
+  const { make } = stubDocument();
+  const mount = make("div");
+  renderTable({ mount, data: withPlaces(), editing: false, handlers: {} });
+  const chips = findAll(mount, (n) => n.className === "pkplace");
+  assert.deepEqual(
+    chips.map((c) => c.textContent),
+    ["手持ち", "スーツケース"],
+    "設定した 2 件のラベルが順に出ていません"
+  );
+});
+
+test("読み取りモードで未設定の項目にはラベルを作らない（「未設定」と書かない）", () => {
+  const { make } = stubDocument();
+  const mount = make("div");
+  // 4 項目のうち where を持つのは 2 件だけ
+  renderTable({ mount, data: withPlaces(), editing: false, handlers: {} });
+  assert.equal(findAll(mount, (n) => n.className === "pkplace").length, 2);
+  assert.equal(
+    findAll(mount, (n) => n.textContent === "未設定").length,
+    0,
+    "読み取りモードに「未設定」の文字を出しています"
+  );
+});
+
+test("読み取りモードでは選択欄（select）を作らない", () => {
+  const { make } = stubDocument();
+  const mount = make("div");
+  renderTable({ mount, data: withPlaces(), editing: false, handlers: {} });
+  assert.equal(findAll(mount, (n) => n.tagName === "SELECT").length, 0);
+});
+
+test("編集モードでは項目ごとに選択欄が 1 つ出て、未設定＋既知の場所が並ぶ", async () => {
+  const { PLACE_META } = await import("../assets/js/packing-data.js");
+  const { make } = stubDocument();
+  const mount = make("div");
+  const data = withPlaces();
+  renderTable({ mount, data, editing: true, handlers: {} });
+
+  const selects = findAll(mount, (n) => n.tagName === "SELECT");
+  const itemCount = data.groups.reduce((n, g) => n + g.items.length, 0);
+  assert.equal(selects.length, itemCount, "選択欄の数が項目数と合いません");
+
+  // 選択肢は「未設定」＋ PLACE_META のキー。一覧を書き写さず定義から導く
+  const options = selects[0].children.map((o) => o.textContent);
+  assert.deepEqual(options, ["未設定", ...Object.values(PLACE_META).map((p) => p.label)]);
+});
+
+test("編集モードの選択欄には、その項目の現在値が入っている", () => {
+  const { make } = stubDocument();
+  const mount = make("div");
+  renderTable({ mount, data: withPlaces(), editing: true, handlers: {} });
+  const selects = findAll(mount, (n) => n.tagName === "SELECT");
+  assert.equal(selects[0].value, "hand", "1 件目に現在値が入っていません");
+  assert.equal(selects[1].value, "checked", "2 件目に現在値が入っていません");
+  assert.equal(selects[2].value, "", "未設定の項目が空になっていません");
+});
+
+test("選択欄を変えると onSetPlace(itemId, where) が呼ばれる", () => {
+  const { make } = stubDocument();
+  const mount = make("div");
+  const calls = [];
+  renderTable({
+    mount,
+    data: withPlaces(),
+    editing: true,
+    handlers: { onSetPlace: (id, where) => calls.push([id, where]) },
+  });
+  const select = findAll(mount, (n) => n.tagName === "SELECT")[0];
+  select.value = "cabin";
+  select.dispatch("change");
+  assert.deepEqual(calls, [["passport", "cabin"]]);
+
+  // 未設定へ戻す経路も通ること（空文字を渡す）
+  select.value = "";
+  select.dispatch("change");
+  assert.deepEqual(calls[1], ["passport", ""]);
+});
+
+test("選択欄の focusKey は id 由来（並べ替えても変わらない）", () => {
+  const { make } = stubDocument();
+  const keyOf = (data) => {
+    const mount = make("div");
+    renderTable({ mount, data, editing: true, handlers: {} });
+    return findFirst(mount, (n) => n.dataset?.itemId === "passport")
+      ? findAll(mount, (n) => n.dataset?.focusKey === "item:passport:place").length
+      : 0;
+  };
+  assert.equal(keyOf(withPlaces()), 1, "選択欄に focusKey がありません");
+
+  // 並び順を変えても同じキーで引ける（位置由来なら壊れる）
+  const moved = withPlaces();
+  moved.groups[0].items.reverse();
+  assert.equal(keyOf(moved), 1, "並べ替えで focusKey が変わりました");
+});

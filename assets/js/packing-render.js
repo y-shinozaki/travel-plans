@@ -21,7 +21,7 @@
 
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
-import { progressOf } from "./packing-data.js";
+import { progressOf, PLACE_META, PLACE_KEYS } from "./packing-data.js";
 
 /** 文字は textContent、アイコンだけ定数の innerHTML。値は絶対に混ぜない。 */
 function iconButton(cls, iconId, label) {
@@ -153,6 +153,45 @@ function itemBody(item, editing, onRename) {
   return body;
 }
 
+/**
+ * 入れる場所。読むときはラベル、編集モードでは選ぶだけ。
+ *
+ * 読み取りモードで未設定の項目は**何も出さない**。「未設定」と書いた
+ * チップを 39 個並べても、決めた項目が埋もれるだけで読み取れない。
+ *
+ * select には focusKey を付ける。選ぶと change → 保存 → 表を作り直すので、
+ * 付けないと選んだ直後にフォーカスが飛ぶ（packing.js の scheduleDraw 参照）。
+ */
+function placeCell(item, editing, onSetPlace) {
+  if (!editing) {
+    const label = PLACE_META[item.where]?.label;
+    if (!label) return null;
+    return el("span", "pkplace", label);
+  }
+
+  const select = document.createElement("select");
+  select.className = "pkplace__pick";
+  select.dataset.focusKey = `item:${item.id}:place`;
+  select.setAttribute("aria-label", "入れる場所");
+
+  const blank = document.createElement("option");
+  blank.value = "";
+  blank.textContent = "未設定";
+  select.appendChild(blank);
+
+  for (const key of PLACE_KEYS) {
+    const option = document.createElement("option");
+    option.value = key;
+    option.textContent = PLACE_META[key].label;
+    select.appendChild(option);
+  }
+  // value は option を足したあとに入れる。先に入れると、その値の option が
+  // まだ無いのでブラウザに捨てられ、常に「未設定」で描かれる
+  select.value = PLACE_META[item.where] ? item.where : "";
+  select.addEventListener("change", () => onSetPlace?.(item.id, select.value));
+  return select;
+}
+
 function itemRow(item, data, editing, handlers) {
   const row = el("li", "pkitem");
   row.dataset.itemId = item.id;
@@ -169,6 +208,9 @@ function itemRow(item, data, editing, handlers) {
   }
 
   row.appendChild(itemBody(item, editing, handlers.onRenameItem));
+
+  const place = placeCell(item, editing, handlers.onSetPlace);
+  if (place) row.appendChild(place);
 
   const checks = el("div", "pkitem__checks");
   for (const member of ["a", "b"]) {

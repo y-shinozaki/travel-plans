@@ -276,6 +276,16 @@ const handlers = {
     if (!item) return;
     apply(withItem(state.data, null, { ...item, ...patch }));
   },
+  /**
+   * 入れる場所を決める。onRenameItem に相乗りさせない ── あちらは
+   * 名前とメモのための口で、{ where } を混ぜると呼び名と中身が食い違う。
+   * 空文字は「未設定に戻す」で、検証もそれを通す（packing-validate.js）。
+   */
+  onSetPlace(itemId, where) {
+    const item = state.data.groups.flatMap((g) => g.items).find((i) => i.id === itemId);
+    if (!item) return;
+    apply(withItem(state.data, null, { ...item, where }));
+  },
   onRenameGroup(groupId, patch) {
     const group = state.data.groups.find((g) => g.id === groupId);
     if (!group) return;

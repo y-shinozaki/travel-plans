@@ -174,3 +174,51 @@ test("b だけが真偽値でなくても、a 単独と同様に投げる", () =
   assert.throws(() => validatePacking(data), /passport/);
   assert.throws(() => validatePacking(data), /b のチェック状態が真偽値ではありません/);
 });
+
+/* ── where（入れる場所）── */
+
+test("where は省略できる（未設定・空文字の両方）", () => {
+  const data = clone();
+  delete data.groups[0].items[0].where;
+  assert.equal(validatePacking(data), data);
+
+  const data2 = clone();
+  data2.groups[0].items[0].where = "";
+  assert.equal(validatePacking(data2), data2);
+});
+
+test("既知の入れる場所は通る", () => {
+  const data = clone();
+  data.groups[0].items[0].where = "hand";
+  data.groups[0].items[1].where = "cabin";
+  data.groups[0].items[2].where = "checked";
+  assert.equal(validatePacking(data), data);
+});
+
+test("未知の入れる場所は名指しして投げる", () => {
+  // 通してしまうと画面はラベルを引けず、何も出ないチップになる。
+  // 「設定したのに出ない」という静かな壊れ方になるので読み込み時に止める
+  const data = clone();
+  data.groups[0].items[0].where = "backpack";
+  assert.throws(() => validatePacking(data), /passport/);
+  assert.throws(() => validatePacking(data), /backpack/);
+});
+
+test("where が文字列でなければ投げる", () => {
+  const data = clone();
+  data.groups[0].items[0].where = 3;
+  assert.throws(() => validatePacking(data), /passport/);
+  assert.throws(() => validatePacking(data), /where/);
+});
+
+test("PLACE_META のキーはすべて検証を通る（定義と検査がずれない）", async () => {
+  // 場所を足したのに検証だけ古い、を防ぐ。一覧を書き写さず PLACE_META から導く
+  const { PLACE_META } = await import("../assets/js/packing-data.js");
+  const keys = Object.keys(PLACE_META);
+  assert.ok(keys.length >= 3, "PLACE_META が空です");
+  for (const key of keys) {
+    const data = clone();
+    data.groups[0].items[0].where = key;
+    assert.equal(validatePacking(data), data, `${key} が検証に落ちました`);
+  }
+});
