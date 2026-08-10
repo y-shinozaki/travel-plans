@@ -360,8 +360,13 @@ export function createSync({
       // `remoteMs > baseMs` の分岐（outerStampMismatch が起こりうる側）とは
       // 独立している。外側の updatedAt が読めて base より進んでいる場合は
       // この if を素通りして下の分岐に入り 409 になる。readDraft() があっても
-      // その 409 は公開では直せない（唯一の逃げ道 adoptRemote() も validate で
-      // 落ちるため）。
+      // その 409 は公開では直せない ── 逃げ道の adoptRemote() 自体は通るが、
+      // base に入るのは復号した**内側**の updatedAt なので（storeAdopted →
+      // stampOf は内側を見る）、進んでいる外側は base を上回ったままで、
+      // 次の公開も同じ 409 になる。
+      // なお days / events そのものが壊れている場合は、adoptRemote() が
+      // validate で落ちるので、そもそも逃げ道が使えない。壊れ方が違えば
+      // 詰まり方も違う。
       console.warn("sync: リモートの updatedAt が読めないため、公開前の突き合わせを省略します");
       return false;
     }
