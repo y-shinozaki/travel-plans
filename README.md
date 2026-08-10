@@ -299,7 +299,8 @@ Jekyll の機能を 1 つも使っていないので、通しても得るもの�
 **Markdown が Liquid テンプレートとして解釈される**。2026-08-10、実装計画に書いた
 JSDoc の型注記（波括弧 2 つで始まる形）が Liquid の構文エラーになり、
 サイト全体のデプロイが 3 回続けて失敗した。`.nojekyll` だけでは止められなかったため、
-`_config.yml` の `exclude` で `docs/` `tests/` `CLAUDE.md` `README.md` を明示的に外してある。
+`_config.yml` の `exclude` で `docs/` `tests/` `CLAUDE.md` `README.md` `package.json` を
+明示的に外してある。
 **`docs/` に置いたドキュメントに何を書いてもデプロイが壊れないのは、この設定のおかげ。**
 
 ## ブラウザサポート

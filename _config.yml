@@ -13,8 +13,9 @@
 # exclude に挙げたものは Jekyll が読みもしないので、中に何を書いても安全になる。
 # サイト本体（*.html / assets/）はここに挙げていないため、これまでどおり配信される
 # ── front matter を持たない .html は Jekyll がそのまま複製する。
-# ドキュメントは docs/ に集約してあるので、1 行で全部が外れる
+# ドキュメントは docs/ に集約してあるので、新しく足すぶんは `docs/` の 1 行で覆える
 # （旧 DESIGN.md も docs/design/design-system.md へ移した）。
+# ルートに残る CLAUDE.md / README.md / package.json だけは個別に挙げる必要がある。
 exclude:
   - docs/
   - tests/
