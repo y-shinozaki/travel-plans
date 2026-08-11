@@ -400,12 +400,13 @@ export function createEventEditor({ sheet, bodyEl, getData, commit, fallbackFocu
      * 触っていないフォームは素通しする。開いて眺めただけの予定を閉じるのに
      * 2 度押させるのは、守るものが無いのに手間だけ増やすことになる。
      */
-    const snapshot = readFormText();
+    let snapshot = null;
     let discardArmed = false;
     const canClose = () => {
-      // 読めない（フォームが崩れている）なら止めない。閉じられなくなるほうが困る
+      // 読めない（フォームが崩れている・まだ撮れていない）なら止めない。
+      // 閉じられなくなるほうが困る
       const current = readFormText();
-      if (current === null || current === snapshot) return true;
+      if (current === null || snapshot === null || current === snapshot) return true;
       if (discardArmed) return true;
       discardArmed = true;
       showProblems([
@@ -415,6 +416,14 @@ export function createEventEditor({ sheet, bodyEl, getData, commit, fallbackFocu
     };
 
     sheet.open(original ? "予定を編集" : "予定を追加", body, foot, { canClose });
+
+    // **スナップショットは sheet.open() のあとで撮る。** 前で撮ると、本文の
+    // HTML がまだ文書に入っていないので requireField が投げ、readFormText が
+    // null を返す ── その結果「触っていないフォームも閉じるのを断る」になる。
+    // 2026-08-11 に実ページで見つけた。**テストのスタブは open の前から
+    // 入力欄を持っているので、この順序の誤りを再現できない**（下のテストは
+    // open() の中で値を変えて、撮る時点が open より後であることを見ている）
+    snapshot = readFormText();
 
     // 終日の予定は時刻を持たないので、切り替えに合わせて時刻欄を出し入れする。
     //

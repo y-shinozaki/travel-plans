@@ -608,3 +608,46 @@ test("保存が通った直後は、未保存の確認で引っかからない",
     assert.equal(h.sheet.closes, 1, "保存したのにシートが閉じていません");
   });
 });
+
+test("未保存の判定は sheet.open のあとの値を基準にする", () => {
+  /*
+   * スナップショットを sheet.open() より前で撮ると、本文の HTML がまだ
+   * 文書に入っていないので readFormText が null になり、**触っていない
+   * フォームまで閉じるのを断る**（2026-08-11 に実ページで発見）。
+   *
+   * スタブは open の前から入力欄を持っているので、順序をそのまま真似ても
+   * 再現できない。ここでは open() の中で値を変えて、「撮る時点が open より
+   * あとか」を直接見る ── 前で撮っていれば、この変更が「触られた」と読まれる。
+   */
+  withDom(() => {
+    const data = copyData();
+    const target = data.events.find((ev) => !ev.allDay);
+    const h = mountEditor(data, target);
+
+    h.editor.select(target);
+
+    // **フォームを開く回だけ**値を差し替える。詳細シートを開く回まで
+    // 変えてしまうと、スナップショットを前で撮っても後で撮っても同じ値になり、
+    // 順序の誤りを分離できない
+    const originalOpen = h.sheet.open;
+    h.sheet.open = (title, body, foot, options) => {
+      if (title === "予定を編集") {
+        // 本文が文書に入った瞬間に相当する。ここで入った値が基準になるべき
+        h.bodyEl.fields["f-title"].value = "開いた時点のタイトル";
+      }
+      originalOpen(title, body, foot, options);
+    };
+
+    fire(h.sheet.opens[0].foot[0]); // 「この予定を編集」
+
+    assert.equal(
+      h.sheet.canClose(),
+      true,
+      "触っていないのに閉じるのを断っています（スナップショットが open より前）"
+    );
+
+    // そのうえで、実際に触れば断ること（判定が死んでいないこと）
+    h.bodyEl.fields["f-title"].value = "そのあとで書いた";
+    assert.equal(h.sheet.canClose(), false);
+  });
+});
