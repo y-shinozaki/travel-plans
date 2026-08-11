@@ -108,3 +108,22 @@ test("不正な日時は remote-is-newer に倒す", () => {
     "remote-is-newer"
   );
 });
+
+test("hasLocal が false なのにローカルの updatedAt が来たら人に選ばせる", () => {
+  // 呼び出し側の 2 つの値が食い違っている。どちらが正しいかは決められないので、
+  // 黙って use-remote（＝下書きを上書きしうる側）へは倒さない。
+  // この関数で唯一「迷ったら人に聞く」に倒れていなかった経路（設計書 §13）。
+  assert.equal(
+    decideSync({ remoteUpdatedAt: T1, localUpdatedAt: T0, baseUpdatedAt: T0, hasLocal: false }),
+    "remote-is-newer"
+  );
+});
+
+test("hasLocal が false でローカルの updatedAt も無ければ、これまでどおり use-remote", () => {
+  // 上の分岐が広すぎないことの番人。食い違っていない呼び出しまで
+  // remote-is-newer に倒すと、初回起動のたびにバーが出る
+  assert.equal(
+    decideSync({ remoteUpdatedAt: T1, localUpdatedAt: null, baseUpdatedAt: T0, hasLocal: false }),
+    "use-remote"
+  );
+});

@@ -289,11 +289,17 @@ function makeNode(tag = "div") {
     setAttribute(key, value) {
       node.attrs[key] = String(value);
     },
+    removeAttribute(key) {
+      delete node.attrs[key];
+    },
     addEventListener(type, fn) {
       (node.listeners[type] ??= []).push(fn);
     },
     querySelector(sel) {
       return node.children.find((child) => child.tag === sel) ?? null;
+    },
+    querySelectorAll() {
+      return [];
     },
     scrollIntoView() {},
     focus() {
@@ -327,6 +333,12 @@ function makeBody(ev) {
   const body = makeNode("div");
   body.fields = fields;
   body.querySelector = (sel) => fields[sel.replace(/^#/, "")] ?? null;
+  // clearProblems が「いま aria-invalid が付いている欄」を引くのに使う。
+  // 実 DOM の属性セレクタと同じく、付いている要素だけを返す
+  body.querySelectorAll = (sel) =>
+    sel === "[aria-invalid]"
+      ? Object.values(fields).filter((f) => f.attrs["aria-invalid"] != null)
+      : [];
   return body;
 }
 
@@ -334,11 +346,19 @@ function fakeSheet() {
   const sheet = {
     opens: [],
     closes: 0,
-    open(title, body, foot = []) {
-      sheet.opens.push({ title, body, foot });
+    open(title, body, foot = [], options = {}) {
+      // canClose を受け取って覚える。実物と同じく open のたびに差し替わる
+      sheet.canClose = typeof options.canClose === "function" ? options.canClose : null;
+      sheet.opens.push({ title, body, foot, options });
     },
-    close() {
-      sheet.closes += 1;
+    /** 実物と同じく、force でなければ述語に断られる。 */
+    close(force = false) {
+      if (!force && sheet.canClose && !sheet.canClose()) {
+        sheet.refused = (sheet.refused ?? 0) + 1;
+        return;
+      }
+      sheet.canClose = null;
+      sheet.closes++;
     },
   };
   return sheet;
@@ -493,5 +513,141 @@ test("配線: 新規追加は採番され、削除ボタンを出さない", () 
     for (const key of ["image", "imagePos", "icon"]) {
       assert.equal(Object.hasOwn(added, key), false, `${key} がどこからか付いています`);
     }
+  });
+});
+
+test("不備のある欄すべてに aria-invalid が付き、直すと消える", () => {
+  /*
+   * 以前はタイトル欄にしか付けておらず、緯度や時刻を直すべき場面では
+   * 支援技術に「どこが悪いのか」が伝わらなかった。さらに clearProblems が
+   * role="alert" を残していたので、空の警告の器が居座り続けた（設計書 §13）。
+   */
+  withDom(() => {
+    const data = copyData();
+    const target = data.events.find((ev) => !ev.allDay);
+    const h = mountEditor(data, target);
+
+    h.editor.select(target);
+    fire(h.sheet.opens[0].foot[0]); // 「この予定を編集」
+    const form = h.sheet.opens[1];
+
+    // タイトルを空にし、同じ日の中で終了を開始より前にする（別々の欄の不備を 2 件）
+    h.bodyEl.fields["f-title"].value = "";
+    h.bodyEl.fields["f-sday"].value = "0";
+    h.bodyEl.fields["f-eday"].value = "0";
+    h.bodyEl.fields["f-start"].value = "12:00";
+    h.bodyEl.fields["f-end"].value = "11:00";
+    fire(form.foot[0]); // 保存
+
+    assert.equal(h.commits.length, 0, "不備があるのに保存されています");
+    assert.equal(h.bodyEl.fields["f-title"].attrs["aria-invalid"], "true");
+    assert.equal(
+      h.bodyEl.fields["f-end"].attrs["aria-invalid"],
+      "true",
+      "時刻の不備が終了時刻の欄に伝わっていません（以前はタイトル欄にしか付かなかった）"
+    );
+    assert.equal(h.bodyEl.fields["f-error"].attrs.role, "alert");
+
+    // 直して保存し直すと、印も警告の器も残らない
+    h.bodyEl.fields["f-title"].value = "直した予定";
+    h.bodyEl.fields["f-end"].value = "13:00";
+    fire(form.foot[0]);
+
+    assert.equal(h.commits.length, 1, "直したのに保存されていません");
+    assert.equal(h.bodyEl.fields["f-title"].attrs["aria-invalid"], undefined);
+    assert.equal(h.bodyEl.fields["f-end"].attrs["aria-invalid"], undefined);
+    assert.equal(h.bodyEl.fields["f-error"].attrs.role, undefined, "role=alert が残っています");
+  });
+});
+
+test("未保存の入力があるとき、1 度目の閉じるは断って 2 度目で捨てる", () => {
+  /*
+   * 以前は閉じると未保存の入力を黙って捨てていた（設計書 §13）。
+   * confirm() は使えない規約なので、削除ボタンと同じ「1 度目で身構え、
+   * 2 度目で実行」にした
+   */
+  withDom(() => {
+    const data = copyData();
+    const target = data.events.find((ev) => !ev.allDay);
+    const h = mountEditor(data, target);
+
+    h.editor.select(target);
+    fire(h.sheet.opens[0].foot[0]); // 「この予定を編集」
+
+    // 触っていなければ素通し。守るものが無いのに 2 度押させない
+    assert.equal(typeof h.sheet.canClose, "function", "canClose が渡っていません");
+    assert.equal(h.sheet.canClose(), true, "触っていないのに閉じるのを断っています");
+
+    // 触ったら 1 度目は断る
+    h.bodyEl.fields["f-title"].value = "書きかけのタイトル";
+    h.sheet.close();
+    assert.equal(h.sheet.closes, 0, "未保存のまま閉じています");
+    assert.equal(h.bodyEl.fields["f-error"].attrs.role, "alert", "理由が出ていません");
+
+    // 2 度目で捨てる
+    h.sheet.close();
+    assert.equal(h.sheet.closes, 1, "2 度目でも閉じません");
+    assert.equal(h.commits.length, 0, "破棄したのに保存されています");
+  });
+});
+
+test("保存が通った直後は、未保存の確認で引っかからない", () => {
+  // ここで述語に聞くと、いま保存したばかりの入力を「未保存」と読んで
+  // シートが閉じなくなる
+  withDom(() => {
+    const data = copyData();
+    const target = data.events.find((ev) => !ev.allDay);
+    const h = mountEditor(data, target);
+
+    h.editor.select(target);
+    fire(h.sheet.opens[0].foot[0]);
+    h.bodyEl.fields["f-title"].value = "直したタイトル";
+    fire(h.sheet.opens[1].foot[0]); // 保存
+
+    assert.equal(h.commits.length, 1, "保存されていません");
+    assert.equal(h.sheet.closes, 1, "保存したのにシートが閉じていません");
+  });
+});
+
+test("未保存の判定は sheet.open のあとの値を基準にする", () => {
+  /*
+   * スナップショットを sheet.open() より前で撮ると、本文の HTML がまだ
+   * 文書に入っていないので readFormText が null になり、**触っていない
+   * フォームまで閉じるのを断る**（2026-08-11 に実ページで発見）。
+   *
+   * スタブは open の前から入力欄を持っているので、順序をそのまま真似ても
+   * 再現できない。ここでは open() の中で値を変えて、「撮る時点が open より
+   * あとか」を直接見る ── 前で撮っていれば、この変更が「触られた」と読まれる。
+   */
+  withDom(() => {
+    const data = copyData();
+    const target = data.events.find((ev) => !ev.allDay);
+    const h = mountEditor(data, target);
+
+    h.editor.select(target);
+
+    // **フォームを開く回だけ**値を差し替える。詳細シートを開く回まで
+    // 変えてしまうと、スナップショットを前で撮っても後で撮っても同じ値になり、
+    // 順序の誤りを分離できない
+    const originalOpen = h.sheet.open;
+    h.sheet.open = (title, body, foot, options) => {
+      if (title === "予定を編集") {
+        // 本文が文書に入った瞬間に相当する。ここで入った値が基準になるべき
+        h.bodyEl.fields["f-title"].value = "開いた時点のタイトル";
+      }
+      originalOpen(title, body, foot, options);
+    };
+
+    fire(h.sheet.opens[0].foot[0]); // 「この予定を編集」
+
+    assert.equal(
+      h.sheet.canClose(),
+      true,
+      "触っていないのに閉じるのを断っています（スナップショットが open より前）"
+    );
+
+    // そのうえで、実際に触れば断ること（判定が死んでいないこと）
+    h.bodyEl.fields["f-title"].value = "そのあとで書いた";
+    assert.equal(h.sheet.canClose(), false);
   });
 });

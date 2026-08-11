@@ -27,23 +27,23 @@ function stubDocument() {
       style: {},
       attrs: {},
       listeners: {},
-      // NOTE (review finding, not a defect today): unlike a real DOM, this setter
-      // does not clear `.children`. Every innerHTML assignment in packing-render.js
-      // happens *before* any appendChild on the same node, which is safe here and
-      // would also be safe in a real DOM (assigning innerHTML after children exist
-      // is what nukes them there). But if a future edit ever assigns innerHTML
-      // *after* appendChild on the same node, this stub will not catch the bug —
-      // .children keeps the appended nodes while a real browser would discard them.
+      // 実 DOM と同じく、代入は既存の子要素を捨てる。**この 1 行を消さないこと。**
+      // 消すと「先に appendChild して、あとから innerHTML で別の断片を差し込む」
+      // 改変が、スタブ上では何も気付かれずに通り、実ブラウザでだけ壊れる
+      // （実 DOM では innerHTML への代入が子要素を消すため）。設計書 §13。
       set innerHTML(v) {
         htmlSink.push(String(v));
         this._html = String(v);
+        this.children.length = 0;
       },
       get innerHTML() {
         return this._html ?? "";
       },
+      // textContent も実 DOM では子要素を消す。理由は innerHTML と同じ
       set textContent(v) {
         textSink.push(String(v));
         this._text = String(v);
+        this.children.length = 0;
       },
       get textContent() {
         return this._text ?? "";

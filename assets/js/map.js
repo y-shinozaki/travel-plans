@@ -17,15 +17,24 @@ const TILE_ATTR =
 const keyOf = (ev) => `${ev.lat},${ev.lng}`;
 
 /**
- * 表示中のロケーションを表す文字列。
- * 時間帯セレクトの変更では中身が変わらないため、これが同じなら再描画しない。
+ * 表示中のロケーションを表す文字列。**署名は 2 つある。分けたままにすること。**
  *
- * id と座標だけでは足りない。Phase B ではタイトル・カテゴリ・時刻がブラウザから
- * 編集できるので、「同じ地点の集合」のまま中身だけが変わる。マーカーと一覧が
- * 読む値をすべて並べて、編集が黙って無視されないようにする
- * （ここに無い値を drawList / drawMarkers が読み始めたら、ここにも足すこと）。
+ * 1 つにまとめていたころは、タイトルを 1 文字直しただけでも「変わった」と
+ * 判定され、再描画のついでに fitBounds が走って**ユーザーが選んだ地点・
+ * ズーム・開いていたポップアップが初期位置へ巻き戻っていた**（設計書 §13）。
+ * 地図を動かしてよいのは「どこにピンが立つか」が変わったときだけで、
+ * 「ピンに何が書いてあるか」が変わっただけなら動かす理由が無い。
+ *
+ * - bounds: 地図の当てはめ（fitBounds）をやり直すかの判断。地点の集合そのもの
+ * - content: マーカーと一覧を作り直すかの判断。表示に出る値すべて
+ *
+ * content に無い値を drawList / drawMarkers が読み始めたら、content にも足すこと
+ * （足し忘れると、その値の編集が画面に出ないまま黙って無視される）。
  */
-const signatureOf = (locations) =>
+export const boundsSignatureOf = (locations) =>
+  JSON.stringify(locations.map((ev) => [ev.id, ev.lat, ev.lng]));
+
+export const contentSignatureOf = (locations) =>
   JSON.stringify(
     locations.map((ev) => [
       ev.id,
@@ -79,9 +88,11 @@ export function createMap({ mapMount, listMount, days, onSelect }) {
   L.tileLayer(TILE_URL, { attribution: TILE_ATTR, subdomains: "abcd", maxZoom: 19 }).addTo(map);
 
   let markers = new Map();
-  let signature = null;
+  // 2 つ持つ理由は boundsSignatureOf / contentSignatureOf のコメント
+  let boundsSignature = null;
+  let contentSignature = null;
 
-  function drawMarkers(locations) {
+  function drawMarkers(locations, refit) {
     for (const marker of markers.values()) map.removeLayer(marker);
     markers = new Map();
 
@@ -100,7 +111,7 @@ export function createMap({ mapMount, listMount, days, onSelect }) {
       markers.set(keyOf(ev), marker);
     }
 
-    if (locations.length) {
+    if (refit && locations.length) {
       map.fitBounds(L.latLngBounds(locations.map((e) => [e.lat, e.lng])).pad(0.18));
     }
   }
@@ -137,11 +148,18 @@ export function createMap({ mapMount, listMount, days, onSelect }) {
       // 表示時間帯を変えただけでは集合は変わらない。それでも再構築すると
       // fitBounds が走り、ユーザーが選んだ地点・ズーム・ポップアップを
       // 巻き戻してしまう（マーカーと一覧の作り直しも丸ごと無駄になる）。
-      const next = signatureOf(locations);
-      if (next === signature) return;
-      signature = next;
+      const nextContent = contentSignatureOf(locations);
+      if (nextContent === contentSignature) return;
+      contentSignature = nextContent;
 
-      drawMarkers(locations);
+      // 地点の集合が変わったときだけ地図を当てはめ直す。内容だけの編集
+      // （タイトルを 1 文字直した、など）で動かすと、選んでいた地点・ズーム・
+      // 開いていたポップアップが初期位置へ巻き戻る
+      const nextBounds = boundsSignatureOf(locations);
+      const refit = nextBounds !== boundsSignature;
+      boundsSignature = nextBounds;
+
+      drawMarkers(locations, refit);
       drawList(locations);
     },
   };

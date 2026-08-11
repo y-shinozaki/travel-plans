@@ -1051,3 +1051,82 @@ test("messagesFor は noun を文言に通す", () => {
   // noun に依存しない文言は据え置き
   assert.equal(m.tokenSaved, "トークンを保存しました");
 });
+
+/* ── 設計書 §13 の繰り越し ─────────────────────────────── */
+
+test("noun が sync と食い違っていたら組み立ての時点で落とす", () => {
+  /*
+   * noun は createSync の config と createPublishUI の content の 2 か所へ
+   * 独立に渡っており、結びつける仕組みが無かった。B3 が同じパターンで
+   * comments.json を足すときに片方だけ書き換えれば、同期バーとステータスが
+   * 違う名前を出すページができる ── どちらも例外を投げないので、
+   * テストで拾えなければ気付かれないまま残る（設計書 §13）
+   */
+  const store = createStore(memoryBackend());
+  const sync = createSync({
+    store,
+    fetchImpl: fakeFetch(github()),
+    config: { ...CONFIG, noun: "持ち物リスト" },
+    now,
+  });
+  const els = {
+    controls: makeNode("div"),
+    panel: makeNode("div"),
+    status: makeNode("div"),
+    bar: makeNode("div"),
+  };
+  els.panel.id = "pub-panel";
+
+  assert.throws(
+    () =>
+      createPublishUI({
+        els,
+        store,
+        sync,
+        getData: () => plan(REMOTE_STAMP),
+        onAdopt: () => {},
+        content: { validate: validateEvents, noun: "旅程" },
+      }),
+    /持ち物リスト|旅程/
+  );
+});
+
+test("取り込みボタンは離れると構えが解ける", async () => {
+  // トークン削除ボタンには updatePanel() という解除の経路があったが、
+  // 取り込みボタンには無く、一度押すと「もう一度で取り込む（手元の変更は
+  // 消えます）」の表示のまま戻らなかった（設計書 §13）
+  const h = mount({ initial: SYNCED, source: "remote-is-newer" });
+  h.ui.start("remote-is-newer");
+
+  const adopt = findButton(h.els.bar, "取り込む");
+  assert.ok(adopt, "取り込むボタンがありません");
+  await click(adopt);
+  assert.match(textOf(adopt), /もう一度で取り込む/, "1 度目で身構えていません");
+
+  dispatch(adopt, "blur");
+  assert.match(textOf(adopt), /^取り込む$/, "離れても構えたままです");
+
+  // 解けたあとの 1 回目は実行しない（＝押し直しでまた 2 度必要）
+  await click(adopt);
+  assert.match(textOf(adopt), /もう一度で取り込む/);
+  assert.equal(h.adopted.length, 0, "1 度押しただけで取り込んでいます");
+});
+
+test("控えを書けなかった公開でも、コミットへのリンクを出す", async () => {
+  // 出さないと、この端末には「本当に公開できたのか」を確かめる手段が
+  // リポジトリを自分で見に行くことだけになる（設計書 §13）
+  const backend = memoryBackend({ ...SYNCED });
+  const store = createStore(backend);
+  writeToken(store, TOKEN);
+  // トークンを書いたあとで保存領域を塞ぐ（公開はできるが控えは残せない端末）
+  backend.setItem = () => {
+    throw new Error("QuotaExceededError");
+  };
+
+  const h = mount({ backend, token: null, data: plan("2026-08-09T11:00:00.000Z") });
+  await click(findButton(h.els.controls, "公開"));
+
+  const text = serialize(h.els.status);
+  assert.match(text, /公開はできましたが/, text);
+  assert.ok(text.includes(COMMIT_URL), `コミットへのリンクがありません: ${text}`);
+});

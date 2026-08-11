@@ -18,7 +18,11 @@
   text-transform: uppercase;
   color: var(--ink-2);
 }
+/* p の既定マージンを base.css で 0 にしたので、ここは明示的に空ける。
+   バーの margin-top と同じ 6px にして、名前 → 数字 → バーが等間隔になる形にした
+   （以前は UA の 1em が効いて 22px 空いており、宣言のどこにも無い数字だった） */
 .svprog__count {
+  margin-top: 6px;
   font-family: var(--serif);
   font-size: 22px;
   font-weight: 300;
@@ -65,14 +69,8 @@
   align-items: center;
   gap: 8px;
 }
-/* base.css は p を初期化していないので、UA 既定の margin: 1em 0（＝14px）が
-   そのまま効く。名前の行が上下 14px ずつ沈み、上揃えにしてもチェックだけが
-   名前より上に浮いて見えた（メモ付きの行で 113px、メモ無しでも 63px の高さ）。
-   行間は .svitem__body の gap: 8px が持つので、ここは 0 でよい。
-   入力欄は p ではないため、編集モードの見え方は変わらない（2026-08-11 実測） */
-.svitem__body p {
-  margin: 0;
-}
+/* 名前とメモの行間は .svitem__body の gap: 8px が持つ。p の余白は base.css が
+   0 にしてある（そこのコメントを参照）ので、ここで打ち消す必要は無い */
 /* 読み取りモードの 1 行。名前・誰に・どこで を同じ行に流す */
 .svitem__line {
   display: flex;

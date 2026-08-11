@@ -246,7 +246,7 @@ map.js の createMap() → 座標を持つイベントからマーカーと位�
 - **「公開」を押した端末だけが**、GitHub Contents API 経由でリポジトリへコミットする。
   トークンを持たない端末は閲覧と下書き編集のみ（公開ボタン自体が置かれない）
 
-`localStorage` のキーは `store.js` が `tp:` を前置する。使うのは 8 つ:
+`localStorage` のキーは `store.js` が `tp:` を前置する。使うのは 11 個:
 
 | キー | 中身 | 書く場所 |
 |---|---|---|
@@ -256,6 +256,7 @@ map.js の createMap() → 座標を持つイベントからマーカーと位�
 | `tp:packing-base` | 持ち物リストを最後にリモートと揃えた時点の `updatedAt` 文字列 | 同上 |
 | `tp:souvenirs` | お土産リストの下書き（`souvenirs.json` と同じ形＋`updatedAt`。平文のまま） | `souvenirs.js` が `createSync()` に渡す `config`（Phase B5 で追加） |
 | `tp:souvenirs-base` | お土産リストを最後にリモートと揃えた時点の `updatedAt` 文字列 | 同上 |
+| `tp:events-fp` / `tp:packing-fp` / `tp:souvenirs-fp` | 最後に揃えたリモート**本文の指紋**（`fingerprint.js`）。公開の直前に「リモートが自分の知っている版のままか」を時計を見ずに確かめる | `sync.js`（`draftKey` から導く。`config` には出ていない） |
 | `tp:gh-token` | 公開用トークン（平文） | `token.js` |
 | `tp:key` | 合言葉から導いた鍵素材（`salt.iter.key` を `.` 区切りで連結） | `auth.js` |
 
@@ -264,8 +265,16 @@ map.js の createMap() → 座標を持つイベントからマーカーと位�
 `packing.js` が組み立てる `config` だけ、`tp:souvenirs` / `tp:souvenirs-base` を知っているのは
 `souvenirs.js` が組み立てる `config` だけ、`tp:gh-token` は `token.js`、`tp:key` は
 `auth.js`（唯一の出入口）だけ。
-（この 8 つのほかに `publish-ui.js` が `tp:write-probe` を一瞬だけ書いて消す。
+（この 11 個のほかに `publish-ui.js` が `tp:write-probe` を一瞬だけ書いて消す。
 保存領域に書けるかを実際に試すためで、残さない。）
+
+**`-fp`（指紋）は `-base`（`updatedAt`）を置き換えるものではなく、足したもの。**
+`-base` は「どちらが新しいか」を答えられるが端末の時計に依存し、`-fp` は時計を
+一切見ないが「同じか違うか」しか答えられない。競合検出（公開の直前）に要るのは
+後者なので `-fp` を使い、起動時の判断（`decideSync`）は前者のままにしてある。
+**片方だけ消さないこと** ── `-fp` を消すと時計ずれによる上書きが戻り、
+`-base` を消すと起動時に「リモートが新しい」を判断できなくなる。
+指紋をまだ持たない端末では `-base` の突き合わせに落ちる（移行のための経路）。
 
 **`createSync()` の `config` は owner / repo / branch / path に加えて
 `draftKey` / `baseKey` / `validate` / `commitMessage` / `codec` / `noun` の 6 つを持つ**
@@ -426,12 +435,15 @@ validateEvents → 暗号化 → GET で sha と本文 → updatedAt の突き�
 - `img-src` が `https:` のワイルドカードなのは、`events.json` と `menu.js` が
   複数の外部ホストから画像を直リンクしているため（設計書 §13 の負債）
 
-`tests/csp.test.js` の 7 件が機械的に検査している。4 ページすべてを見るのが
+`tests/csp.test.js` の 8 件が機械的に検査している。4 ページすべてを見るのが
 「CSP がある」「`script-src` が `'self'` のみ」「インライン script が 1 つも無い」
-「`on*` 属性が 1 つも無い」「`connect-src` に GitHub API がある」の 5 件、
+「`on*` 属性が 1 つも無い」「`connect-src` に GitHub API がある」「`img-src` に
+地図タイル、`font-src` にフォント」の 6 件と、**4 ページの CSP が完全に同一である**
+ことを見る 1 件（正規化して突き合わせる。ページごとの検査は「そのディレクティブが
+あるか」しか見ないので、1 ページにだけ緩い指定を足しても他のどれも落ちない）。
 `archive.html`（取りやめた仮ページ）が実ファイルとして残っていないことを見るのが
-ページを見ない 1 件、残る 1 件（`img-src` に地図タイル、`font-src` にフォント）だけは
-`schedule.html` しか見ていない（設計書 §13 のテストの穴）。
+ページを見ない 1 件。**意図してページごとに CSP を変えるなら、同一性の検査を
+消すのではなく「どう違ってよいか」に書き換えること。**
 
 ## デザインシステム
 
@@ -469,11 +481,10 @@ validateEvents → 暗号化 → GET で sha と本文 → updatedAt の突き�
 （写すと 1 だけ足して CSS を忘れた状態が素通りする）。
 新しいカテゴリは `tests/categories.test.js` の `CATEGORIES`（Phase A の想定一覧）にも足す。
 
-`tokens.test.js` の色リテラル検査（次項）は対象ファイルをハードコードしたリストで持っている。
-Phase B2 で `packing.css` を、Phase B5 で `souvenirs.css` をそのリストへ足した実績がある。
-**リストがハードコードのままなので、次に新しい CSS ファイルを足すときも同じ手順
-（このリストへの追加）が要る** ── 忘れても検査は何も言わずに素通りする
-（設計書 §13「小さいもの」）。
+`tokens.test.js` の色リテラル検査（次項）は、対象ファイルを `assets/css/` の走査で
+導く（`tokens.css` 以外のすべて）。**新しい CSS ファイルは黙って対象に入るので、
+テスト側に足す作業は要らない。書き写さないこと。** 走査が壊れて 0 件になれば
+検査がループ 0 回で素通りするので、件数そのものを見る検査も別に置いてある。
 
 ### データの検査（`assets/js/validate.js`）
 
@@ -657,8 +668,9 @@ Phase B5 で追加したもの:
 `tokens.test.js` は色そのものに加えて次の約束も機械的に守らせている:
 
 - `--hour-h`（tokens.css）と `HOUR_H`（calendar.js）が同じ値であること
-- `base.css` / `controls.css` / `calendar.css` / `packing.css` / `souvenirs.css` に
-  色リテラルを書かないこと
+- `tokens.css` 以外の CSS（対象は `assets/css/` の走査で導く。テストに書き写さない）に
+  色リテラルを書かないこと。16 進・色関数に加えて、値の位置に現れた名前付き色
+  （`red` / `white` など）も弾く
   （半透明が必要なら `rgb(var(--ink-rgb) / 0.14)` のようにチャンネルトークンを使う）
 - `CAT_META` の各カテゴリに `tokens.css` の 3 値と `calendar.css` の `.cat-xxx` が揃っていること
   （「新しいカテゴリを追加」参照。カテゴリ一覧は `CAT_META` から導いている）

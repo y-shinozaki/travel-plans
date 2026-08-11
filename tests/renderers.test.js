@@ -398,3 +398,77 @@ test("renderNav: current を変えると付く位置も変わる", () => {
     );
   }
 });
+
+/* ── 地図の再描画署名（設計書 §13） ─────────────────────── */
+
+test("内容だけ変わったとき、地点の署名は変わらない", async () => {
+  // タイトルを直しただけで fitBounds が走ると、選んでいた地点・ズーム・
+  // 開いていたポップアップが初期位置へ巻き戻る
+  const { boundsSignatureOf, contentSignatureOf } = await import("../assets/js/map.js");
+  const before = [{ id: "ev-1", lat: 13.7, lng: 100.5, cat: "cat-food", title: "昼食", startDay: 0 }];
+  const after = [{ ...before[0], title: "昼食（変更）" }];
+
+  assert.equal(boundsSignatureOf(after), boundsSignatureOf(before), "地点が変わったことになっています");
+  assert.notEqual(contentSignatureOf(after), contentSignatureOf(before), "内容の変更が拾えていません");
+});
+
+test("地点が変われば両方の署名が変わる", async () => {
+  const { boundsSignatureOf, contentSignatureOf } = await import("../assets/js/map.js");
+  const before = [{ id: "ev-1", lat: 13.7, lng: 100.5, cat: "cat-food", title: "昼食", startDay: 0 }];
+  const moved = [{ ...before[0], lat: 12.9 }];
+  const added = [...before, { id: "ev-2", lat: 12.9, lng: 100.9, cat: "cat-food", title: "夕食", startDay: 0 }];
+
+  for (const [name, next] of [["移動", moved], ["追加", added]]) {
+    assert.notEqual(boundsSignatureOf(next), boundsSignatureOf(before), `${name}で地点の署名が変わっていません`);
+    assert.notEqual(contentSignatureOf(next), contentSignatureOf(before), `${name}で内容の署名が変わっていません`);
+  }
+});
+
+/* ── object-position の許可リスト（設計書 §13） ─────────── */
+
+test("imagePos は許可リストを通り、宣言を増やす値は落ちる", async () => {
+  const { safeObjectPosition } = await import("../assets/js/sheet.js");
+
+  // 通ってよい形
+  for (const ok of ["center", "top", "left top", "30% 70%", "12px -4px", "center 30%"]) {
+    assert.equal(safeObjectPosition(ok), ok, `${ok} が落ちています`);
+  }
+
+  // escapeHtml() では止まらない形。宣言を増やして要素をシートの外へ被せられる
+  for (const bad of [
+    "top; position:fixed",
+    "center;inset:0",
+    "url(https://example.com/x)",
+    "calc(100% - 10px)",
+    "expression(alert(1))",
+    "top left center",
+    "",
+    "   ",
+  ]) {
+    assert.equal(safeObjectPosition(bad), "center", `${bad} が通っています`);
+  }
+
+  // 文字列でない値も既定へ
+  for (const bad of [null, undefined, 12, {}, []]) {
+    assert.equal(safeObjectPosition(bad), "center");
+  }
+});
+
+test("renderEventDetail は弾いた imagePos を style に出さない", async () => {
+  const { renderEventDetail } = await import("../assets/js/sheet.js");
+  const html = renderEventDetail(
+    {
+      id: "ev-1",
+      cat: "cat-sight",
+      title: "寺",
+      allDay: true,
+      startDay: 0,
+      endDay: 0,
+      image: "https://example.com/a.jpg",
+      imagePos: "top; position:fixed",
+    },
+    [{ date: "8/12", dow: "水" }]
+  );
+  assert.ok(!html.includes("position:fixed"), `宣言が漏れています: ${html}`);
+  assert.match(html, /object-position:center/);
+});

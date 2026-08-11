@@ -45,3 +45,12 @@ test("timeLabel は終日と時刻つきを出し分ける", () => {
   assert.equal(timeLabel({ allDay: true }), "終日");
   assert.equal(timeLabel({ start: 10.58, end: 15.08 }), "10:35 → 15:05");
 });
+
+test("24 時台は 24:00 だけを受け入れる", () => {
+  // "24:30" は h > 24 の判定をすり抜けて 24.5 になっていた（設計書 §13）。
+  // 0〜24 に収まらない値をこの関数から出さない
+  assert.equal(hhmmToDec("24:00"), 24);
+  assert.throws(() => hhmmToDec("24:30"), RangeError);
+  assert.throws(() => hhmmToDec("24:01"), RangeError);
+  assert.throws(() => hhmmToDec("25:00"), RangeError);
+});

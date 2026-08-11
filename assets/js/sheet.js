@@ -46,7 +46,19 @@ export function createSheet({ root, overlay, titleEl, bodyEl, footEl, closeBtn }
 
   setOpen(false);
 
-  function open(title, bodyHtml, footNodes = []) {
+  /**
+   * いま開いている中身が「閉じてよいか」を答える述語。open() のたびに差し替わる。
+   *
+   * 無い（＝渡されなかった）なら常に閉じてよい。読み取り専用の詳細はこちら。
+   *
+   * **断るときは、断ったことを利用者に見せるのは述語の側の仕事。** ここで
+   * 文言を出さないのは、シートが中身の事情（どの欄が未保存か）を知らないため。
+   * confirm() は使えない規約なので、「1 度目は断って理由を出し、2 度目は
+   * 通す」という形を中身の側が組む（event-editor.js の canCloseForm）。
+   */
+  let canClose = null;
+
+  function open(title, bodyHtml, footNodes = [], options = {}) {
     // 戻り先を覚えるのは「閉じているシートを開くとき」だけ。
     // すでに開いているシートの中身を差し替える場面（詳細 →「この予定を編集」）で
     // 更新してしまうと、そのときの activeElement はこれから innerHTML="" で
@@ -54,8 +66,16 @@ export function createSheet({ root, overlay, titleEl, bodyEl, footEl, closeBtn }
     // focus() は何も起きず、閉じたあとフォーカスが body へ落ちる）。
     // 背景は inert なので、開いている間に外の要素から open() が呼ばれることはない。
     if (!isOpen()) lastFocused = document.activeElement;
+    canClose = typeof options.canClose === "function" ? options.canClose : null;
     titleEl.textContent = title;
-    bodyEl.innerHTML = bodyHtml;
+    // 文字列でも Node でも受ける。Node を渡せば、呼び出し側が描画後に
+    // bodyEl から入力欄を引き直す必要が無くなる（event-editor.js の
+    // requireField がやっているのがそれ。設計書 §13）
+    if (bodyHtml && typeof bodyHtml === "object" && bodyHtml.nodeType) {
+      bodyEl.replaceChildren(bodyHtml);
+    } else {
+      bodyEl.innerHTML = bodyHtml;
+    }
     footEl.innerHTML = "";
     for (const node of footNodes) footEl.appendChild(node);
 
@@ -70,10 +90,20 @@ export function createSheet({ root, overlay, titleEl, bodyEl, footEl, closeBtn }
     (footEl.querySelector("button") ?? closeBtn).focus();
   }
 
-  function close() {
+  /**
+   * @param {boolean} force 述語を無視して閉じる。保存や削除が成功した直後の
+   *   ように、中身の側が「もう閉じてよい」と分かっている場面で使う
+   *   （そこで述語に聞くと、いま保存したばかりの入力を未保存と読んでしまう）。
+   */
+  function close(force = false) {
+    // 閉じてよいかを中身に聞く。断られたら何もしない ── 理由の表示は
+    // 述語の側が済ませている（canClose のコメント）
+    if (!force && canClose && !canClose()) return;
+
     // setOpen(false) がシートを inert にした時点で、シート内にあった
     // フォーカスは body へ外れる。背景の inert もここで同時に解けるので、
     // 直後の lastFocused.focus() は必ず成功する。
+    canClose = null;
     setOpen(false);
     document.body.style.overflow = "";
     lastFocused?.focus();
@@ -81,8 +111,10 @@ export function createSheet({ root, overlay, titleEl, bodyEl, footEl, closeBtn }
 
   const isOpen = () => root.classList.contains("is-open");
 
-  closeBtn.addEventListener("click", close);
-  overlay.addEventListener("click", close);
+  // どの経路で閉じても述語を通す。1 つでも素通しにすると、
+  // 「閉じるボタンでは止まるがオーバーレイを押すと消える」という穴が開く
+  closeBtn.addEventListener("click", () => close());
+  overlay.addEventListener("click", () => close());
   window.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && isOpen()) close();
   });
@@ -118,22 +150,36 @@ function dayRangeLabel(ev, days) {
     : `${escapeHtml(from.date)}（${escapeHtml(from.dow)}）`;
 }
 
+/**
+ * object-position に載せてよい値だけを通す。通らなければ "center"。
+ *
+ * **escapeHtml() ではここを守れない。** 変換するのは属性から抜け出す 5 文字
+ * （& < > " '）だけで、`;` も CSS の関数記法も素通りする ── 引用符が消える以上
+ * タグからは抜け出せないが、**宣言は増やせる**（`top; position:fixed` のような形で、
+ * シートの外にまで被さる要素を作れる）。style-src には Leaflet のために
+ * 'unsafe-inline' が要るので、CSP も止めてくれない（設計書 §13）。
+ *
+ * 通すのは object-position が実際に取る形だけ ── キーワード（center / top /
+ * bottom / left / right）と、長さ／パーセント（12px, 30%, -1.5em …）を
+ * 1〜2 個並べたもの。ここに関数記法（calc など）を足すなら、括弧の中まで
+ * 見る必要があることに注意すること。
+ *
+ * 今は到達しない経路（imagePos の入力欄はフォームに無い）だが、**入力欄を
+ * 足した瞬間に生きた経路になる**ので、足す前に検証を置いておく。
+ */
+const POSITION_TOKEN = /^(?:center|top|bottom|left|right|-?\d+(?:\.\d+)?(?:px|%|em|rem|vw|vh))$/;
+
+export function safeObjectPosition(value) {
+  if (typeof value !== "string") return "center";
+  const tokens = value.trim().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0 || tokens.length > 2) return "center";
+  return tokens.every((t) => POSITION_TOKEN.test(t)) ? tokens.join(" ") : "center";
+}
+
 export function renderEventDetail(ev, days) {
-  // ⚠ imagePos を style 属性へ差し込んでいる。escapeHtml() は属性から抜け出す
-  // 5 文字（& < > " '）しか変換しないので、`;` も CSS の関数記法もそのまま通る。
-  // 引用符が消える以上タグからは抜け出せないが、宣言は増やせる（`top; position:fixed`
-  // のような形で、シートの外にまで被さる要素を作れる）。style-src に
-  // 'unsafe-inline' が要る（Leaflet のため）ので CSP も止めない。
-  //
-  // 今は届かない。imagePos の入力欄はフォームに無く（event-form.js）、
-  // 値は events.json を手で書いた分しか存在しない。ただし全 40 件がこのキーを
-  // 持っているので、B2 で画像位置の入力欄を足した瞬間に生きた経路になる。
-  // **入力欄を足すなら、先に imagePos を許可リストで検証すること**
-  // （object-position が実際に取る形 ── キーワードと長さ／パーセントだけ）。
-  // escapeHtml() を足しても防げない。設計書 §13 に項目がある。
   const image = ev.image
     ? `<img class="sheet__img" src="${escapeHtml(ev.image)}" alt=""
-         style="object-position:${escapeHtml(ev.imagePos || "center")}">`
+         style="object-position:${safeObjectPosition(ev.imagePos)}">`
     : "";
 
   // 許可リストを通らなかった URL は、行ごと消さずに素のテキストとして出す。

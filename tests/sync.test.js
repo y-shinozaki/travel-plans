@@ -388,7 +388,14 @@ test("取り込みを保存できなくても旅程は表示する", async () =>
   const { result: out, seen } = await captureConsole(() => sync.load());
   assert.deepEqual(out.data, remote);
   assert.equal(out.source, "use-remote");
-  assert.equal(seen.length, 1); // 黙って捨てない
+  // 黙って捨てない。件数は数えない ── 書き込む控えが増える（指紋など）たびに
+  // 数がずれて、テストが別のものを試し始める。「取り込んだ内容を保存できな
+  // かったことが出ている」ことだけを見る
+  assert.ok(seen.length >= 1, "保存の失敗が黙って捨てられています");
+  assert.ok(
+    seen.some((line) => line.includes("取り込んだ内容を保存できませんでした")),
+    `取り込みの失敗が出ていません: ${seen.join(" / ")}`
+  );
 });
 
 test("未公開の変更があるときはリモートで黙って上書きしない", async () => {
@@ -644,7 +651,12 @@ test("リモートの updatedAt が読めないときは突き合わせを省い
   const { result, seen } = await captureConsole(() => sync.publish(data));
   assert.equal(fetchImpl.calls.length, 2);
   assert.equal(fetchImpl.calls[1].method, "PUT");
-  assert.equal(seen.length, 1);
+  // 黙って通さない。件数は数えない ── 判断の段階が増えるたびに数がずれて、
+  // テストが別のものを試し始める
+  assert.ok(
+    seen.some((line) => line.includes("突き合わせを省略します")),
+    `省略したことが console に出ていません: ${seen.join(" / ")}`
+  );
   // console.warn だけでは、唯一ガードが効いていない場面を誰も知らないまま
   // 公開が済んでしまう。画面に出せるよう戻り値でも伝えること
   assert.equal(result.conflictChecked, false, "省略した事実が返っていません");
@@ -850,7 +862,14 @@ function fakeRemote(initialText) {
         }),
       };
     }
-    return { ok: true, status: 200, json: async () => JSON.parse(state.text) };
+    // text() も返す。sync.fetchRemote は配信されたバイト列そのものから
+    // 指紋を作るので（fingerprint.js）、実物の Response と同じ形にしておく
+    return {
+      ok: true,
+      status: 200,
+      text: async () => state.text,
+      json: async () => JSON.parse(state.text),
+    };
   };
   return { state, fetchImpl };
 }
@@ -1124,7 +1143,7 @@ test("404 は status を持った失敗として投げる（まだ無いファ�
   const store = createStore(backend);
   const sync = createSync({
     store,
-    fetchImpl: async () => ({ ok: false, status: 404, json: async () => ({}) }),
+    fetchImpl: async () => ({ ok: false, status: 404, text: async () => "", json: async () => ({}) }),
     config: {
       path: "assets/data/packing.json",
       draftKey: "packing",
@@ -1164,4 +1183,252 @@ test("通信断には status が付かない（404 と取り違えない）", as
       }
     )
   );
+});
+
+/* ── 保存領域に書けない端末（設計書 §13） ─────────────── */
+
+/** 公開にはトークンが要る。中身は使われないので何でもよい。 */
+const WITH_TOKEN = { "tp:gh-token": "ghp_test" };
+
+/**
+ * 素の GET（load / adoptRemote が読む配信ファイル）と Contents API の
+ * 両方を返すハンドラ。github() は API しか返さないので、取り込みまで
+ * 通すテストではこちらを使う。
+ */
+function siteAndApi({ remote = plan(REMOTE_STAMP), sha = "old-sha", put = OK_PUT } = {}) {
+  return (url, init) => {
+    if (init?.method === "PUT") return put();
+    if (url.startsWith("https://api.github.com")) {
+      return jsonResponse(200, { sha, content: toBase64Utf8(JSON.stringify(remote)) });
+    }
+    return jsonResponse(200, remote);
+  };
+}
+
+/** setItem が必ず失敗する store。プライベートブラウジングの端末に相当する。 */
+function readOnlyStore(initial = {}) {
+  const backend = memoryBackend(initial);
+  backend.setItem = () => {
+    throw new Error("QuotaExceededError");
+  };
+  return createStore(backend);
+}
+
+test("保存領域に書けない端末でも、2 回目以降の公開は 409 にならない", async () => {
+  // base を残せないので、これまでは assertRemoteNotAhead が毎回
+  // 「取り込んだ証拠が無い」と判断して必ず 409 になっていた。しかも
+  // その 409 に添える「取り込んでから公開し直す」も同じ理由で成立しない
+  await captureConsole(async () => {
+    const store = readOnlyStore(WITH_TOKEN);
+    const fetchImpl = fakeFetch(siteAndApi());
+    const sync = createSync({ store, fetchImpl, config: CONFIG, now });
+
+    // 1 回目: base が無いので通らない
+    await assert.rejects(sync.publish(plan(FIXED_ISO)), (e) => e.status === 409);
+
+    // 取り込みは通る（下書きは書けないが、セッションの記憶に base が残る）
+    await assert.rejects(sync.adoptRemote(), StoreWriteError);
+
+    // 2 回目: セッションの記憶が base の代わりになるので 409 では止まらない。
+    // 控えは相変わらず書けないので StoreWriteError にはなるが、**PUT は通っている**
+    // ── その証拠にコミット URL が載っている（これが出せないと、この端末には
+    // 公開できたのか確かめる手段が無い）
+    await assert.rejects(sync.publish(plan(FIXED_ISO)), (error) => {
+      assert.ok(error instanceof StoreWriteError, `409 のままです: ${error}`);
+      assert.equal(error.commitUrl, "https://github.com/acme/trip/commit/abc");
+      return true;
+    });
+  });
+});
+
+test("公開が保存に失敗しても、コミット URL は例外から取れる", async () => {
+  // 出さないと「本当に公開できたのか」を確かめる手段がリポジトリを
+  // 自分で見に行くことだけになる
+  await captureConsole(async () => {
+    const store = readOnlyStore({ ...WITH_TOKEN, [BASE_KEY]: JSON.stringify(REMOTE_STAMP) });
+    const fetchImpl = fakeFetch(github({ remote: plan(REMOTE_STAMP) }));
+    const sync = createSync({ store, fetchImpl, config: CONFIG, now });
+
+    await assert.rejects(sync.publish(plan(FIXED_ISO)), (error) => {
+      assert.ok(error instanceof StoreWriteError);
+      assert.equal(error.commitUrl, "https://github.com/acme/trip/commit/abc");
+      return true;
+    });
+  });
+});
+
+test("取り込みが base だけ書けなかったときは、取り込んだ中身を例外に載せる", async () => {
+  // 下書きはもう入れ替わっている。画面を古いまま据え置くと、次の編集が
+  // その古い内容を保存し直して取り込みを黙って巻き戻す
+  await captureConsole(async () => {
+    const backend = memoryBackend(WITH_TOKEN);
+    const original = backend.setItem.bind(backend);
+    // base のキーだけ失敗させる。**呼ばれた回数では数えない** ── 指紋のような
+    // 書き込みが増えるたびに数がずれて、テストが別のものを試し始める
+    backend.setItem = (k, v) => {
+      if (k === BASE_KEY) throw new Error("QuotaExceededError");
+      original(k, v);
+    };
+    const store = createStore(backend);
+    const fetchImpl = fakeFetch(siteAndApi());
+    const sync = createSync({ store, fetchImpl, config: CONFIG, now });
+
+    await assert.rejects(sync.adoptRemote(), (error) => {
+      assert.equal(error.draftWritten, true, "下書きが書けたことが伝わっていません");
+      assert.equal(error.adopted?.updatedAt, REMOTE_STAMP);
+      return true;
+    });
+    // 下書きは実際に入れ替わっている
+    assert.equal(JSON.parse(backend._dump()[DRAFT_KEY]).updatedAt, REMOTE_STAMP);
+  });
+});
+
+test("検証を通らないリモートには突き合わせを掛けず、上書きで直せる", async () => {
+  /*
+   * リモートが「JSON としては読めて updatedAt も進んでいるが、中身が
+   * 検証を通らない」形だと、これまでは 409 で止まっていた。逃げ道の
+   * 「取り込む」も同じ検証で落ちるので、その端末では直せなかった
+   * （設計書 §13）。events.json の手編集を廃止した以上、ブラウザから
+   * 直せる経路はこの上書きしか残っていない
+   */
+  await captureConsole(async () => {
+    // BROKEN は days が空なので validateEvents に必ず弾かれる。
+    // updatedAt は base より進めておく（＝これまでなら 409 になる条件）
+    const ahead = { ...BROKEN, updatedAt: "2026-08-09T11:00:00.000Z" };
+    const { sync } = setup({
+      initial: { ...SYNCED, ...WITH_TOKEN },
+      handler: github({ remote: ahead }),
+    });
+
+    const result = await sync.publish(plan(FIXED_ISO));
+    assert.equal(typeof result.commitUrl, "string");
+    // 突き合わせを省いたことは黙らない
+    assert.equal(result.conflictChecked, false);
+  });
+});
+
+test("検証を通るリモートが進んでいれば、これまでどおり 409 で止める", async () => {
+  // 上の逃がし方が広すぎないことの番人。壊れていないリモートまで
+  // 上書きできてしまうと、競合検出そのものが無くなる
+  const { sync } = setup({
+    initial: { ...SYNCED, ...WITH_TOKEN },
+    handler: github({ remote: plan("2026-08-09T11:00:00.000Z") }),
+  });
+  await assert.rejects(sync.publish(plan(FIXED_ISO)), (e) => e.status === 409);
+});
+
+test("sync は画面の文言に使う noun を公開する", () => {
+  // publish-ui が自分の content.noun と突き合わせるために読む
+  const { sync } = setup();
+  assert.equal(sync.noun, DEFAULT_CONFIG.noun);
+  const other = createSync({
+    store: createStore(memoryBackend()),
+    fetchImpl: fakeFetch(() => jsonResponse(500, {})),
+    config: { ...CONFIG, noun: "持ち物リスト" },
+  });
+  assert.equal(other.noun, "持ち物リスト");
+});
+
+test("時計が巻き戻っていても、内容が変わったリモートは上書きしない", async () => {
+  /*
+   * 設計書 §13 の残存リスク。base に入る updatedAt は公開した端末の時計で
+   * 押されるので、端末間で時計がずれていると順序が保たれない ── あとから
+   * 公開された版のほうが「古い」と読まれ、突き合わせが素通りして
+   * **他の端末の公開を黙って上書きしていた。**
+   *
+   * 指紋は時計を一切見ないので、この形の取りこぼしが無くなる。
+   */
+  await captureConsole(async () => {
+    const remote = plan(REMOTE_STAMP);
+    const backend = memoryBackend(WITH_TOKEN);
+    const store = createStore(backend);
+    const state = { remote };
+    const fetchImpl = fakeFetch((url, init) => {
+      if (init?.method === "PUT") return OK_PUT();
+      if (url.startsWith("https://api.github.com")) {
+        return jsonResponse(200, {
+          sha: "old-sha",
+          content: toBase64Utf8(JSON.stringify(state.remote)),
+        });
+      }
+      return jsonResponse(200, state.remote);
+    });
+    const sync = createSync({ store, fetchImpl, config: CONFIG, now });
+
+    // 起動時にリモートを取り込む → 指紋を覚える
+    await sync.load();
+
+    // 別の端末が公開した。**その端末の時計は遅れていて、updatedAt は
+    // こちらの base より古い**（＝これまでは「進んでいない」と読まれていた）
+    state.remote = plan("2026-08-09T09:00:00.000Z", [ev({ title: "他の端末が直した昼食" })]);
+
+    await assert.rejects(
+      sync.publish(plan(FIXED_ISO)),
+      (error) => error.status === 409,
+      "時計が古い他端末の公開を上書きしています"
+    );
+  });
+});
+
+test("内容が変わっていなければ、指紋があっても公開できる", async () => {
+  // 上のガードが広すぎないことの番人。自分が取り込んだままのリモートなら通す
+  await captureConsole(async () => {
+    const remote = plan(REMOTE_STAMP);
+    const store = createStore(memoryBackend(WITH_TOKEN));
+    const fetchImpl = fakeFetch(siteAndApi({ remote }));
+    const sync = createSync({ store, fetchImpl, config: CONFIG, now });
+
+    await sync.load();
+    const result = await sync.publish(plan(FIXED_ISO));
+    assert.equal(typeof result.commitUrl, "string");
+    assert.equal(result.conflictChecked, true);
+  });
+});
+
+test("指紋をまだ持たない端末は、これまでどおり updatedAt で判断する", async () => {
+  // 移行のあいだだけ通る経路。ここで 409 にすると、この変更を入れた瞬間に
+  // 全端末の 1 回目の公開が失敗する
+  await captureConsole(async () => {
+    const { sync } = setup({
+      initial: { ...SYNCED, ...WITH_TOKEN }, // base はあるが指紋は無い
+      handler: github({ remote: plan(REMOTE_STAMP) }),
+    });
+    const result = await sync.publish(plan(FIXED_ISO));
+    assert.equal(result.conflictChecked, true);
+  });
+});
+
+test("復号できないリモートは「壊れている」扱いにせず、上書きも通さない", async () => {
+  /*
+   * 「読めない」と「読めたが壊れている」を一緒くたにすると、**合言葉が違って
+   * 復号できないだけのリモートを上書きしてしまう** ── 中身が読めないのだから
+   * 壊れているかを判断する材料が無く、上書きしてよい根拠も無い。
+   * この端末に読めないデータを消すのが一番まずい壊れ方（PR #13 の自己レビューで発見）。
+   */
+  await captureConsole(async () => {
+    const codec = {
+      // 復号できない（別の合言葉で暗号化されている）
+      decode: async () => {
+        throw new DecryptError("wrong-key");
+      },
+      encode: async (data) => ({ updatedAt: data.updatedAt, ct: "xxx" }),
+    };
+    const store = createStore(
+      memoryBackend({ ...WITH_TOKEN, [BASE_KEY]: JSON.stringify(REMOTE_STAMP) })
+    );
+    // リモートは base より進んでいる（＝突き合わせが効けば 409 になる条件）
+    const ahead = { updatedAt: "2026-08-09T11:00:00.000Z", ct: "yyy" };
+    const fetchImpl = fakeFetch((url, init) =>
+      init?.method === "PUT"
+        ? OK_PUT()
+        : jsonResponse(200, { sha: "old-sha", content: toBase64Utf8(JSON.stringify(ahead)) })
+    );
+    const sync = createSync({ store, fetchImpl, config: { ...CONFIG, codec }, now });
+
+    await assert.rejects(
+      sync.publish(plan(FIXED_ISO)),
+      (error) => error.status === 409,
+      "復号できないリモートを上書きしています"
+    );
+  });
 });

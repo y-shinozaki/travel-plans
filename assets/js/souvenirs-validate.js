@@ -18,6 +18,7 @@
  */
 
 import { DataError } from "./data-error.js";
+import { isPlainObject } from "./plain-object.js";
 
 /** お土産データ内容の不備。通信・パース失敗とは呼び出し側で区別する。 */
 export class SouvenirDataError extends DataError {
@@ -27,7 +28,6 @@ export class SouvenirDataError extends DataError {
   }
 }
 
-const isPlainObject = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
 const isNonEmptyString = (v) => typeof v === "string" && v !== "";
 const show = (v) => (typeof v === "number" ? String(v) : JSON.stringify(v));
 

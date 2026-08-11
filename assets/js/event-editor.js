@@ -13,7 +13,7 @@
 import { el, escapeHtml } from "./dom.js";
 import { icon } from "./icons.js";
 import { renderEventDetail } from "./sheet.js";
-import { emptyEvent, eventFormHtml, readEventForm, formProblems } from "./event-form.js";
+import { emptyEvent, eventFormHtml, readEventForm, formProblemDetails } from "./event-form.js";
 import { validateEvents, EventDataError } from "./validate.js";
 import { decToHHMM } from "./time.js";
 
@@ -151,15 +151,44 @@ export function createEventEditor({ sheet, bodyEl, getData, commit, fallbackFocu
     return node.type === "checkbox" ? (node.checked ? "on" : "") : node.value;
   }
 
+  /**
+   * いまフォームに入っている値をまとめた文字列。開いた直後の値と比べて
+   * 「触られたか」を見るためだけに使う（canClose）。
+   *
+   * 読めなければ null。フォームが崩れている場面で「触られた」と読んで
+   * シートを閉じられなくすると、出口が無くなる ── 判断できないときは
+   * 止めない側へ倒す。
+   */
+  function readFormText() {
+    try {
+      return JSON.stringify(readEventForm(getValue));
+    } catch {
+      return null;
+    }
+  }
+
   /* ── エラー表示（シートの中に出し、閉じない） ── */
 
   const errorBox = () => bodyEl.querySelector("#f-error");
 
+  /**
+   * エラー表示を消す。**role と aria-invalid も必ず一緒に消すこと。**
+   *
+   * 以前は className と中身しか消していなかったので、role="alert" が
+   * 空の箱に残り続けた。空の live region は読み上げこそ起こさないが、
+   * 支援技術から見ると「まだ警告の器がそこにある」状態で、次に別の理由で
+   * ここへ文字を入れた瞬間に、消したはずの前の文脈として読まれる。
+   * aria-invalid も同じで、直した欄に付いたままだと「まだ不正」と伝わる。
+   */
   function clearProblems() {
+    for (const node of bodyEl.querySelectorAll("[aria-invalid]")) {
+      node.removeAttribute("aria-invalid");
+    }
     const box = errorBox();
     if (!box) return;
     box.innerHTML = "";
     box.className = "";
+    box.removeAttribute("role");
   }
 
   /** 直すべき点を 1 行ずつ並べる。 */
@@ -238,7 +267,10 @@ export function createEventEditor({ sheet, bodyEl, getData, commit, fallbackFocu
       showFailure(error);
       return;
     }
-    sheet.close();
+    // 保存・削除が通った直後なので、未保存の確認は飛ばす（force）。
+    // ここで述語に聞くと、いま保存したばかりの入力を「未保存」と読んで
+    // シートが閉じなくなる
+    sheet.close(true);
     focusEvent(focusId);
   }
 
@@ -250,11 +282,15 @@ export function createEventEditor({ sheet, bodyEl, getData, commit, fallbackFocu
 
     // dayCount は必ず今の days から渡す。控えを持ち回ると、日程を縮めた
     // あとに古い日数で検査してしまう
-    const problems = formProblems(input, data.days.length);
-    const titleField = bodyEl.querySelector("#f-title");
-    if (titleField) titleField.setAttribute("aria-invalid", String(!input.title));
+    const problems = formProblemDetails(input, data.days.length);
     if (problems.length) {
-      showProblems(problems);
+      // 不備のある欄を全部名指しする。以前はタイトル欄にしか付けていなかったので、
+      // 緯度や時刻を直すべき場面で支援技術には「どこが悪いのか」が伝わらなかった
+      for (const { inputId } of problems) {
+        if (!inputId) continue;
+        bodyEl.querySelector(`#${inputId}`)?.setAttribute("aria-invalid", "true");
+      }
+      showProblems(problems.map((p) => p.message));
       return;
     }
 
@@ -356,7 +392,38 @@ export function createEventEditor({ sheet, bodyEl, getData, commit, fallbackFocu
       foot.push(del);
     }
 
-    sheet.open(original ? "予定を編集" : "予定を追加", body, foot);
+    /*
+     * 閉じると未保存の入力が黙って消える、という穴を塞ぐ（設計書 §13）。
+     * confirm() は使えない規約なので、削除ボタンと同じ「1 度目で身構え、
+     * 2 度目で実行」にする ── 1 度目は閉じずに理由を出し、2 度目で捨てる。
+     *
+     * 触っていないフォームは素通しする。開いて眺めただけの予定を閉じるのに
+     * 2 度押させるのは、守るものが無いのに手間だけ増やすことになる。
+     */
+    let snapshot = null;
+    let discardArmed = false;
+    const canClose = () => {
+      // 読めない（フォームが崩れている・まだ撮れていない）なら止めない。
+      // 閉じられなくなるほうが困る
+      const current = readFormText();
+      if (current === null || snapshot === null || current === snapshot) return true;
+      if (discardArmed) return true;
+      discardArmed = true;
+      showProblems([
+        "保存していない入力があります。もう一度閉じると、この入力は捨てられます。",
+      ]);
+      return false;
+    };
+
+    sheet.open(original ? "予定を編集" : "予定を追加", body, foot, { canClose });
+
+    // **スナップショットは sheet.open() のあとで撮る。** 前で撮ると、本文の
+    // HTML がまだ文書に入っていないので requireField が投げ、readFormText が
+    // null を返す ── その結果「触っていないフォームも閉じるのを断る」になる。
+    // 2026-08-11 に実ページで見つけた。**テストのスタブは open の前から
+    // 入力欄を持っているので、この順序の誤りを再現できない**（下のテストは
+    // open() の中で値を変えて、撮る時点が open より後であることを見ている）
+    snapshot = readFormText();
 
     // 終日の予定は時刻を持たないので、切り替えに合わせて時刻欄を出し入れする。
     //

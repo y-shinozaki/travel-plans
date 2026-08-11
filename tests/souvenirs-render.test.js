@@ -24,9 +24,12 @@ function stubDocument() {
       attrs: {},
       listeners: {},
       value: "",
+      // 実 DOM と同じく、代入は既存の子要素を捨てる（packing-render.test.js の
+      // 同じ setter のコメントを参照。消すと退行がスタブ上で素通りする）
       set innerHTML(v) {
         htmlSink.push(String(v));
         this._html = String(v);
+        this.children.length = 0;
       },
       get innerHTML() {
         return this._html ?? "";
@@ -34,6 +37,7 @@ function stubDocument() {
       set textContent(v) {
         textSink.push(String(v));
         this._text = String(v);
+        this.children.length = 0;
       },
       get textContent() {
         return this._text ?? "";

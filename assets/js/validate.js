@@ -22,6 +22,7 @@
 
 import { CAT_META } from "./categories.js";
 import { DataError } from "./data-error.js";
+import { isPlainObject } from "./plain-object.js";
 
 /**
  * 旅程データ内容の不備。通信・パース失敗とは呼び出し側で区別する。
@@ -40,11 +41,11 @@ export class EventDataError extends DataError {
  * id が無いイベントは where（配列上の位置など、呼び出し側が知っている
  * 「どこの話か」）で代用する。
  *
- * ラベルと本文は必ず `${label}: 本文` の形で継ぐこと。event-form.js の
- * inFormWords がこの形を前提に、名指しだけを落として本文をフォームの
- * 利用者に見せている。継ぎ方（ラベルの組み立て方・区切り）を変えるなら
- * あちらも直すこと。tests/event-form.test.js の
- * 「validate.js の名指しは『id: 本文』の形」がこの約束を見張っている。
+ * **名指しを付けるのは validateEvents だけ。** validateEvent が返す不備は
+ * 本文だけを持つ（下の Problem を参照）。以前は validateEvent 側が
+ * `${label}: 本文` の形に継いでいたため、1 件しか扱わない編集フォームが
+ * 文字列を切り直して名指しを落としていた ── タイトルや cat に ": " が
+ * 入っただけで本文の頭が削れる、という壊れ方をした。
  */
 function labelOf(ev, where) {
   const id = ev && typeof ev.id === "string" && ev.id ? ev.id : where;
@@ -52,7 +53,6 @@ function labelOf(ev, where) {
   return `${id}${title}`;
 }
 
-const isPlainObject = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
 const isFiniteNumber = (v) => typeof v === "number" && Number.isFinite(v);
 
 /**
@@ -90,21 +90,46 @@ function checkDays(days, problems) {
   return true;
 }
 
-function checkDayIndex(value, name, dayCount, label, problems) {
+/**
+ * 不備 1 件。
+ *
+ * @typedef {object} Problem
+ * @property {string|null} field 主に問題のあるキー（"startDay" など）。
+ *   イベント全体の話なら null。呼び出し側が入力欄を名指ししたり
+ *   aria-invalid を付けたりするのに使う
+ * @property {(nameOf: (key: string) => string) => string} message 本文を作る。
+ *   **キー名を直接埋め込まず、必ず nameOf(key) を通すこと。** これがあるから
+ *   同じ規則で「lat が範囲外です」（JSON を直接見る人向け）と
+ *   「緯度 が範囲外です」（フォームの利用者向け）を出し分けられる。
+ *   以前は本文が文字列で、フォーム側が正規表現でキー名を置換していた
+ *   ── 置換は本文のどこにでも当たるので、値の中に "start" を含む
+ *   イベントがあれば値まで書き換わった（設計書 §13）
+ */
+
+/** @returns {Problem} */
+const problem = (field, message) => ({ field, message });
+
+/** 名指しを付けない生のキー名。JSON を直接読む人向けの見え方。 */
+const rawName = (key) => key;
+
+function checkDayIndex(value, name, dayCount, problems) {
   if (!Number.isInteger(value)) {
-    problems.push(`${label}: ${name} が整数ではありません（${show(value)}）`);
+    problems.push(problem(name, (n) => `${n(name)} が整数ではありません（${show(value)}）`));
     return false;
   }
   if (value < 0 || value >= dayCount) {
     problems.push(
-      `${label}: ${name} が範囲外です（${value} / 有効な範囲は 0〜${dayCount - 1}）`
+      problem(
+        name,
+        (n) => `${n(name)} が範囲外です（${value} / 有効な範囲は 0〜${dayCount - 1}）`
+      )
     );
     return false;
   }
   return true;
 }
 
-function checkCoords(ev, label, problems) {
+function checkCoords(ev, problems) {
   const latAbsent = isAbsent(ev.lat);
   const lngAbsent = isAbsent(ev.lng);
   if (latAbsent && lngAbsent) return;
@@ -112,8 +137,12 @@ function checkCoords(ev, label, problems) {
     // 片方だけだと hasCoords が false を返し「座標なし」と同じ扱いになる。
     // 意図的に地図へ出さないイベントと見分けが付かないので、書き間違いとして弾く
     problems.push(
-      `${label}: lat / lng は両方書くか両方 null にしてください` +
-        `（lat=${show(ev.lat)}, lng=${show(ev.lng)}）`
+      problem(
+        latAbsent ? "lat" : "lng",
+        (n) =>
+          `${n("lat")} / ${n("lng")} は両方書くか両方 null にしてください` +
+          `（${n("lat")}=${show(ev.lat)}, ${n("lng")}=${show(ev.lng)}）`
+      )
     );
     return;
   }
@@ -122,9 +151,11 @@ function checkCoords(ev, label, problems) {
     ["lng", ev.lng, 180],
   ]) {
     if (!isFiniteNumber(value)) {
-      problems.push(`${label}: ${name} が有限の数値ではありません（${show(value)}）`);
+      problems.push(
+        problem(name, (n) => `${n(name)} が有限の数値ではありません（${show(value)}）`)
+      );
     } else if (value < -limit || value > limit) {
-      problems.push(`${label}: ${name} が範囲外です（${value} / ±${limit}）`);
+      problems.push(problem(name, (n) => `${n(name)} が範囲外です（${value} / ±${limit}）`));
     }
   }
 }
@@ -137,48 +168,59 @@ function checkCoords(ev, label, problems) {
  * validateEvents に弾かれ、ページが起動しない」データを作れてしまう。
  * イベント 1 件に対する規則の置き場所はここ 1 か所だけにする。
  *
+ * **返すのは文字列ではなく {field, message} の組**（上の Problem を参照）。
+ * イベントの名指し（"ev-006「出国フライト」: "）は付けない ── 1 件しか
+ * 扱わない呼び出し側が、あとから文字列を切り直さずに済むようにするため。
+ * 名指しを付けるのは validateEvents だけ。
+ *
  * @param {object} ev 検査するイベント
  * @param {number} dayCount days の件数
  * @param {Set<string>} seenIds すでに使われている id（重複の検出に使い、
  *   通ったものを足していく）。1 件だけ検査するときは既定の空集合でよい
- * @param {string} where id を持たないイベントの呼び方。validateEvents は
- *   配列上の位置（"events[3]"）を渡す
- * @returns {string[]} 不備の一覧
+ * @returns {Problem[]} 不備の一覧
  */
-export function validateEvent(ev, dayCount, seenIds = new Set(), where = "イベント") {
+export function validateEvent(ev, dayCount, seenIds = new Set()) {
   const problems = [];
-  const label = labelOf(ev, where);
 
   if (!isPlainObject(ev)) {
-    problems.push(`${where} がオブジェクトではありません`);
+    problems.push(problem(null, () => "オブジェクトではありません"));
     return problems;
   }
 
   // id は地図の再描画判定（map.js の signatureOf）の鍵になる。
   // 重複すると別の地点が同じものとして扱われる
   if (typeof ev.id !== "string" || !ev.id) {
-    problems.push(`${where}: id が空でない文字列ではありません`);
+    problems.push(problem("id", (n) => `${n("id")} が空でない文字列ではありません`));
   } else if (seenIds.has(ev.id)) {
-    problems.push(`${label}: id が重複しています`);
+    problems.push(problem("id", (n) => `${n("id")} が重複しています`));
   } else {
     seenIds.add(ev.id);
   }
 
   if (typeof ev.title !== "string") {
-    problems.push(`${label}: title が文字列ではありません`);
+    problems.push(problem("title", (n) => `${n("title")} が文字列ではありません`));
   }
 
   if (!Object.hasOwn(CAT_META, ev.cat)) {
     problems.push(
-      `${label}: 未知のカテゴリです（${show(ev.cat)} / ` +
-        `有効な値は ${Object.keys(CAT_META).join(", ")}）`
+      problem(
+        "cat",
+        () =>
+          `未知のカテゴリです（${show(ev.cat)} / ` +
+          `有効な値は ${Object.keys(CAT_META).join(", ")}）`
+      )
     );
   }
 
-  const startOk = checkDayIndex(ev.startDay, "startDay", dayCount, label, problems);
-  const endOk = checkDayIndex(ev.endDay, "endDay", dayCount, label, problems);
+  const startOk = checkDayIndex(ev.startDay, "startDay", dayCount, problems);
+  const endOk = checkDayIndex(ev.endDay, "endDay", dayCount, problems);
   if (startOk && endOk && ev.endDay < ev.startDay) {
-    problems.push(`${label}: endDay(${ev.endDay}) が startDay(${ev.startDay}) より前です`);
+    problems.push(
+      problem(
+        "endDay",
+        (n) => `${n("endDay")}(${ev.endDay}) が ${n("startDay")}(${ev.startDay}) より前です`
+      )
+    );
   }
 
   if (!ev.allDay) {
@@ -186,11 +228,16 @@ export function validateEvent(ev, dayCount, seenIds = new Set(), where = "イベ
       const value = ev[name];
       if (!isFiniteNumber(value)) {
         problems.push(
-          `${label}: 終日でないイベントの ${name} が有限の数値ではありません` +
-            `（${show(value)}）`
+          problem(
+            name,
+            (n) =>
+              `終日でないイベントの ${n(name)} が有限の数値ではありません（${show(value)}）`
+          )
         );
       } else if (value < 0 || value > 24) {
-        problems.push(`${label}: ${name} が 0〜24 の範囲外です（${value}）`);
+        problems.push(
+          problem(name, (n) => `${n(name)} が 0〜24 の範囲外です（${value}）`)
+        );
       }
     }
     // start > end は日をまたぐイベントでは正しい（例: 22:10 発 → 翌 06:20 着）ので
@@ -198,7 +245,7 @@ export function validateEvent(ev, dayCount, seenIds = new Set(), where = "イベ
     // buildBlock の下限クランプが吸収するため描画は破綻しない
   }
 
-  checkCoords(ev, label, problems);
+  checkCoords(ev, problems);
 
   return problems;
 }
@@ -220,9 +267,14 @@ export function validateEvents(data) {
     problems.push("events が配列ではありません");
   } else if (daysOk) {
     const seenIds = new Set();
-    data.events.forEach((ev, i) =>
-      problems.push(...validateEvent(ev, data.days.length, seenIds, `events[${i}]`))
-    );
+    data.events.forEach((ev, i) => {
+      // 名指しを付けるのはここだけ（validateEvent は本文しか返さない）。
+      // id が無いイベントは配列上の位置で呼ぶ
+      const label = labelOf(ev, `events[${i}]`);
+      for (const p of validateEvent(ev, data.days.length, seenIds)) {
+        problems.push(`${label}: ${p.message(rawName)}`);
+      }
+    });
   }
 
   if (problems.length) {

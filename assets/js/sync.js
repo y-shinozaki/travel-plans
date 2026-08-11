@@ -18,6 +18,8 @@ import { createGitHub, GitHubError, CONFLICT_MESSAGE } from "./github.js";
 import { validateEvents } from "./validate.js";
 import { readToken } from "./token.js";
 import { passthroughCodec, DecryptError } from "./crypto.js";
+import { isPlainObject } from "./plain-object.js";
+import { fingerprint } from "./fingerprint.js";
 
 /**
  * 公開先と、ファイルごとに違う 6 つ。ここ以外に owner / repo / branch / path を書かないこと。
@@ -75,7 +77,6 @@ export const DEFAULT_CONFIG = {
  */
 const UNCOMPARABLE = "";
 
-const isPlainObject = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
 
 /** ISO8601 の文字列だけを時刻として認める。 */
 const stampOf = (data) => (typeof data?.updatedAt === "string" ? data.updatedAt : null);
@@ -122,7 +123,11 @@ export function createSync({
       throw error;
     }
     try {
-      return await response.json();
+      // JSON だけでなく元のテキストも返す。指紋（fingerprint.js）は
+      // **配信されたバイト列そのもの**から作らないと、Contents API 経由で
+      // 取った本文との突き合わせがずれる
+      const text = await response.text();
+      return { data: JSON.parse(text), text };
     } catch (error) {
       throw new Error(`最新の${noun}データを JSON として読めませんでした`, { cause: error });
     }
@@ -136,7 +141,56 @@ export function createSync({
    * 直し方が違うので、呼び出し側が reason を見て文言を分ける（設計書 §9）。
    */
   async function fetchAndDecode() {
-    return codec.decode(await fetchRemote());
+    const { data, text } = await fetchRemote();
+    return { ...(await codec.decode(data)), text };
+  }
+
+  /**
+   * base（最後にリモートと揃えた updatedAt）を保存領域に書けなかったときの控え。
+   *
+   * 保存領域に書けない端末（プライベートブラウジング、容量超過）では base が
+   * 一度も残らないので、assertRemoteNotAhead が毎回「取り込んだ証拠が無い」と
+   * 判断して**公開が必ず 409 になる**。しかもその 409 に添える「取り込んでから
+   * 公開し直す」も同じ理由で成立しない ── 出口の無い袋小路だった（設計書 §13）。
+   *
+   * このセッションの間だけ覚えておけば、少なくとも 2 回目以降の公開は通る。
+   * **保存領域の代わりにはしない**（タブを閉じれば消える）。あくまで
+   * 「さっき自分が公開した／取り込んだ」という、この場限りの記憶。
+   */
+  let sessionBase = null;
+
+  /** base を読む。保存領域が使えない端末ではこのセッションの記憶に落ちる。 */
+  const readBase = () => store.read(baseKey, null) ?? sessionBase;
+
+  /**
+   * 指紋の置き場所。**時計を見ない競合検出のための、base の相棒。**
+   *
+   * base（updatedAt）は公開した端末の時計で押されるので、端末間で時計が
+   * ずれていると順序が保たれず、あとから公開した版が「古い」と読まれて
+   * 黙って上書きされる（設計書 §13 の残存リスク）。指紋は「同じ内容か
+   * 違う内容か」しか答えないが、競合検出に要るのはそれで、時計を一切見ない。
+   *
+   * **base を置き換えるのではなく、足す。** 指紋では新旧が分からないので、
+   * 起動時の判断（decideSync）は updatedAt のままにしてある。そちらまで
+   * 一度に変えると、いま動いている 5 台の端末の同期の意味が変わる。
+   *
+   * 指紋がまだ無い端末（この変更より前から使っている端末）では、これまで
+   * どおり updatedAt の突き合わせに落ちる ── 移行のために 1 度だけ通る経路。
+   */
+  const fpKey = `${draftKey}-fp`;
+  let sessionFp = null;
+  const readFp = () => store.read(fpKey, null) ?? sessionFp;
+
+  /** 指紋を覚える。保存できなくてもセッションの記憶には必ず残す。 */
+  function storeFp(text) {
+    if (typeof text !== "string") return;
+    const fp = fingerprint(text);
+    sessionFp = fp;
+    try {
+      store.write(fpKey, fp);
+    } catch (error) {
+      console.warn("sync: 指紋を保存できませんでした", error);
+    }
   }
 
   /**
@@ -145,10 +199,32 @@ export function createSync({
    * 逆にすると、base だけ書けて下書きが書けなかったとき（容量超過など）に
    * 「古い下書きが最新と揃っている」ことになり、リモートの内容が静かに消える。
    * この順なら最悪でも次回に「新しい版があります」が出るだけで済む。
+   *
+   * **順序が非対称なので、失敗の意味も非対称になる。** 下書きで失敗したなら
+   * 何も起きていない。base で失敗したなら**下書きだけは入れ替わっている** ──
+   * 呼び出し側が「取り込めませんでした」と言って画面を古いまま据え置くと、
+   * 保存領域にはリモートが入っているのに画面は前の内容、という食い違いが残り、
+   * 次の編集がその古い内容を保存し直して取り込みを黙って巻き戻す。
+   * それを見分けられるよう、base だけ失敗した場合は draftWritten を立てて投げる。
    */
-  function storeAdopted(data) {
+  function storeAdopted(data, text) {
+    const stamp = stampOf(data);
+    // 指紋は base より先に。ここで失敗しても投げない（storeFp が握る）ので、
+    // 下書きの書き込みより前に置いても順序の保証は崩れない
+    storeFp(text);
+    // **保存より先に覚える。** ここへ来た時点で「この版を採る」判断は済んで
+    // いるので、保存領域に書けたかどうかに関わらず、この端末はその版を
+    // 見ている。書き込みの成否を待つと、1 バイトも書けない端末では
+    // sessionBase が永久に埋まらず、公開が毎回 409 のままになる
+    sessionBase = stamp;
     store.write(draftKey, data);
-    store.write(baseKey, stampOf(data));
+    // ここから先で失敗しても、下書きはもう入れ替わっている
+    try {
+      store.write(baseKey, stamp);
+    } catch (error) {
+      error.draftWritten = true;
+      throw error;
+    }
   }
 
   /**
@@ -204,7 +280,7 @@ export function createSync({
    * 外側が正しい値に上書きされることを利用者に伝えること（Task 9 側の役割）。
    */
   async function load() {
-    const baseUpdatedAt = store.read(baseKey, null);
+    const baseUpdatedAt = readBase();
 
     // 下書きも検証する。壊れたリモートを画面に出さないのに壊れた下書きは出す、
     // では筋が通らない。旅行の日数を減らせば、他の端末に残っている下書きは
@@ -216,12 +292,14 @@ export function createSync({
     // remote が使えるかは remoteOk で持つ。null をセンチネルにすると、
     // リモート本文がリテラルの null だったときに「取れなかった」と区別できない
     let remote = null;
+    let remoteText = null;
     let remoteOk = false;
     let fetchError = null;
     let outerStampMismatch = false;
     try {
       const decoded = await fetchAndDecode();
       remote = decoded.data;
+      remoteText = decoded.text;
       outerStampMismatch = decoded.outerStampMismatch;
       remoteOk = true;
     } catch (error) {
@@ -247,9 +325,23 @@ export function createSync({
     if (source === "use-remote") {
       // 未公開の変更が無い（または下書きが無い）ときだけ静かに取り込む。
       // ただし下書きを弾いた場合は書かない。救出できる中身を上書きしてしまう
-      if (!draftRejected) {
+      if (draftRejected) {
+        // **base だけは進める。** 画面に出ているのはリモートそのものなので、
+        // 「このリモートを見た」のは事実。ここを飛ばすと base が古いままになり、
+        // 次の公開が必ず 409 になる ── しかも公開しようとしている中身は
+        // いま表示しているリモートと同じなので、止める理由が無い（設計書 §13）。
+        // 下書きは触らない。救出できる中身はそのまま残す
+        storeFp(remoteText);
         try {
-          storeAdopted(remote);
+          const stamp = stampOf(remote);
+          sessionBase = stamp;
+          store.write(baseKey, stamp);
+        } catch (error) {
+          console.warn("sync: base を更新できませんでした", error);
+        }
+      } else {
+        try {
+          storeAdopted(remote, remoteText);
         } catch (error) {
           // 保存できなくても表示はできる。この取り込みは次回の判断を速くするための
           // 控えであって、旅程を見せる条件ではない。閲覧しかしない端末を
@@ -295,7 +387,7 @@ export function createSync({
   function hasUnpublishedChanges() {
     const draft = store.read(draftKey, null);
     if (!isPlainObject(draft)) return false;
-    return stampOf(draft) !== store.read(baseKey, null);
+    return stampOf(draft) !== readBase();
   }
 
   /**
@@ -325,9 +417,18 @@ export function createSync({
    * 「取り込む」を押したらリモートの内容が消える、という静かなデータ消失になる。
    */
   async function adoptRemote() {
-    const { data } = await fetchAndDecode();
+    const { data, text } = await fetchAndDecode();
     validate(data);
-    storeAdopted(data);
+    // base だけ書けなかった場合、下書きはもう入れ替わっている（storeAdopted の
+    // コメント）。ここで投げっぱなしにすると呼び出し側は「取り込めませんでした」と
+    // 出して画面を古いまま据え置き、次の編集がその古い内容を保存し直して
+    // 取り込みを黙って巻き戻す。data を例外に載せて、画面だけは進めさせる
+    try {
+      storeAdopted(data, text);
+    } catch (error) {
+      if (error.draftWritten) error.adopted = data;
+      throw error;
+    }
     return data;
   }
 
@@ -346,6 +447,67 @@ export function createSync({
    *   という意味で、呼び出し側はそれを利用者に伝えること（console.warn だけだと、
    *   唯一ガードが効いていない場面を誰も知らないまま公開が済んでしまう）。
    */
+  /**
+   * GET した本文が、そもそも中身として使える形かを見る。
+   *
+   * 使えないと分かっている回に限り、突き合わせを飛ばして公開を通すためにある。
+   * **リモートが検証を通らない状態は、409 で塞ぐと出口が無くなる**（設計書 §13）:
+   * 409 の画面が示す唯一の逃げ道（「取り込む」→ adoptRemote）も同じ検証で
+   * 落ちるので、その端末では直せない。手元に正しい下書きを持つ端末が
+   * 上書きで直せるようにする ── events.json の手編集を廃止した以上、
+   * ブラウザから直せる経路はこれしか残っていない（§6.5）。
+   *
+   * 上書きしてよいと判断できるのは「壊れている」と確かめられたときだけ。
+   * 読めて検証も通るリモートは、これまでどおり突き合わせの対象にする。
+   */
+  async function remoteIsUsable(current) {
+    if (current === null) return true; // ファイルがまだ無い
+
+    // **「読めない」と「読めたが壊れている」を必ず分けること。**
+    //
+    // 一緒くたにすると、合言葉が違って復号できないだけのリモートを
+    // 「壊れている」と判定し、突き合わせを飛ばして**上書きしてしまう** ──
+    // その中身はこの端末には読めないのだから、壊れているかどうか判断する
+    // 材料が無い。上書きしてよい根拠が無い場面で上書きするのが一番まずい。
+    let data;
+    try {
+      ({ data } = await codec.decode(JSON.parse(current.text)));
+    } catch (error) {
+      // 復号できない・JSON として読めない。判断材料が無いので「分からない」を返し、
+      // これまでどおり updatedAt の突き合わせに任せる（封筒の外側は読める）
+      console.warn(`sync: リモートの${noun}を読めないため、壊れているかは判断しません`, error);
+      return null;
+    }
+
+    try {
+      validate(data);
+      return true;
+    } catch (error) {
+      // 復号はできて、中身が検証に落ちた。これは確かに壊れている
+      console.warn(
+        `sync: リモートの${noun}が検証を通らないため、公開前の突き合わせを省略します`,
+        error
+      );
+      return false;
+    }
+  }
+
+  /**
+   * 指紋で「リモートが自分の知っている版のままか」を見る。**時計を一切見ない。**
+   *
+   * これが答えを出せた回は、updatedAt の突き合わせ（assertRemoteNotAhead）は
+   * 要らない ── 時計ずれで順序が壊れていても、内容が変わったかどうかは
+   * 指紋が正しく答える（設計書 §13 の残存リスク）。
+   *
+   * @returns {boolean|null} true=変わっていない / false=変わっている /
+   *   null=判断できない（指紋をまだ持っていない端末。移行のあいだだけ通る）
+   */
+  function remoteMatchesFingerprint(current) {
+    const known = readFp();
+    if (!known || current === null || typeof current.text !== "string") return null;
+    return fingerprint(current.text) === known;
+  }
+
   function assertRemoteNotAhead(current) {
     if (current === null) return true; // ファイルがまだ無い。競合のしようがない
 
@@ -389,7 +551,7 @@ export function createSync({
     }
 
     // base が無い ＝ このリモートを取り込んだ証拠がない。上書きしてよい根拠もない
-    const baseMs = toTime(store.read(baseKey, null));
+    const baseMs = toTime(readBase());
     if (baseMs === null || remoteMs > baseMs) {
       throw new GitHubError(409, CONFLICT_MESSAGE);
     }
@@ -441,7 +603,26 @@ export function createSync({
     const current = await gh.getFile(cfg.path);
     // 送る前に突き合わせる。ここで投げれば PUT は一度も飛ばない。
     // 読むのは封筒の外側の updatedAt なので、暗号化しても無改造で効く（設計書 §6.2）
-    const conflictChecked = assertRemoteNotAhead(current);
+    //
+    // ただしリモートが**中身として壊れている**と分かった回は飛ばす。
+    // 塞ぐと直す手段が無くなるため（remoteIsUsable のコメント）
+    //
+    // 指紋が答えを出せるなら、そちらを採る。時計を見ないので、端末の時計が
+    // ずれていても他の端末の公開を黙って上書きしない（設計書 §13 の残存リスク）
+    const usable = await remoteIsUsable(current);
+    let conflictChecked;
+    if (usable === false) {
+      // 壊れていると確かめられた回だけ、見張りを外して上書きを通す。
+      // **null（読めなかった）はここに入れないこと** ── 合言葉が違うだけの
+      // リモートを上書きしてしまう
+      conflictChecked = false;
+    } else {
+      const matches = remoteMatchesFingerprint(current);
+      if (matches === false) throw new GitHubError(409, CONFLICT_MESSAGE);
+      // 指紋が一致した回は、時計の突き合わせを重ねる意味が無い。
+      // null（指紋をまだ持っていない端末）だけ、これまでどおりの判定に落ちる
+      conflictChecked = matches === true ? true : assertRemoteNotAhead(current);
+    }
 
     // ファイルがまだ無ければ sha なしで作成する（getFile は 404 で null を返す）
     const { commitUrl } = await gh.putFile({
@@ -455,9 +636,34 @@ export function createSync({
     // 「公開は済んでいるのに失敗として返る」ことになるが、握ると base が
     // 無いまま同期済みに見えてしまう。呼び出し側が StoreWriteError を
     // 「公開はできた／記録は残せなかった」と読み替える（publish-ui.js）。
-    storeAdopted(stamped);
+    //
+    // **commitUrl を例外に載せる。** 載せないと、控えを書けなかった端末には
+    // コミットへのリンクが一切出せず、「公開できたのか」を確かめる手段が
+    // リポジトリを自分で見に行くことだけになる（設計書 §13）。
+    try {
+      storeAdopted(stamped, text);
+    } catch (error) {
+      error.commitUrl = commitUrl;
+      error.conflictChecked = conflictChecked;
+      throw error;
+    }
     return { commitUrl, conflictChecked };
   }
 
-  return { load, saveLocal, adoptRemote, publish, hasUnpublishedChanges, readDraft };
+  return {
+    load,
+    saveLocal,
+    adoptRemote,
+    publish,
+    hasUnpublishedChanges,
+    readDraft,
+    /**
+     * 画面の文言に使う名詞。**publish-ui.js が自分の content.noun と
+     * 突き合わせるためにある。** 両者は同じ値を別々に渡されており、
+     * 結びつける仕組みが無かったので、B3 が片方だけ書き換えれば
+     * 同期バーとステータスが違う名前を出すページができた ── どちらも
+     * 例外を投げないので、テストで拾えなければ気付かれない（設計書 §13）。
+     */
+    noun,
+  };
 }

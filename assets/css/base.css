@@ -21,6 +21,34 @@ body {
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
 }
+/* UA 既定の p は margin: 1em 0 を持つ。このサイトの p はほとんどが
+   flex / grid の行（進捗の見出し、一覧の 1 行、エラーの 1 件…）で、
+   間隔は親の gap が決めている ── そこに 1em が積み増しされると、
+   **行の高さだけが膨らみ、隣に置いたチェックやボタンが本文の行から
+   ずれて見える。**
+
+   実際に 2026-08-11 に souvenirs で起きた（.svitem の中身が 2 行に
+   なる行で、チェックが名前より 25px 下に見えていた）。packing 側は
+   .pkitem__line が、公開まわりは .pubpanel__state / .syncbar__msg が
+   同じ margin: 0 を各自で書いて回避しており、**書き忘れた 1 か所だけが
+   壊れる**という形になっていた。既定を 0 にして、余白が要る場所だけが
+   明示的に足す（＝書き忘れたら詰まって見えるので気付ける）向きに変える。
+
+   ブラウザで実測して確かめた影響（2026-08-11）:
+
+   - メニューカード: 見出しとの間は .h3 の margin-bottom: 10px へ（12.9px から）、
+     矢印との間は .card__arrow の margin-top: var(--s4) = 42px へ（54.9px から）。
+     **どちらも宣言どおりの値に戻る方向** ── 幽霊の 1em が、書いてある数字に
+     上乗せされていた
+   - 保存エラーの一覧: 行間が .fproblems の gap: 8px へ（32px から）。同上
+   - 進捗ブロック（持ち物・お土産）: ここだけは 1em が見た目の役に立っていたので、
+     .pkprog__count / .svprog__count に margin-top: 6px を明示して足し直した
+     （バーの 6px と同じ値。名前 → 数字 → バーが等間隔になる）
+
+   設計書 §13。 */
+p {
+  margin: 0;
+}
 img {
   max-width: 100%;
   display: block;
@@ -304,7 +332,12 @@ button {
   flex-wrap: wrap;
   padding-bottom: var(--s6);
 }
+/* ul にしてあるのは、カードが「3 つのうちの 1 つ」だと支援技術に伝わるため
+   （設計書 §13）。リストの記号と既定の余白は要らないので落とす */
 .menu__grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 1px;
@@ -313,10 +346,18 @@ button {
   border-radius: var(--r-lg);
   overflow: hidden;
 }
+/* グリッドの升目は li のほうになった。カードが升目いっぱいに伸びないと、
+   1 枚だけ説明文が短いときに背景の高さが揃わず、間の 1px の罫線が途切れる。
+   display: contents で li を無いことにする手もあるが、それだと**リストで
+   ある**という、いま足したばかりの情報が一部のブラウザで落ちる */
+.menu__item {
+  display: flex;
+}
 .card {
   position: relative;
   background: var(--sand-lt);
   display: block;
+  width: 100%;
   overflow: hidden;
   transition: background var(--t-mid) var(--e-out);
 }
