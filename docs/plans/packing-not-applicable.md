@@ -591,13 +591,63 @@ function naCell(item, member, memberName, onToggleNa) {
 }
 ```
 
-- [ ] **Step 4: 通ることを確かめる**
+- [ ] **Step 4: 古い挙動を前提にした既存テスト 3 本を直す**
+
+**この 3 本は「編集モードにもチェックボックスがある」ことを前提にしている。**
+挙動を変えると決めたのはこの設計なので、テストのほうを新しい挙動に合わせる
+（2026-08-11、本人の判断）。**消さずに、新しい前提を検査する形に書き換えること。**
+
+1. 「編集モードでは項目名・区分名・メモの入力欄が増える」
+   （`tests/packing-render.test.js`）
+
+   ```js
+   const inputCount = findAll(editing, (n) => n.tagName === "INPUT").length;
+   // 項目名 4 + メモ 4 + 区分名 3 = 11。
+   // **チェックボックスは編集モードには無い**（人ごとの欄は「不要にする」の
+   // トグルになる。plans/packing-not-applicable.md）
+   assert.equal(inputCount, 11);
+   ```
+
+2. 「行の操作ハンドラも個別に省略できる（onToggle などが無くても押せる）」
+
+   チェックボックスは編集モードから消えたので、**通常モードで引く**形に変える:
+
+   ```js
+   renderTable({ mount, data: PACKING, editing: false, handlers: {} });
+   const checkbox = findFirst(mount, (n) => n.tagName === "INPUT" && n.type === "checkbox");
+   assert.doesNotThrow(() => checkbox.dispatch("change"));
+   ```
+
+   あわせて、編集モードのトグルもハンドラ無しで押せることを見る 1 行を足す:
+
+   ```js
+   const editing = make("div");
+   renderTable({ mount: editing, data: PACKING, editing: true, handlers: {} });
+   const pill = findFirst(editing, (n) => n.dataset?.focusKey === "item:passport:na:a");
+   assert.doesNotThrow(() => pill.dispatch("click"));
+   ```
+
+3. 「項目・区分の操作コントロールに data-focus-key が付く（id から作る）」
+
+   `check:a` / `check:b` は編集モードには無くなるので、**`na:a` / `na:b` を
+   見る**形に変える:
+
+   ```js
+   assert.ok(keys.has("item:passport:na:a"), "不要にするボタン(a)にキーが無い");
+   assert.ok(keys.has("item:passport:na:b"), "不要にするボタン(b)にキーが無い");
+   ```
+
+   **`check:a` / `check:b` の検査は消さず、通常モードへ移すこと** ── 通常モードの
+   チェックボックスにフォーカスキーが要るのは変わらない。同じテストの中で
+   `editing: false` の mount を作って確かめる。
+
+- [ ] **Step 5: 通ることを確かめる**
 
 実行: `node --test`
 期待: 全件 PASS。**`tokens.test.js` の色リテラル検査も通ること**
 （`--ink-3` などの変数しか使っていない）
 
-- [ ] **Step 5: コミット**
+- [ ] **Step 6: コミット**
 
 ```bash
 git add assets/js/packing-render.js assets/css/packing.css tests/packing-render.test.js
