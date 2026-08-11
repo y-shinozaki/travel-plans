@@ -150,14 +150,33 @@
 /* 人ごとの欄。ひとつのボタンが 3 段階（ブランク・チェック・不要）を回る
    （packing-render.js の cycleCell）。モードで見た目を変えない
    （plans/packing-not-applicable.md「描画」── 最初の実装はここが
-   モードで分かれていて、書き直した）。 */
+   モードで分かれていて、書き直した）。
+
+   ボタン自身が箱と名前の両方を包む（前の <label class="switch"> と同じ
+   当たり判定）。箱（.pkcycle__box）だけをボタンにすると、押せる範囲が
+   22px 四方に縮み、名前の上に乗った cursor: pointer が何も起きないのに
+   押せるように見えてしまう（レビュー指摘）。border / background / padding を
+   0 にリセットするのは、button の UA 既定（枠・背景・内側の余白）が
+   箱＋名前のレイアウトに余計な隙間を持ち込まないようにするため。
+   cursor: pointer は base.css の `button` 規則がすでに与えている
+   （.tbtn / .rowbtn と同じく、ここで重ねて書かない）。 */
 .pkcycle {
   display: inline-flex;
   align-items: center;
   gap: 12px;
-  cursor: pointer;
+  padding: 0;
+  border: none;
+  background: none;
 }
-.pkcycle span:last-child {
+.pkcycle:focus-visible {
+  outline: 1px solid var(--ink);
+  outline-offset: 2px;
+}
+/* 名前の文字色。**子結合子にすること** ── 子孫セレクタ（.pkcycle span:last-child）
+   だと、箱（.pkcycle__box）の中の「—」の span（箱の最後の子）にもマッチする。
+   直接指定は .pkcycle__box--na からの継承に必ず勝つので、「—」が薄くならない
+   （レビュー指摘）。 */
+.pkcycle > span:last-child {
   font-size: 13px;
   letter-spacing: 0.4px;
   color: var(--ink);
@@ -165,13 +184,17 @@
 /* 3 状態とも同じ 22px 四方にする（controls.css の .check__box を下敷きに
    したサイズ）。大きさが揃っていれば、どの状態の行でも列が自然に揃う ──
    前の実装は「—」だけ細く、その行だけ列がずれた（plans/packing-not-applicable.md）。
-   input ではなく button なので `:checked` セレクタは使えず、状態は
-   class（--checked / --na）で切り替える。 */
+   ここはボタンではなく見た目だけの span（当たり判定はボタン全体 .pkcycle）。
+   padding: 0 を明示しておくのは、この 22px がそのまま中の svg / 「—」の
+   位置決めの基準になるため ── 何らかの理由でここが再び button に戻っても
+   （UA 既定の padding-inline: 6px を持つ）、中身が中央からずれない
+   （レビュー指摘）。状態は class（--checked / --na）で切り替える。 */
 .pkcycle__box {
   display: grid;
   place-items: center;
   width: 22px;
   height: 22px;
+  padding: 0;
   border: 1px solid var(--line);
   border-radius: var(--r-xs);
   color: var(--ink-2);
@@ -179,12 +202,8 @@
   font-size: 13px;
   transition: background var(--t-fast) var(--e-out), border-color var(--t-fast) var(--e-out);
 }
-.pkcycle__box:hover {
+.pkcycle:hover .pkcycle__box {
   border-color: var(--ink);
-}
-.pkcycle__box:focus-visible {
-  outline: 1px solid var(--ink);
-  outline-offset: 2px;
 }
 .pkcycle__box svg {
   width: 13px;

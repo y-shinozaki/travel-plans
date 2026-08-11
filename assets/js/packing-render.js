@@ -81,33 +81,44 @@ export function renderProgress({ mount, data }) {
  * 支援技術には「mixed」としか読まれない（「不要」とは意味が違う）。加えて
  * クリックの既定動作（checked の反転）を毎回止める必要が生まれる。
  *
+ * **ボタンが箱と名前の両方を包む。** 前の `<label class="switch">` と同じ
+ * 当たり判定（箱＋名前）に戻すため ── 箱（.pkcycle__box）だけをボタンにすると
+ * 押せる範囲が 22px 四方に縮み、名前の上に乗った `cursor: pointer` が
+ * 何も起きないのに押せるように見えてしまう（レビュー指摘。38 項目 × 2 人分を
+ * スマートフォンで指で触る画面で 22px は WCAG 2.5.5 の推奨 44px を大きく下回る）。
+ * 箱はここでは見た目だけの `<span aria-hidden>` ── 状態と操作はボタンの
+ * aria-label が言うので、箱の中身を別に読み上げる必要はない。
+ *
  * いまの状態は cycleState()（このファイル内、item の na / a・b から**読むだけ**）
  * が決める。次の状態への**遷移**は packing-data.js の cycleMember() が持つ ──
  * 描画は状態を読んで見た目を出すだけで、遷移の規則を書き写さない。
  *
- * 3 状態とも同じ 22px の四角にする（packing.css の .pkcycle__box）。
- * 大きさが揃っていれば、どの状態の行でも列が自然に揃う。
+ * 3 状態とも箱（.pkcycle__box）は同じ 22px の四角にする（packing.css）。
+ * 大きさが揃っていれば、どの状態の行でも列が自然に揃う ── 当たり判定を
+ * ボタン全体に広げても、この 22px は保つ（列がずれた事故を 2 回踏んでいる）。
  */
 function cycleCell(item, member, memberName, onCycle) {
   const state = cycleState(item, member);
 
-  const wrap = el("span", "pkcycle");
-
-  const button = el("button", `pkcycle__box${state === "blank" ? "" : ` pkcycle__box--${state}`}`);
+  const button = el("button", "pkcycle");
   button.type = "button";
+
+  const box = el("span", `pkcycle__box${state === "blank" ? "" : ` pkcycle__box--${state}`}`);
+  box.setAttribute("aria-hidden", "true"); // 中身の読み上げはボタンの aria-label に任せる
   if (state === "checked") {
-    button.innerHTML = CHECK_MARK; // 定数のみ。値は混ぜない
+    box.innerHTML = CHECK_MARK; // 定数のみ。値は混ぜない
   } else if (state === "na") {
-    button.appendChild(el("span", null, NA_MARK));
+    box.appendChild(el("span", null, NA_MARK));
   }
   // ブランクは枠だけの四角（何も入れない）
+
+  button.appendChild(box);
+  button.appendChild(el("span", null, memberName));
   button.setAttribute("aria-label", cycleLabel(item, memberName, state));
   button.dataset.focusKey = itemFocusKey(item.id, `check:${member}`);
   button.addEventListener("click", () => onCycle?.(item.id, member));
 
-  wrap.appendChild(button);
-  wrap.appendChild(el("span", null, memberName));
-  return wrap;
+  return button;
 }
 
 /** 名前とメモ。編集モードでは入力欄になる（設計書 §7.3「行がそのまま入力欄になる」）。 */

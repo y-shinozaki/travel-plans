@@ -229,12 +229,12 @@ test("読み取りモードには編集専用のボタンが 1 つも無い（�
   const { make } = stubDocument();
   const readOnly = make("div");
   renderTable({ mount: readOnly, data: PACKING, editing: false, handlers: {} });
-  // 人ごとの状態ボタン（pkcycle__box）はモードに関わらず出る、唯一の例外
-  // （plans/packing-not-applicable.md「描画」）。それ以外のボタン（削除・
-  // 並べ替え・追加など）は読み取りモードに 1 つも無いこと
+  // 人ごとの状態ボタン（.pkcycle。箱＋名前を包む当たり判定）はモードに
+  // 関わらず出る、唯一の例外（plans/packing-not-applicable.md「描画」）。
+  // それ以外のボタン（削除・並べ替え・追加など）は読み取りモードに 1 つも無いこと
   const buttons = findAll(
     readOnly,
-    (n) => n.tagName === "BUTTON" && !(n.className ?? "").startsWith("pkcycle__box")
+    (n) => n.tagName === "BUTTON" && n.className !== "pkcycle"
   );
   assert.equal(buttons.length, 0);
 });
@@ -395,17 +395,18 @@ test("チェックの印は icon('i-check') の <use> ではなく生の SVG（s
   assert.ok(!html.includes("#i-check"), "icon('i-check') の <use> 参照が使われています");
 });
 
-test("人ごとの欄は span.pkcycle > (button.pkcycle__box, span) の並び", () => {
+test("人ごとの欄は button.pkcycle > (span.pkcycle__box, span) の並び（当たり判定はボタン全体）", () => {
   const { make } = stubDocument();
   const mount = make("div");
   renderTable({ mount, data: PACKING, editing: false, handlers: {} });
 
   const wrap = findFirst(mount, (n) => n.className === "pkcycle");
-  assert.ok(wrap, "span.pkcycle が見つかりません");
-  assert.equal(wrap.children.length, 2, "ボタンと名前の 2 要素構成ではありません");
-  const [button, name] = wrap.children;
-  assert.equal(button.tagName, "BUTTON", "1 つ目の子が button ではありません");
-  assert.match(button.className, /^pkcycle__box/, "button に pkcycle__box が付いていません");
+  assert.ok(wrap, "button.pkcycle が見つかりません");
+  assert.equal(wrap.tagName, "BUTTON", "外側が button ではありません（当たり判定が箱だけに縮んでいます）");
+  assert.equal(wrap.children.length, 2, "箱と名前の 2 要素構成ではありません");
+  const [box, name] = wrap.children;
+  assert.match(box.className, /^pkcycle__box/, "1 つ目の子に pkcycle__box が付いていません");
+  assert.notEqual(box.tagName, "BUTTON", "箱がボタンのままです（ボタンの中にボタンは作れません）");
   assert.equal(name.tagName, "SPAN", "2 つ目の子が名前の span ではありません");
   assert.equal(name.textContent, "雄一", "名前が入っていません");
 });
@@ -807,9 +808,11 @@ test("ブランクの状態では枠だけの四角（アイコンも「—」�
     (n) => n.tagName === "BUTTON" && n.dataset?.focusKey === "item:i1:check:a"
   );
   assert.ok(button, "人ごとの欄のボタンが見つかりません");
-  assert.equal(button.className, "pkcycle__box", "ブランクに状態のクラスが付いています");
+  assert.equal(button.className, "pkcycle", "外側のボタンに余計な状態クラスが付いています");
   assert.equal(button.attrs["aria-label"], "雄一: カード、未チェック");
-  assert.equal(button.children.length, 0, "ブランクなのに中身があります");
+  const box = button.children[0];
+  assert.equal(box.className, "pkcycle__box", "ブランクに状態のクラスが付いています");
+  assert.equal(box.children.length, 0, "ブランクなのに中身があります");
 });
 
 test("チェック済みの状態ではチェックマークが入り、aria-label がそう言う", () => {
@@ -827,7 +830,8 @@ test("チェック済みの状態ではチェックマークが入り、aria-lab
     mount,
     (n) => n.tagName === "BUTTON" && n.dataset?.focusKey === "item:i1:check:a"
   );
-  assert.equal(button.className, "pkcycle__box pkcycle__box--checked");
+  assert.equal(button.className, "pkcycle");
+  assert.equal(button.children[0].className, "pkcycle__box pkcycle__box--checked");
   assert.equal(button.attrs["aria-label"], "雄一: カード、チェック済み");
   assert.match(htmlSink.join("\n"), /<path d="m4\.5 12\.6 5\.2 5\.2L19\.5 6\.6"\/>/);
 });
@@ -847,7 +851,8 @@ test("不要の状態では「—」が入り、aria-label がそう言う", () 
     mount,
     (n) => n.tagName === "BUTTON" && n.dataset?.focusKey === "item:i1:check:b"
   );
-  assert.equal(button.className, "pkcycle__box pkcycle__box--na");
+  assert.equal(button.className, "pkcycle");
+  assert.equal(button.children[0].className, "pkcycle__box pkcycle__box--na");
   assert.equal(button.attrs["aria-label"], "朱汰: カード、不要");
   assert.ok(textSink.includes("—"), "「—」が textContent に入っていません");
 });
@@ -873,6 +878,9 @@ test("モードで見た目を変えない（通常モードと編集モード�
     return findAll(mount, (n) => n.dataset?.focusKey?.startsWith("item:i1:check:")).map((n) => [
       n.dataset.focusKey,
       n.className,
+      n.children[0]?.className, // 箱（状態）の class もここで見る。
+      // 外側のボタンの class は常に "pkcycle" で状態を持たないので、
+      // これを比べないと「状態が変わっていないこと」を検査できない
       n.attrs["aria-label"],
     ]);
   };
