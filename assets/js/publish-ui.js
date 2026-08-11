@@ -112,14 +112,32 @@ const TOKEN_DELETE_ARMED_LABEL = "もう一度で削除";
  * 書けたら必ず消す（残すと 2 つ目のゴミキーになる）。
  */
 const PROBE_KEY = "write-probe";
-function canPersist(store) {
+
+/**
+ * @param {number} sizeHint 実際に書こうとしている文字数。
+ *   **1 バイトで試すと、容量ぎりぎりの端末ではプローブだけ通って本番の
+ *   書き込みが失敗する**（設計書 §13）。同じくらいの大きさで試せば、
+ *   「書けるはずだったのに書けなかった」の幅が狭まる。
+ *   0 以下や数値でない場合は、これまでどおり最小の書き込みで試す。
+ */
+function canPersist(store, sizeHint = 0) {
+  const value = Number.isFinite(sizeHint) && sizeHint > 0 ? "x".repeat(sizeHint) : 1;
   try {
-    store.write(PROBE_KEY, 1);
+    store.write(PROBE_KEY, value);
     return true;
   } catch {
     return false;
   } finally {
     store.remove(PROBE_KEY);
+  }
+}
+
+/** 保存しようとしている下書きのおおよその文字数。測れなければ 0（＝最小で試す）。 */
+function sizeOf(data) {
+  try {
+    return JSON.stringify(data)?.length ?? 0;
+  } catch {
+    return 0;
   }
 }
 
@@ -155,6 +173,12 @@ function armedButton({ cls, armedCls, iconId, label, armedLabel, onConfirm }) {
     disarm();
     onConfirm();
   });
+  // 離れたら構えを解く。トークン削除ボタンには updatePanel() という解除の経路が
+  // あったが、取り込みボタンには無く、一度押すと「もう一度で取り込む（手元の
+  // 変更は消えます）」の表示のまま戻らなかった（設計書 §13）。押しかけて
+  // やめた人の画面に、押していない警告が残り続けるのは筋が悪い。
+  // 2 度押しは同じボタンを続けて押すので、この解除で妨げられることはない
+  button.addEventListener("blur", disarm);
   return { button, disarm };
 }
 
@@ -183,6 +207,16 @@ export function createPublishUI({ els, store, sync, getData, onAdopt, content })
   }
   if (typeof content.noun !== "string" || !content.noun) {
     throw new Error("publish-ui: content.noun に空でない文字列が必要です");
+  }
+  // sync にも同じ noun が渡っている（createSync の config.noun）。両者を
+  // 結びつける仕組みが無かったので、片方だけ書き換えると同期バーと
+  // ステータスが違う名前を出すページができた ── どちらも例外を投げないので、
+  // テストで拾えなければ誰も気付かない（設計書 §13）。ここで突き合わせる
+  if (typeof sync?.noun === "string" && sync.noun !== content.noun) {
+    throw new Error(
+      `publish-ui: content.noun（${content.noun}）が sync の noun（${sync.noun}）と違います。` +
+        "同じページの中で 2 つの名前が出ることになります"
+    );
   }
   const { validate, noun } = content;
   const MSG = messagesFor(noun);
@@ -408,12 +442,19 @@ export function createPublishUI({ els, store, sync, getData, onAdopt, content })
       // PUT は通っている。ただし控えを書けていないので、ストアから見れば
       // まだ「未公開の変更あり」のまま ── dirty は勝手に下ろさず聞き直す。
       // 状況は文言で説明する
-      setStatus([line(MSG.publishedNotRecorded), line(MSG.cannotPersist)], "warn");
+      const nodes = [line(MSG.publishedNotRecorded), line(MSG.cannotPersist)];
+      // 公開そのものは済んでいるので、コミットへのリンクは出せる。
+      // sync.publish() が例外に載せてくれる（設計書 §13）── 出さないと、
+      // この端末では「本当に公開できたのか」を確かめる手段がリポジトリを
+      // 自分で見に行くことだけになる
+      const link = commitLink(error.commitUrl);
+      if (link) nodes.push(link);
+      setStatus(nodes, "warn");
       return;
     }
 
     if (error instanceof GitHubError && error.status === 409) {
-      if (!canPersist(store)) {
+      if (!canPersist(store, sizeOf(getData()))) {
         setStatus([line(MSG.conflictUnverifiable), line(MSG.cannotPersist)], "error");
         return;
       }
@@ -495,15 +536,28 @@ export function createPublishUI({ els, store, sync, getData, onAdopt, content })
     setStatus([line("取り込んでいます…")], "ok");
 
     let data;
+    // base を書けなかった取り込み。中身は入れ替わっているので画面は進めるが、
+    // 「取り込みました」だけを出すと記録が残っていないことが伝わらない
+    let notRecorded = false;
     try {
       data = await sync.adoptRemote();
     } catch (error) {
       console.error("publish-ui: 取り込みに失敗しました", error);
-      setStatus(
-        [line(MSG.adoptFailed), line(error?.message ?? String(error), true)],
-        "error"
-      );
-      return;
+      // **下書きだけは入れ替わっている場合がある**（storeAdopted は下書き →
+      // base の順に書く）。それを「取り込めませんでした」と言って画面を
+      // 古いまま据え置くと、保存領域にはリモートが入っているのに画面は前の
+      // 内容、という食い違いが残り、次の編集がその古い内容を保存し直して
+      // 取り込みを黙って巻き戻す（設計書 §13）。画面だけは進める
+      if (error.adopted) {
+        notRecorded = true;
+        data = error.adopted;
+      } else {
+        setStatus(
+          [line(MSG.adoptFailed), line(error?.message ?? String(error), true)],
+          "error"
+        );
+        return;
+      }
     } finally {
       setBusy(null);
       refreshDirty();
@@ -513,7 +567,10 @@ export function createPublishUI({ els, store, sync, getData, onAdopt, content })
     // 言わない（下書きはもう入れ替わっているので、それは嘘になる）。
     // 画面の更新の成否は schedule.js の safeDraw が自分の文言で伝える
     hideBar();
-    setStatus([line(MSG.adopted)], "ok");
+    setStatus(
+      notRecorded ? [line(MSG.adopted), line(MSG.cannotPersist)] : [line(MSG.adopted)],
+      notRecorded ? "warn" : "ok"
+    );
     // 押したボタンは hideBar / setStatus で文書から消えている。
     // 戻し先を用意しないとフォーカスが <body> へ落ちる
     focusFallback();

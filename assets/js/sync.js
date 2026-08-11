@@ -140,15 +140,51 @@ export function createSync({
   }
 
   /**
+   * base（最後にリモートと揃えた updatedAt）を保存領域に書けなかったときの控え。
+   *
+   * 保存領域に書けない端末（プライベートブラウジング、容量超過）では base が
+   * 一度も残らないので、assertRemoteNotAhead が毎回「取り込んだ証拠が無い」と
+   * 判断して**公開が必ず 409 になる**。しかもその 409 に添える「取り込んでから
+   * 公開し直す」も同じ理由で成立しない ── 出口の無い袋小路だった（設計書 §13）。
+   *
+   * このセッションの間だけ覚えておけば、少なくとも 2 回目以降の公開は通る。
+   * **保存領域の代わりにはしない**（タブを閉じれば消える）。あくまで
+   * 「さっき自分が公開した／取り込んだ」という、この場限りの記憶。
+   */
+  let sessionBase = null;
+
+  /** base を読む。保存領域が使えない端末ではこのセッションの記憶に落ちる。 */
+  const readBase = () => store.read(baseKey, null) ?? sessionBase;
+
+  /**
    * 取り込みを書き込む。下書き → base の順で書く。
    *
    * 逆にすると、base だけ書けて下書きが書けなかったとき（容量超過など）に
    * 「古い下書きが最新と揃っている」ことになり、リモートの内容が静かに消える。
    * この順なら最悪でも次回に「新しい版があります」が出るだけで済む。
+   *
+   * **順序が非対称なので、失敗の意味も非対称になる。** 下書きで失敗したなら
+   * 何も起きていない。base で失敗したなら**下書きだけは入れ替わっている** ──
+   * 呼び出し側が「取り込めませんでした」と言って画面を古いまま据え置くと、
+   * 保存領域にはリモートが入っているのに画面は前の内容、という食い違いが残り、
+   * 次の編集がその古い内容を保存し直して取り込みを黙って巻き戻す。
+   * それを見分けられるよう、base だけ失敗した場合は draftWritten を立てて投げる。
    */
   function storeAdopted(data) {
+    const stamp = stampOf(data);
+    // **保存より先に覚える。** ここへ来た時点で「この版を採る」判断は済んで
+    // いるので、保存領域に書けたかどうかに関わらず、この端末はその版を
+    // 見ている。書き込みの成否を待つと、1 バイトも書けない端末では
+    // sessionBase が永久に埋まらず、公開が毎回 409 のままになる
+    sessionBase = stamp;
     store.write(draftKey, data);
-    store.write(baseKey, stampOf(data));
+    // ここから先で失敗しても、下書きはもう入れ替わっている
+    try {
+      store.write(baseKey, stamp);
+    } catch (error) {
+      error.draftWritten = true;
+      throw error;
+    }
   }
 
   /**
@@ -204,7 +240,7 @@ export function createSync({
    * 外側が正しい値に上書きされることを利用者に伝えること（Task 9 側の役割）。
    */
   async function load() {
-    const baseUpdatedAt = store.read(baseKey, null);
+    const baseUpdatedAt = readBase();
 
     // 下書きも検証する。壊れたリモートを画面に出さないのに壊れた下書きは出す、
     // では筋が通らない。旅行の日数を減らせば、他の端末に残っている下書きは
@@ -247,7 +283,20 @@ export function createSync({
     if (source === "use-remote") {
       // 未公開の変更が無い（または下書きが無い）ときだけ静かに取り込む。
       // ただし下書きを弾いた場合は書かない。救出できる中身を上書きしてしまう
-      if (!draftRejected) {
+      if (draftRejected) {
+        // **base だけは進める。** 画面に出ているのはリモートそのものなので、
+        // 「このリモートを見た」のは事実。ここを飛ばすと base が古いままになり、
+        // 次の公開が必ず 409 になる ── しかも公開しようとしている中身は
+        // いま表示しているリモートと同じなので、止める理由が無い（設計書 §13）。
+        // 下書きは触らない。救出できる中身はそのまま残す
+        try {
+          const stamp = stampOf(remote);
+          sessionBase = stamp;
+          store.write(baseKey, stamp);
+        } catch (error) {
+          console.warn("sync: base を更新できませんでした", error);
+        }
+      } else {
         try {
           storeAdopted(remote);
         } catch (error) {
@@ -295,7 +344,7 @@ export function createSync({
   function hasUnpublishedChanges() {
     const draft = store.read(draftKey, null);
     if (!isPlainObject(draft)) return false;
-    return stampOf(draft) !== store.read(baseKey, null);
+    return stampOf(draft) !== readBase();
   }
 
   /**
@@ -327,7 +376,16 @@ export function createSync({
   async function adoptRemote() {
     const { data } = await fetchAndDecode();
     validate(data);
-    storeAdopted(data);
+    // base だけ書けなかった場合、下書きはもう入れ替わっている（storeAdopted の
+    // コメント）。ここで投げっぱなしにすると呼び出し側は「取り込めませんでした」と
+    // 出して画面を古いまま据え置き、次の編集がその古い内容を保存し直して
+    // 取り込みを黙って巻き戻す。data を例外に載せて、画面だけは進めさせる
+    try {
+      storeAdopted(data);
+    } catch (error) {
+      if (error.draftWritten) error.adopted = data;
+      throw error;
+    }
     return data;
   }
 
@@ -346,6 +404,34 @@ export function createSync({
    *   という意味で、呼び出し側はそれを利用者に伝えること（console.warn だけだと、
    *   唯一ガードが効いていない場面を誰も知らないまま公開が済んでしまう）。
    */
+  /**
+   * GET した本文が、そもそも中身として使える形かを見る。
+   *
+   * 使えないと分かっている回に限り、突き合わせを飛ばして公開を通すためにある。
+   * **リモートが検証を通らない状態は、409 で塞ぐと出口が無くなる**（設計書 §13）:
+   * 409 の画面が示す唯一の逃げ道（「取り込む」→ adoptRemote）も同じ検証で
+   * 落ちるので、その端末では直せない。手元に正しい下書きを持つ端末が
+   * 上書きで直せるようにする ── events.json の手編集を廃止した以上、
+   * ブラウザから直せる経路はこれしか残っていない（§6.5）。
+   *
+   * 上書きしてよいと判断できるのは「壊れている」と確かめられたときだけ。
+   * 読めて検証も通るリモートは、これまでどおり突き合わせの対象にする。
+   */
+  async function remoteIsUsable(current) {
+    if (current === null) return true; // ファイルがまだ無い
+    try {
+      const { data } = await codec.decode(JSON.parse(current.text));
+      validate(data);
+      return true;
+    } catch (error) {
+      console.warn(
+        `sync: リモートの${noun}が検証を通らないため、公開前の突き合わせを省略します`,
+        error
+      );
+      return false;
+    }
+  }
+
   function assertRemoteNotAhead(current) {
     if (current === null) return true; // ファイルがまだ無い。競合のしようがない
 
@@ -389,7 +475,7 @@ export function createSync({
     }
 
     // base が無い ＝ このリモートを取り込んだ証拠がない。上書きしてよい根拠もない
-    const baseMs = toTime(store.read(baseKey, null));
+    const baseMs = toTime(readBase());
     if (baseMs === null || remoteMs > baseMs) {
       throw new GitHubError(409, CONFLICT_MESSAGE);
     }
@@ -441,7 +527,11 @@ export function createSync({
     const current = await gh.getFile(cfg.path);
     // 送る前に突き合わせる。ここで投げれば PUT は一度も飛ばない。
     // 読むのは封筒の外側の updatedAt なので、暗号化しても無改造で効く（設計書 §6.2）
-    const conflictChecked = assertRemoteNotAhead(current);
+    //
+    // ただしリモートが**中身として壊れている**と分かった回は飛ばす。
+    // 塞ぐと直す手段が無くなるため（remoteIsUsable のコメント）
+    const usable = await remoteIsUsable(current);
+    const conflictChecked = usable ? assertRemoteNotAhead(current) : false;
 
     // ファイルがまだ無ければ sha なしで作成する（getFile は 404 で null を返す）
     const { commitUrl } = await gh.putFile({
@@ -455,9 +545,34 @@ export function createSync({
     // 「公開は済んでいるのに失敗として返る」ことになるが、握ると base が
     // 無いまま同期済みに見えてしまう。呼び出し側が StoreWriteError を
     // 「公開はできた／記録は残せなかった」と読み替える（publish-ui.js）。
-    storeAdopted(stamped);
+    //
+    // **commitUrl を例外に載せる。** 載せないと、控えを書けなかった端末には
+    // コミットへのリンクが一切出せず、「公開できたのか」を確かめる手段が
+    // リポジトリを自分で見に行くことだけになる（設計書 §13）。
+    try {
+      storeAdopted(stamped);
+    } catch (error) {
+      error.commitUrl = commitUrl;
+      error.conflictChecked = conflictChecked;
+      throw error;
+    }
     return { commitUrl, conflictChecked };
   }
 
-  return { load, saveLocal, adoptRemote, publish, hasUnpublishedChanges, readDraft };
+  return {
+    load,
+    saveLocal,
+    adoptRemote,
+    publish,
+    hasUnpublishedChanges,
+    readDraft,
+    /**
+     * 画面の文言に使う名詞。**publish-ui.js が自分の content.noun と
+     * 突き合わせるためにある。** 両者は同じ値を別々に渡されており、
+     * 結びつける仕組みが無かったので、B3 が片方だけ書き換えれば
+     * 同期バーとステータスが違う名前を出すページができた ── どちらも
+     * 例外を投げないので、テストで拾えなければ気付かれない（設計書 §13）。
+     */
+    noun,
+  };
 }
