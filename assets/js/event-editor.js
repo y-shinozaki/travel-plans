@@ -13,7 +13,7 @@
 import { el, escapeHtml } from "./dom.js";
 import { icon } from "./icons.js";
 import { renderEventDetail } from "./sheet.js";
-import { emptyEvent, eventFormHtml, readEventForm, formProblems } from "./event-form.js";
+import { emptyEvent, eventFormHtml, readEventForm, formProblemDetails } from "./event-form.js";
 import { validateEvents, EventDataError } from "./validate.js";
 import { decToHHMM } from "./time.js";
 
@@ -155,11 +155,24 @@ export function createEventEditor({ sheet, bodyEl, getData, commit, fallbackFocu
 
   const errorBox = () => bodyEl.querySelector("#f-error");
 
+  /**
+   * エラー表示を消す。**role と aria-invalid も必ず一緒に消すこと。**
+   *
+   * 以前は className と中身しか消していなかったので、role="alert" が
+   * 空の箱に残り続けた。空の live region は読み上げこそ起こさないが、
+   * 支援技術から見ると「まだ警告の器がそこにある」状態で、次に別の理由で
+   * ここへ文字を入れた瞬間に、消したはずの前の文脈として読まれる。
+   * aria-invalid も同じで、直した欄に付いたままだと「まだ不正」と伝わる。
+   */
   function clearProblems() {
+    for (const node of bodyEl.querySelectorAll("[aria-invalid]")) {
+      node.removeAttribute("aria-invalid");
+    }
     const box = errorBox();
     if (!box) return;
     box.innerHTML = "";
     box.className = "";
+    box.removeAttribute("role");
   }
 
   /** 直すべき点を 1 行ずつ並べる。 */
@@ -250,11 +263,15 @@ export function createEventEditor({ sheet, bodyEl, getData, commit, fallbackFocu
 
     // dayCount は必ず今の days から渡す。控えを持ち回ると、日程を縮めた
     // あとに古い日数で検査してしまう
-    const problems = formProblems(input, data.days.length);
-    const titleField = bodyEl.querySelector("#f-title");
-    if (titleField) titleField.setAttribute("aria-invalid", String(!input.title));
+    const problems = formProblemDetails(input, data.days.length);
     if (problems.length) {
-      showProblems(problems);
+      // 不備のある欄を全部名指しする。以前はタイトル欄にしか付けていなかったので、
+      // 緯度や時刻を直すべき場面で支援技術には「どこが悪いのか」が伝わらなかった
+      for (const { inputId } of problems) {
+        if (!inputId) continue;
+        bodyEl.querySelector(`#${inputId}`)?.setAttribute("aria-invalid", "true");
+      }
+      showProblems(problems.map((p) => p.message));
       return;
     }
 

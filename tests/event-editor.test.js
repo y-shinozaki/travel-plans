@@ -289,11 +289,17 @@ function makeNode(tag = "div") {
     setAttribute(key, value) {
       node.attrs[key] = String(value);
     },
+    removeAttribute(key) {
+      delete node.attrs[key];
+    },
     addEventListener(type, fn) {
       (node.listeners[type] ??= []).push(fn);
     },
     querySelector(sel) {
       return node.children.find((child) => child.tag === sel) ?? null;
+    },
+    querySelectorAll() {
+      return [];
     },
     scrollIntoView() {},
     focus() {
@@ -327,6 +333,12 @@ function makeBody(ev) {
   const body = makeNode("div");
   body.fields = fields;
   body.querySelector = (sel) => fields[sel.replace(/^#/, "")] ?? null;
+  // clearProblems が「いま aria-invalid が付いている欄」を引くのに使う。
+  // 実 DOM の属性セレクタと同じく、付いている要素だけを返す
+  body.querySelectorAll = (sel) =>
+    sel === "[aria-invalid]"
+      ? Object.values(fields).filter((f) => f.attrs["aria-invalid"] != null)
+      : [];
   return body;
 }
 
@@ -493,5 +505,49 @@ test("配線: 新規追加は採番され、削除ボタンを出さない", () 
     for (const key of ["image", "imagePos", "icon"]) {
       assert.equal(Object.hasOwn(added, key), false, `${key} がどこからか付いています`);
     }
+  });
+});
+
+test("不備のある欄すべてに aria-invalid が付き、直すと消える", () => {
+  /*
+   * 以前はタイトル欄にしか付けておらず、緯度や時刻を直すべき場面では
+   * 支援技術に「どこが悪いのか」が伝わらなかった。さらに clearProblems が
+   * role="alert" を残していたので、空の警告の器が居座り続けた（設計書 §13）。
+   */
+  withDom(() => {
+    const data = copyData();
+    const target = data.events.find((ev) => !ev.allDay);
+    const h = mountEditor(data, target);
+
+    h.editor.select(target);
+    fire(h.sheet.opens[0].foot[0]); // 「この予定を編集」
+    const form = h.sheet.opens[1];
+
+    // タイトルを空にし、同じ日の中で終了を開始より前にする（別々の欄の不備を 2 件）
+    h.bodyEl.fields["f-title"].value = "";
+    h.bodyEl.fields["f-sday"].value = "0";
+    h.bodyEl.fields["f-eday"].value = "0";
+    h.bodyEl.fields["f-start"].value = "12:00";
+    h.bodyEl.fields["f-end"].value = "11:00";
+    fire(form.foot[0]); // 保存
+
+    assert.equal(h.commits.length, 0, "不備があるのに保存されています");
+    assert.equal(h.bodyEl.fields["f-title"].attrs["aria-invalid"], "true");
+    assert.equal(
+      h.bodyEl.fields["f-end"].attrs["aria-invalid"],
+      "true",
+      "時刻の不備が終了時刻の欄に伝わっていません（以前はタイトル欄にしか付かなかった）"
+    );
+    assert.equal(h.bodyEl.fields["f-error"].attrs.role, "alert");
+
+    // 直して保存し直すと、印も警告の器も残らない
+    h.bodyEl.fields["f-title"].value = "直した予定";
+    h.bodyEl.fields["f-end"].value = "13:00";
+    fire(form.foot[0]);
+
+    assert.equal(h.commits.length, 1, "直したのに保存されていません");
+    assert.equal(h.bodyEl.fields["f-title"].attrs["aria-invalid"], undefined);
+    assert.equal(h.bodyEl.fields["f-end"].attrs["aria-invalid"], undefined);
+    assert.equal(h.bodyEl.fields["f-error"].attrs.role, undefined, "role=alert が残っています");
   });
 });
