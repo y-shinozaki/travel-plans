@@ -147,6 +147,35 @@
   gap: 14px;
   flex: 0 0 auto;
 }
+/* 編集モードの「不要にする」。**四角いチェックと見た目を変えるのが目的**なので、
+   ピルにする（同じ四角が意味だけ変えると取り違えが起きる。設計書 §13 と
+   plans/packing-not-applicable.md） */
+.napill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 10px;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+.napill:hover {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+/* 不要になっている側。枠を濃くして、押せば戻ることを見た目で示す */
+.napill--off {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+/* 通常モードの「—」。押せないので枠は持たせない */
+.pkitem__na {
+  color: var(--ink-3);
+  font-size: 12px;
+}
 .pkitem__acts {
   display: flex;
   gap: 2px;

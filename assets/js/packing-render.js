@@ -84,6 +84,42 @@ function checkCell(item, member, memberName, onToggle) {
   return label;
 }
 
+/** 不要の印。押せないことが分かるよう、ボタンにしない。 */
+const NA_MARK = "—";
+
+/**
+ * 通常モードで、その人に不要な項目の欄。読むだけ。
+ * チェックボックスを出さないのは、押せてしまうと「不要なのにチェックが付く」
+ * 状態を作れるため（進捗からは外れているので、画面と数字が食い違う）。
+ */
+function naMark(item, memberName) {
+  const cell = el("span", "pkitem__na", NA_MARK);
+  cell.setAttribute("aria-label", `${memberName}には不要: ${item.name}`);
+  return cell;
+}
+
+/**
+ * 編集モードの人ごとの欄。「その人には不要」を切り替える。
+ *
+ * **チェックボックスとは見た目を変えること。** 同じ四角が、モードによって
+ * 「詰めたか」と「要るか」を切り替えると、取り違えが進捗の分母を動かす ──
+ * 画面を見ただけでは気付けない壊れ方になる（plans/packing-not-applicable.md）。
+ */
+function naCell(item, member, memberName, onToggleNa) {
+  const notNeeded = item.na?.includes(member) === true;
+  const button = el("button", notNeeded ? "napill napill--off" : "napill");
+  button.type = "button";
+  // 文字は textContent で入れる。値は innerHTML に混ぜない
+  button.appendChild(el("span", null, notNeeded ? NA_MARK : "不要にする"));
+  button.setAttribute(
+    "aria-label",
+    notNeeded ? `${memberName}に戻す: ${item.name}` : `${memberName}には不要にする: ${item.name}`
+  );
+  button.dataset.focusKey = itemFocusKey(item.id, `na:${member}`);
+  button.addEventListener("click", () => onToggleNa?.(item.id, member, !notNeeded));
+  return button;
+}
+
 /** 名前とメモ。編集モードでは入力欄になる（設計書 §7.3「行がそのまま入力欄になる」）。 */
 function itemBody(item, editing, onRename) {
   const body = el("div", "pkitem__body");
@@ -181,7 +217,15 @@ function itemRow(item, data, editing, handlers) {
 
   const checks = el("div", "pkitem__checks");
   for (const member of ["a", "b"]) {
-    checks.appendChild(checkCell(item, member, data.members[member], handlers.onToggle));
+    const memberName = data.members[member];
+    if (editing) {
+      // 編集モードでは「要るかどうか」を切り替える。チェックは通常モードで付ける
+      checks.appendChild(naCell(item, member, memberName, handlers.onToggleNa));
+    } else if (item.na?.includes(member)) {
+      checks.appendChild(naMark(item, memberName));
+    } else {
+      checks.appendChild(checkCell(item, member, memberName, handlers.onToggle));
+    }
   }
   row.appendChild(checks);
 
