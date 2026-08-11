@@ -30,7 +30,7 @@ import {
   withoutGroup,
   withItem,
   withoutItem,
-  withNa,
+  cycleMember,
   moveItem,
   moveGroup,
 } from "./packing-data.js";
@@ -188,15 +188,16 @@ function apply(next, focusKeyOverride) {
 }
 
 const handlers = {
-  onToggle(itemId, member, checked) {
+  /**
+   * 人ごとの欄をひとつ先の状態へ進める（ブランク → チェック → 不要 → …）。
+   * 遷移の規則は packing-data.js の cycleMember() 1 か所だけが持つ。
+   * onToggle / onToggleNa の 2 つを 1 つに束ねたのは、cycleCell() が
+   * モードに関わらず同じボタンだから（packing-render.js）。
+   */
+  onCycle(itemId, member) {
     const item = state.data.groups.flatMap((g) => g.items).find((i) => i.id === itemId);
     if (!item) return;
-    apply(withItem(state.data, null, { ...item, [member]: checked }));
-  },
-  onToggleNa(itemId, member, notNeeded) {
-    const item = state.data.groups.flatMap((g) => g.items).find((i) => i.id === itemId);
-    if (!item) return;
-    apply(withItem(state.data, null, withNa(item, member, notNeeded)));
+    apply(withItem(state.data, null, cycleMember(item, member)));
   },
   onRenameItem(itemId, patch) {
     const item = state.data.groups.flatMap((g) => g.items).find((i) => i.id === itemId);
