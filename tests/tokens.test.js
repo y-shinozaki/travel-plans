@@ -1,11 +1,25 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { CAT_META } from "../assets/js/categories.js";
 
 const css = readFileSync(new URL("../assets/css/tokens.css", import.meta.url), "utf8");
 const readCss = (name) =>
   readFileSync(new URL(`../assets/css/${name}`, import.meta.url), "utf8");
+
+/**
+ * 色リテラル検査の対象。**ディレクトリを読んで導く。書き写さないこと。**
+ *
+ * ここが手書きの配列だったころは、CSS ファイルを足すたびに追加を忘れる余地が
+ * あり（実際 packing.css も souvenirs.css も後から足した）、忘れても検査は
+ * 何も言わずに素通りした。走査にすれば、次に足すファイルは黙って対象に入る。
+ *
+ * tokens.css だけは除く ── 色の実体を書く唯一の場所で、ここに 16 進が
+ * 並んでいるのが正しい。
+ */
+const COLOR_CHECKED = readdirSync(new URL("../assets/css/", import.meta.url))
+  .filter((name) => name.endsWith(".css") && name !== "tokens.css")
+  .sort();
 
 function readTokens(src) {
   const map = new Map();
@@ -192,12 +206,20 @@ test("半透明用のチャンネルトークンが元の色と一致する", ()
   }
 });
 
+test("色リテラル検査の対象がディレクトリから取れている（空回りしていない）", () => {
+  // 走査が壊れて 0 件になると、下の検査はループ 0 回で素通りする。
+  assert.ok(
+    COLOR_CHECKED.length >= 5,
+    `対象の CSS が ${COLOR_CHECKED.length} 件しか取れていません: ${COLOR_CHECKED.join(", ")}`
+  );
+  assert.ok(!COLOR_CHECKED.includes("tokens.css"), "tokens.css を対象から外せていません");
+});
+
 test("tokens.css 以外の CSS に色リテラルを書かない", () => {
   // 「色は tokens.css だけ」は 4 つのドキュメントが宣言している約束。
   // スプライト側には icons.test.js の同種のガードがあるが、
   // CSS 側には無かったので 4 箇所すり抜けていた。
-  const files = ["base.css", "controls.css", "calendar.css", "packing.css", "souvenirs.css"];
-  for (const name of files) {
+  for (const name of COLOR_CHECKED) {
     // コメント中の例示や出典メモは対象外
     const src = readCss(name).replace(/\/\*[\s\S]*?\*\//g, "");
     assert.doesNotMatch(src, /#[0-9a-fA-F]{3,8}\b/, `${name}: 16進の色リテラルがあります`);
@@ -207,6 +229,57 @@ test("tokens.css 以外の CSS に色リテラルを書かない", () => {
       /\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\(\s*[\d.]/,
       `${name}: 数値を直接書いた色関数があります`
     );
+  }
+});
+
+/**
+ * CSS の名前付き色。`red` や `white` は 16 進でも色関数でもないので、
+ * 上の検査を素通りする（設計書 §13 の「小さいもの」）。
+ *
+ * transparent / currentColor と、値ではないキーワード（inherit など）は
+ * 色の実体を持ち込まないので対象外。
+ */
+const NAMED_COLORS = [
+  "aliceblue", "antiquewhite", "aqua", "aquamarine", "azure", "beige", "bisque",
+  "black", "blanchedalmond", "blue", "blueviolet", "brown", "burlywood", "cadetblue",
+  "chartreuse", "chocolate", "coral", "cornflowerblue", "cornsilk", "crimson", "cyan",
+  "darkblue", "darkcyan", "darkgoldenrod", "darkgray", "darkgreen", "darkgrey",
+  "darkkhaki", "darkmagenta", "darkolivegreen", "darkorange", "darkorchid", "darkred",
+  "darksalmon", "darkseagreen", "darkslateblue", "darkslategray", "darkslategrey",
+  "darkturquoise", "darkviolet", "deeppink", "deepskyblue", "dimgray", "dimgrey",
+  "dodgerblue", "firebrick", "floralwhite", "forestgreen", "fuchsia", "gainsboro",
+  "ghostwhite", "gold", "goldenrod", "gray", "green", "greenyellow", "grey", "honeydew",
+  "hotpink", "indianred", "indigo", "ivory", "khaki", "lavender", "lavenderblush",
+  "lawngreen", "lemonchiffon", "lightblue", "lightcoral", "lightcyan", "lightgray",
+  "lightgreen", "lightgrey", "lightpink", "lightsalmon", "lightseagreen", "lightskyblue",
+  "lightslategray", "lightslategrey", "lightsteelblue", "lightyellow", "lime",
+  "limegreen", "linen", "magenta", "maroon", "mediumaquamarine", "mediumblue",
+  "mediumorchid", "mediumpurple", "mediumseagreen", "mediumslateblue",
+  "mediumspringgreen", "mediumturquoise", "mediumvioletred", "midnightblue", "mintcream",
+  "mistyrose", "moccasin", "navajowhite", "navy", "oldlace", "olive", "olivedrab",
+  "orange", "orangered", "orchid", "palegoldenrod", "palegreen", "paleturquoise",
+  "palevioletred", "papayawhip", "peachpuff", "peru", "pink", "plum", "powderblue",
+  "purple", "rebeccapurple", "red", "rosybrown", "royalblue", "saddlebrown", "salmon",
+  "sandybrown", "seagreen", "seashell", "sienna", "silver", "skyblue", "slateblue",
+  "slategray", "slategrey", "snow", "springgreen", "steelblue", "tan", "teal", "thistle",
+  "tomato", "turquoise", "violet", "wheat", "white", "whitesmoke", "yellow",
+  "yellowgreen",
+];
+
+test("tokens.css 以外の CSS に名前付き色を書かない", () => {
+  // 値の位置に現れたものだけを見る。セレクタやカスタムプロパティ名
+  // （--c-food など）に色の名前が入るのは構わない。
+  const named = new RegExp(`\\b(?:${NAMED_COLORS.join("|")})\\b`, "i");
+  for (const name of COLOR_CHECKED) {
+    const src = readCss(name).replace(/\/\*[\s\S]*?\*\//g, "");
+    for (const decl of src.matchAll(/(?:^|[;{])\s*([a-z-]+)\s*:\s*([^;{}]+)/g)) {
+      const [, prop, value] = decl;
+      const hit = named.exec(value);
+      assert.ok(
+        !hit,
+        `${name}: ${prop} に名前付き色 "${hit?.[0]}" があります（tokens.css の変数を使うこと）`
+      );
+    }
   }
 });
 

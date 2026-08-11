@@ -63,14 +63,50 @@ test("archive.html は残っていない", () => {
 });
 
 test("地図タイルとフォントの取得元が許可されている", () => {
-  const csp = cspOf(read("schedule.html"));
-  // img-src は https: のワイルドカードで許可している（旅程データが複数の
-  // 外部ホストから画像を直リンクしているため。設計書 §13 の負債）。
-  // ホスト名を列挙する形に変えたなら、その並びに CartoDB が入っていること。
-  const img = directive(csp, "img-src");
-  assert.ok(
-    img?.includes("https:") || img?.some((s) => s.includes("cartocdn.com")),
-    `img-src が地図タイルを許可していません: ${img?.join(" ")}`
-  );
-  assert.ok(directive(csp, "font-src")?.some((s) => s.includes("fonts.gstatic.com")));
+  // 以前は schedule.html しか見ていなかった（設計書 §13 のテストの穴）。
+  // 地図は schedule だけだが、フォントは 4 ページとも読み込んでいるので
+  // どのページで欠けても字が出ない。全ページを見る。
+  for (const page of PAGES) {
+    const csp = cspOf(read(page));
+    // img-src は https: のワイルドカードで許可している（旅程データが複数の
+    // 外部ホストから画像を直リンクしているため。設計書 §13 の負債）。
+    // ホスト名を列挙する形に変えたなら、その並びに CartoDB が入っていること。
+    const img = directive(csp, "img-src");
+    assert.ok(
+      img?.includes("https:") || img?.some((s) => s.includes("cartocdn.com")),
+      `${page}: img-src が地図タイルを許可していません: ${img?.join(" ")}`
+    );
+    assert.ok(
+      directive(csp, "font-src")?.some((s) => s.includes("fonts.gstatic.com")),
+      `${page}: font-src が fonts.gstatic.com を許可していません`
+    );
+  }
+});
+
+test("4 ページの CSP が完全に同一である", () => {
+  /*
+   * ページごとの個別検査（script-src / connect-src / img-src / font-src）は
+   * 「そのディレクティブがあるか」しか見ない。**あとから 1 ページにだけ
+   * 緩い指定が足された場合、そのページだけ通ってしまう** ── 例えば
+   * packing.html の style-src にだけホストを足しても、他のどの検査も落ちない。
+   *
+   * 4 ページの CSP は同一である、というのが実際の約束（CLAUDE.md
+   * 「Content-Security-Policy」）なので、その約束をそのまま見る。
+   * 意図してページごとに変えるなら、この検査を消すのではなく
+   * 「どう違ってよいか」に書き換えること。
+   */
+  const normalize = (csp) =>
+    csp
+      .split(";")
+      .map((s) => s.trim().replace(/\s+/g, " "))
+      .filter(Boolean)
+      .sort()
+      .join("; ");
+
+  const [first, ...rest] = PAGES;
+  const expected = normalize(cspOf(read(first)));
+  assert.ok(expected.length > 0, `${first} の CSP が空です`);
+  for (const page of rest) {
+    assert.equal(normalize(cspOf(read(page))), expected, `${page} の CSP が ${first} と違います`);
+  }
 });

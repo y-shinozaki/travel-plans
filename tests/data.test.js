@@ -23,7 +23,7 @@
  */
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { expandEvents, collectLocations, hasCoords } from "../assets/js/events.js";
 import { assignLanes } from "../assets/js/lanes.js";
 import { validateEvents } from "../assets/js/validate.js";
@@ -31,27 +31,80 @@ import { timeLabel } from "../assets/js/time.js";
 import { isEnvelope } from "../assets/js/crypto.js";
 import { ITINERARY as data } from "./fixtures/itinerary.js";
 
-const publishedText = readFileSync(
-  new URL("../assets/data/events.json", import.meta.url),
-  "utf8"
-);
+/**
+ * 同期する JSON。**ここも書き写しではなくディレクトリから導く** ── B3 が
+ * comments.json を足したときに、検査の対象から漏れないようにするため。
+ */
+const DATA_DIR = new URL("../assets/data/", import.meta.url);
+const SYNCED = readdirSync(DATA_DIR)
+  .filter((name) => name.endsWith(".json"))
+  .sort()
+  .map((name) => ({ name, text: readFileSync(new URL(name, DATA_DIR), "utf8") }));
 
-test("公開されている events.json は封筒になっている", () => {
-  const raw = JSON.parse(publishedText);
-  assert.equal(isEnvelope(raw), true, "暗号化されないまま公開されています");
-  // 外側の updatedAt は突き合わせ（assertRemoteNotAhead）が復号せずに読む。
-  // これが消えると B1 の競合検出が黙って効かなくなる
-  assert.equal(typeof raw.updatedAt, "string");
-  assert.equal(typeof raw.kdf.salt, "string");
-  assert.equal(typeof raw.kdf.iter, "number");
-  assert.equal(typeof raw.iv, "string");
+const publishedText = SYNCED.find((f) => f.name === "events.json").text;
+
+test("同期する JSON がディレクトリから取れている（空回りしていない）", () => {
+  const names = SYNCED.map((f) => f.name);
+  assert.ok(names.includes("events.json"), `events.json が対象に入っていません: ${names}`);
+  assert.ok(SYNCED.length >= 3, `同期する JSON が ${SYNCED.length} 件しか取れていません`);
 });
 
-test("封筒に旅程の中身が漏れていない", () => {
+test("公開されている JSON はすべて封筒になっている", () => {
+  for (const { name, text } of SYNCED) {
+    const raw = JSON.parse(text);
+    assert.equal(isEnvelope(raw), true, `${name}: 暗号化されないまま公開されています`);
+    // 外側の updatedAt は突き合わせ（assertRemoteNotAhead）が復号せずに読む。
+    // これが消えると B1 の競合検出が黙って効かなくなる
+    assert.equal(typeof raw.updatedAt, "string", `${name}: updatedAt`);
+    assert.ok(!Number.isNaN(Date.parse(raw.updatedAt)), `${name}: updatedAt が時刻として読めません`);
+    assert.equal(typeof raw.kdf.salt, "string", `${name}: kdf.salt`);
+    assert.equal(typeof raw.kdf.iter, "number", `${name}: kdf.iter`);
+    assert.equal(typeof raw.iv, "string", `${name}: iv`);
+  }
+});
+
+test("同期する JSON はソルトと反復回数を共有している", () => {
+  /*
+   * ファイルごとにソルトが違うと、ページを移動するたびに PBKDF2 が
+   * 600,000 回走り直す（設計書 §6.3）。鍵は tp:key に 1 つしか置かないので、
+   * ソルトが割れた瞬間にどれかのページが復号できなくなる。
+   *
+   * **中身を読めなくても、この不変条件だけは機械的に見張れる。** B4 で
+   * 実データの検査能力を失ったが、封筒の外側について言えることは残っている。
+   */
+  const kdfs = SYNCED.map(({ name, text }) => ({ name, kdf: JSON.parse(text).kdf }));
+  const [first, ...rest] = kdfs;
+  for (const { name, kdf } of rest) {
+    assert.equal(kdf.salt, first.kdf.salt, `${name} のソルトが ${first.name} と違います`);
+    assert.equal(kdf.iter, first.kdf.iter, `${name} の反復回数が ${first.name} と違います`);
+  }
+  assert.ok(
+    first.kdf.iter >= 600000,
+    `反復回数が ${first.kdf.iter} まで下がっています（600,000 を下限とする設計）`
+  );
+});
+
+test("同期する JSON が IV を使い回していない", () => {
+  // 同じ鍵で IV を再利用すると AES-GCM は平文が復元できるところまで壊れる。
+  // ソルトを共有する＝鍵が同一なので、ファイル間でも IV は必ず違うこと。
+  const seen = new Map();
+  for (const { name, text } of SYNCED) {
+    const { iv } = JSON.parse(text);
+    assert.ok(!seen.has(iv), `${name} の IV が ${seen.get(iv)} と同じです`);
+    seen.set(iv, name);
+  }
+});
+
+test("封筒に中身が漏れていない", () => {
   // 暗号文の外に出てよいのは updatedAt と kdf / iv だけ。
-  // 実際の行き先・人名がここに現れたら、暗号化の意味が無い
-  for (const word of ["スワンナプーム", "パタヤ", "バンコク", "ホテル", "依田", "篠崎", "cat-move"]) {
-    assert.ok(!publishedText.includes(word), `${word} が暗号文の外に出ています`);
+  // 実際の行き先・人名がここに現れたら、暗号化の意味が無い。
+  // 3 ファイルとも見る（お土産には店名と贈り先、持ち物には人名が入る）
+  const WORDS = ["スワンナプーム", "パタヤ", "バンコク", "ホテル", "依田", "篠崎",
+                 "cat-move", "恵美", "スターバックス", "パスポート"];
+  for (const { name, text } of SYNCED) {
+    for (const word of WORDS) {
+      assert.ok(!text.includes(word), `${name}: ${word} が暗号文の外に出ています`);
+    }
   }
 });
 
