@@ -651,7 +651,12 @@ test("リモートの updatedAt が読めないときは突き合わせを省い
   const { result, seen } = await captureConsole(() => sync.publish(data));
   assert.equal(fetchImpl.calls.length, 2);
   assert.equal(fetchImpl.calls[1].method, "PUT");
-  assert.equal(seen.length, 1);
+  // 黙って通さない。件数は数えない ── 判断の段階が増えるたびに数がずれて、
+  // テストが別のものを試し始める
+  assert.ok(
+    seen.some((line) => line.includes("突き合わせを省略します")),
+    `省略したことが console に出ていません: ${seen.join(" / ")}`
+  );
   // console.warn だけでは、唯一ガードが効いていない場面を誰も知らないまま
   // 公開が済んでしまう。画面に出せるよう戻り値でも伝えること
   assert.equal(result.conflictChecked, false, "省略した事実が返っていません");
@@ -1390,5 +1395,40 @@ test("指紋をまだ持たない端末は、これまでどおり updatedAt で
     });
     const result = await sync.publish(plan(FIXED_ISO));
     assert.equal(result.conflictChecked, true);
+  });
+});
+
+test("復号できないリモートは「壊れている」扱いにせず、上書きも通さない", async () => {
+  /*
+   * 「読めない」と「読めたが壊れている」を一緒くたにすると、**合言葉が違って
+   * 復号できないだけのリモートを上書きしてしまう** ── 中身が読めないのだから
+   * 壊れているかを判断する材料が無く、上書きしてよい根拠も無い。
+   * この端末に読めないデータを消すのが一番まずい壊れ方（PR #13 の自己レビューで発見）。
+   */
+  await captureConsole(async () => {
+    const codec = {
+      // 復号できない（別の合言葉で暗号化されている）
+      decode: async () => {
+        throw new DecryptError("wrong-key");
+      },
+      encode: async (data) => ({ updatedAt: data.updatedAt, ct: "xxx" }),
+    };
+    const store = createStore(
+      memoryBackend({ ...WITH_TOKEN, [BASE_KEY]: JSON.stringify(REMOTE_STAMP) })
+    );
+    // リモートは base より進んでいる（＝突き合わせが効けば 409 になる条件）
+    const ahead = { updatedAt: "2026-08-09T11:00:00.000Z", ct: "yyy" };
+    const fetchImpl = fakeFetch((url, init) =>
+      init?.method === "PUT"
+        ? OK_PUT()
+        : jsonResponse(200, { sha: "old-sha", content: toBase64Utf8(JSON.stringify(ahead)) })
+    );
+    const sync = createSync({ store, fetchImpl, config: { ...CONFIG, codec }, now });
+
+    await assert.rejects(
+      sync.publish(plan(FIXED_ISO)),
+      (error) => error.status === 409,
+      "復号できないリモートを上書きしています"
+    );
   });
 });

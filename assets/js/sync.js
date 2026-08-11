@@ -462,11 +462,28 @@ export function createSync({
    */
   async function remoteIsUsable(current) {
     if (current === null) return true; // ファイルがまだ無い
+
+    // **「読めない」と「読めたが壊れている」を必ず分けること。**
+    //
+    // 一緒くたにすると、合言葉が違って復号できないだけのリモートを
+    // 「壊れている」と判定し、突き合わせを飛ばして**上書きしてしまう** ──
+    // その中身はこの端末には読めないのだから、壊れているかどうか判断する
+    // 材料が無い。上書きしてよい根拠が無い場面で上書きするのが一番まずい。
+    let data;
     try {
-      const { data } = await codec.decode(JSON.parse(current.text));
+      ({ data } = await codec.decode(JSON.parse(current.text)));
+    } catch (error) {
+      // 復号できない・JSON として読めない。判断材料が無いので「分からない」を返し、
+      // これまでどおり updatedAt の突き合わせに任せる（封筒の外側は読める）
+      console.warn(`sync: リモートの${noun}を読めないため、壊れているかは判断しません`, error);
+      return null;
+    }
+
+    try {
       validate(data);
       return true;
     } catch (error) {
+      // 復号はできて、中身が検証に落ちた。これは確かに壊れている
       console.warn(
         `sync: リモートの${noun}が検証を通らないため、公開前の突き合わせを省略します`,
         error
@@ -594,7 +611,10 @@ export function createSync({
     // ずれていても他の端末の公開を黙って上書きしない（設計書 §13 の残存リスク）
     const usable = await remoteIsUsable(current);
     let conflictChecked;
-    if (!usable) {
+    if (usable === false) {
+      // 壊れていると確かめられた回だけ、見張りを外して上書きを通す。
+      // **null（読めなかった）はここに入れないこと** ── 合言葉が違うだけの
+      // リモートを上書きしてしまう
       conflictChecked = false;
     } else {
       const matches = remoteMatchesFingerprint(current);
