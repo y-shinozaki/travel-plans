@@ -41,8 +41,14 @@ const CARDS = [
   },
 ];
 
+/**
+ * カード 1 枚。**li で包む**（親は下の menu__grid が ul にしてある）。
+ * 支援技術に「3 つある中の 1 つ目」と伝わるかどうかの差で、包まないと
+ * ただのリンクが 3 つ並んでいるだけに読まれる（設計書 §13）。
+ */
 function cardHtml(card, index) {
   return `
+  <li class="menu__item">
   <a class="card reveal" href="${card.href}" style="--d:${(index * 0.12).toFixed(2)}s">
     <div class="card__img">
       <img src="${card.image}" alt="" loading="lazy">
@@ -53,7 +59,8 @@ function cardHtml(card, index) {
       <p class="micro">${card.desc}</p>
       <span class="swipe card__arrow">開く ${icon("i-arrow-right", "ico--sm")}</span>
     </div>
-  </a>`;
+  </a>
+  </li>`;
 }
 
 /** id で引いた要素が無ければ、そこで名前を挙げて止める（null に代入して静かに壊れない）。 */

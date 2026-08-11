@@ -332,7 +332,12 @@ button {
   flex-wrap: wrap;
   padding-bottom: var(--s6);
 }
+/* ul にしてあるのは、カードが「3 つのうちの 1 つ」だと支援技術に伝わるため
+   （設計書 §13）。リストの記号と既定の余白は要らないので落とす */
 .menu__grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 1px;
@@ -341,10 +346,18 @@ button {
   border-radius: var(--r-lg);
   overflow: hidden;
 }
+/* グリッドの升目は li のほうになった。カードが升目いっぱいに伸びないと、
+   1 枚だけ説明文が短いときに背景の高さが揃わず、間の 1px の罫線が途切れる。
+   display: contents で li を無いことにする手もあるが、それだと**リストで
+   ある**という、いま足したばかりの情報が一部のブラウザで落ちる */
+.menu__item {
+  display: flex;
+}
 .card {
   position: relative;
   background: var(--sand-lt);
   display: block;
+  width: 100%;
   overflow: hidden;
   transition: background var(--t-mid) var(--e-out);
 }

@@ -438,6 +438,12 @@ export function createPublishUI({ els, store, sync, getData, onAdopt, content })
   function showPublishFailure(error) {
     console.error("publish-ui: 公開に失敗しました", error);
 
+    // dirty をここで聞き直す。以前は呼び出し側（doPublish）の finally だけが
+    // やっており、**この関数を別の場所から呼ぶと表示だけが取り残される**という
+    // 暗黙の結合になっていた（設計書 §13）。setDirty は値が同じなら何もしないので、
+    // finally と二重に呼ばれても描き直しは 1 回で済む
+    refreshDirty();
+
     if (error instanceof StoreWriteError) {
       // PUT は通っている。ただし控えを書けていないので、ストアから見れば
       // まだ「未公開の変更あり」のまま ── dirty は勝手に下ろさず聞き直す。

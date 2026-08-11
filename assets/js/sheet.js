@@ -118,22 +118,36 @@ function dayRangeLabel(ev, days) {
     : `${escapeHtml(from.date)}（${escapeHtml(from.dow)}）`;
 }
 
+/**
+ * object-position に載せてよい値だけを通す。通らなければ "center"。
+ *
+ * **escapeHtml() ではここを守れない。** 変換するのは属性から抜け出す 5 文字
+ * （& < > " '）だけで、`;` も CSS の関数記法も素通りする ── 引用符が消える以上
+ * タグからは抜け出せないが、**宣言は増やせる**（`top; position:fixed` のような形で、
+ * シートの外にまで被さる要素を作れる）。style-src には Leaflet のために
+ * 'unsafe-inline' が要るので、CSP も止めてくれない（設計書 §13）。
+ *
+ * 通すのは object-position が実際に取る形だけ ── キーワード（center / top /
+ * bottom / left / right）と、長さ／パーセント（12px, 30%, -1.5em …）を
+ * 1〜2 個並べたもの。ここに関数記法（calc など）を足すなら、括弧の中まで
+ * 見る必要があることに注意すること。
+ *
+ * 今は到達しない経路（imagePos の入力欄はフォームに無い）だが、**入力欄を
+ * 足した瞬間に生きた経路になる**ので、足す前に検証を置いておく。
+ */
+const POSITION_TOKEN = /^(?:center|top|bottom|left|right|-?\d+(?:\.\d+)?(?:px|%|em|rem|vw|vh))$/;
+
+export function safeObjectPosition(value) {
+  if (typeof value !== "string") return "center";
+  const tokens = value.trim().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0 || tokens.length > 2) return "center";
+  return tokens.every((t) => POSITION_TOKEN.test(t)) ? tokens.join(" ") : "center";
+}
+
 export function renderEventDetail(ev, days) {
-  // ⚠ imagePos を style 属性へ差し込んでいる。escapeHtml() は属性から抜け出す
-  // 5 文字（& < > " '）しか変換しないので、`;` も CSS の関数記法もそのまま通る。
-  // 引用符が消える以上タグからは抜け出せないが、宣言は増やせる（`top; position:fixed`
-  // のような形で、シートの外にまで被さる要素を作れる）。style-src に
-  // 'unsafe-inline' が要る（Leaflet のため）ので CSP も止めない。
-  //
-  // 今は届かない。imagePos の入力欄はフォームに無く（event-form.js）、
-  // 値は events.json を手で書いた分しか存在しない。ただし全 40 件がこのキーを
-  // 持っているので、B2 で画像位置の入力欄を足した瞬間に生きた経路になる。
-  // **入力欄を足すなら、先に imagePos を許可リストで検証すること**
-  // （object-position が実際に取る形 ── キーワードと長さ／パーセントだけ）。
-  // escapeHtml() を足しても防げない。設計書 §13 に項目がある。
   const image = ev.image
     ? `<img class="sheet__img" src="${escapeHtml(ev.image)}" alt=""
-         style="object-position:${escapeHtml(ev.imagePos || "center")}">`
+         style="object-position:${safeObjectPosition(ev.imagePos)}">`
     : "";
 
   // 許可リストを通らなかった URL は、行ごと消さずに素のテキストとして出す。
