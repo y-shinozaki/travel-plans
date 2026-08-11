@@ -19,6 +19,7 @@ import { validateEvents } from "./validate.js";
 import { readToken } from "./token.js";
 import { passthroughCodec, DecryptError } from "./crypto.js";
 import { isPlainObject } from "./plain-object.js";
+import { fingerprint } from "./fingerprint.js";
 
 /**
  * 公開先と、ファイルごとに違う 6 つ。ここ以外に owner / repo / branch / path を書かないこと。
@@ -122,7 +123,11 @@ export function createSync({
       throw error;
     }
     try {
-      return await response.json();
+      // JSON だけでなく元のテキストも返す。指紋（fingerprint.js）は
+      // **配信されたバイト列そのもの**から作らないと、Contents API 経由で
+      // 取った本文との突き合わせがずれる
+      const text = await response.text();
+      return { data: JSON.parse(text), text };
     } catch (error) {
       throw new Error(`最新の${noun}データを JSON として読めませんでした`, { cause: error });
     }
@@ -136,7 +141,8 @@ export function createSync({
    * 直し方が違うので、呼び出し側が reason を見て文言を分ける（設計書 §9）。
    */
   async function fetchAndDecode() {
-    return codec.decode(await fetchRemote());
+    const { data, text } = await fetchRemote();
+    return { ...(await codec.decode(data)), text };
   }
 
   /**
@@ -157,6 +163,37 @@ export function createSync({
   const readBase = () => store.read(baseKey, null) ?? sessionBase;
 
   /**
+   * 指紋の置き場所。**時計を見ない競合検出のための、base の相棒。**
+   *
+   * base（updatedAt）は公開した端末の時計で押されるので、端末間で時計が
+   * ずれていると順序が保たれず、あとから公開した版が「古い」と読まれて
+   * 黙って上書きされる（設計書 §13 の残存リスク）。指紋は「同じ内容か
+   * 違う内容か」しか答えないが、競合検出に要るのはそれで、時計を一切見ない。
+   *
+   * **base を置き換えるのではなく、足す。** 指紋では新旧が分からないので、
+   * 起動時の判断（decideSync）は updatedAt のままにしてある。そちらまで
+   * 一度に変えると、いま動いている 5 台の端末の同期の意味が変わる。
+   *
+   * 指紋がまだ無い端末（この変更より前から使っている端末）では、これまで
+   * どおり updatedAt の突き合わせに落ちる ── 移行のために 1 度だけ通る経路。
+   */
+  const fpKey = `${draftKey}-fp`;
+  let sessionFp = null;
+  const readFp = () => store.read(fpKey, null) ?? sessionFp;
+
+  /** 指紋を覚える。保存できなくてもセッションの記憶には必ず残す。 */
+  function storeFp(text) {
+    if (typeof text !== "string") return;
+    const fp = fingerprint(text);
+    sessionFp = fp;
+    try {
+      store.write(fpKey, fp);
+    } catch (error) {
+      console.warn("sync: 指紋を保存できませんでした", error);
+    }
+  }
+
+  /**
    * 取り込みを書き込む。下書き → base の順で書く。
    *
    * 逆にすると、base だけ書けて下書きが書けなかったとき（容量超過など）に
@@ -170,8 +207,11 @@ export function createSync({
    * 次の編集がその古い内容を保存し直して取り込みを黙って巻き戻す。
    * それを見分けられるよう、base だけ失敗した場合は draftWritten を立てて投げる。
    */
-  function storeAdopted(data) {
+  function storeAdopted(data, text) {
     const stamp = stampOf(data);
+    // 指紋は base より先に。ここで失敗しても投げない（storeFp が握る）ので、
+    // 下書きの書き込みより前に置いても順序の保証は崩れない
+    storeFp(text);
     // **保存より先に覚える。** ここへ来た時点で「この版を採る」判断は済んで
     // いるので、保存領域に書けたかどうかに関わらず、この端末はその版を
     // 見ている。書き込みの成否を待つと、1 バイトも書けない端末では
@@ -252,12 +292,14 @@ export function createSync({
     // remote が使えるかは remoteOk で持つ。null をセンチネルにすると、
     // リモート本文がリテラルの null だったときに「取れなかった」と区別できない
     let remote = null;
+    let remoteText = null;
     let remoteOk = false;
     let fetchError = null;
     let outerStampMismatch = false;
     try {
       const decoded = await fetchAndDecode();
       remote = decoded.data;
+      remoteText = decoded.text;
       outerStampMismatch = decoded.outerStampMismatch;
       remoteOk = true;
     } catch (error) {
@@ -289,6 +331,7 @@ export function createSync({
         // 次の公開が必ず 409 になる ── しかも公開しようとしている中身は
         // いま表示しているリモートと同じなので、止める理由が無い（設計書 §13）。
         // 下書きは触らない。救出できる中身はそのまま残す
+        storeFp(remoteText);
         try {
           const stamp = stampOf(remote);
           sessionBase = stamp;
@@ -298,7 +341,7 @@ export function createSync({
         }
       } else {
         try {
-          storeAdopted(remote);
+          storeAdopted(remote, remoteText);
         } catch (error) {
           // 保存できなくても表示はできる。この取り込みは次回の判断を速くするための
           // 控えであって、旅程を見せる条件ではない。閲覧しかしない端末を
@@ -374,14 +417,14 @@ export function createSync({
    * 「取り込む」を押したらリモートの内容が消える、という静かなデータ消失になる。
    */
   async function adoptRemote() {
-    const { data } = await fetchAndDecode();
+    const { data, text } = await fetchAndDecode();
     validate(data);
     // base だけ書けなかった場合、下書きはもう入れ替わっている（storeAdopted の
     // コメント）。ここで投げっぱなしにすると呼び出し側は「取り込めませんでした」と
     // 出して画面を古いまま据え置き、次の編集がその古い内容を保存し直して
     // 取り込みを黙って巻き戻す。data を例外に載せて、画面だけは進めさせる
     try {
-      storeAdopted(data);
+      storeAdopted(data, text);
     } catch (error) {
       if (error.draftWritten) error.adopted = data;
       throw error;
@@ -430,6 +473,22 @@ export function createSync({
       );
       return false;
     }
+  }
+
+  /**
+   * 指紋で「リモートが自分の知っている版のままか」を見る。**時計を一切見ない。**
+   *
+   * これが答えを出せた回は、updatedAt の突き合わせ（assertRemoteNotAhead）は
+   * 要らない ── 時計ずれで順序が壊れていても、内容が変わったかどうかは
+   * 指紋が正しく答える（設計書 §13 の残存リスク）。
+   *
+   * @returns {boolean|null} true=変わっていない / false=変わっている /
+   *   null=判断できない（指紋をまだ持っていない端末。移行のあいだだけ通る）
+   */
+  function remoteMatchesFingerprint(current) {
+    const known = readFp();
+    if (!known || current === null || typeof current.text !== "string") return null;
+    return fingerprint(current.text) === known;
   }
 
   function assertRemoteNotAhead(current) {
@@ -530,8 +589,20 @@ export function createSync({
     //
     // ただしリモートが**中身として壊れている**と分かった回は飛ばす。
     // 塞ぐと直す手段が無くなるため（remoteIsUsable のコメント）
+    //
+    // 指紋が答えを出せるなら、そちらを採る。時計を見ないので、端末の時計が
+    // ずれていても他の端末の公開を黙って上書きしない（設計書 §13 の残存リスク）
     const usable = await remoteIsUsable(current);
-    const conflictChecked = usable ? assertRemoteNotAhead(current) : false;
+    let conflictChecked;
+    if (!usable) {
+      conflictChecked = false;
+    } else {
+      const matches = remoteMatchesFingerprint(current);
+      if (matches === false) throw new GitHubError(409, CONFLICT_MESSAGE);
+      // 指紋が一致した回は、時計の突き合わせを重ねる意味が無い。
+      // null（指紋をまだ持っていない端末）だけ、これまでどおりの判定に落ちる
+      conflictChecked = matches === true ? true : assertRemoteNotAhead(current);
+    }
 
     // ファイルがまだ無ければ sha なしで作成する（getFile は 404 で null を返す）
     const { commitUrl } = await gh.putFile({
@@ -550,7 +621,7 @@ export function createSync({
     // コミットへのリンクが一切出せず、「公開できたのか」を確かめる手段が
     // リポジトリを自分で見に行くことだけになる（設計書 §13）。
     try {
-      storeAdopted(stamped);
+      storeAdopted(stamped, text);
     } catch (error) {
       error.commitUrl = commitUrl;
       error.conflictChecked = conflictChecked;

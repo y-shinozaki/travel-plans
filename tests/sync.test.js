@@ -388,7 +388,14 @@ test("取り込みを保存できなくても旅程は表示する", async () =>
   const { result: out, seen } = await captureConsole(() => sync.load());
   assert.deepEqual(out.data, remote);
   assert.equal(out.source, "use-remote");
-  assert.equal(seen.length, 1); // 黙って捨てない
+  // 黙って捨てない。件数は数えない ── 書き込む控えが増える（指紋など）たびに
+  // 数がずれて、テストが別のものを試し始める。「取り込んだ内容を保存できな
+  // かったことが出ている」ことだけを見る
+  assert.ok(seen.length >= 1, "保存の失敗が黙って捨てられています");
+  assert.ok(
+    seen.some((line) => line.includes("取り込んだ内容を保存できませんでした")),
+    `取り込みの失敗が出ていません: ${seen.join(" / ")}`
+  );
 });
 
 test("未公開の変更があるときはリモートで黙って上書きしない", async () => {
@@ -850,7 +857,14 @@ function fakeRemote(initialText) {
         }),
       };
     }
-    return { ok: true, status: 200, json: async () => JSON.parse(state.text) };
+    // text() も返す。sync.fetchRemote は配信されたバイト列そのものから
+    // 指紋を作るので（fingerprint.js）、実物の Response と同じ形にしておく
+    return {
+      ok: true,
+      status: 200,
+      text: async () => state.text,
+      json: async () => JSON.parse(state.text),
+    };
   };
   return { state, fetchImpl };
 }
@@ -1124,7 +1138,7 @@ test("404 は status を持った失敗として投げる（まだ無いファ�
   const store = createStore(backend);
   const sync = createSync({
     store,
-    fetchImpl: async () => ({ ok: false, status: 404, json: async () => ({}) }),
+    fetchImpl: async () => ({ ok: false, status: 404, text: async () => "", json: async () => ({}) }),
     config: {
       path: "assets/data/packing.json",
       draftKey: "packing",
@@ -1243,11 +1257,11 @@ test("取り込みが base だけ書けなかったときは、取り込んだ�
   // その古い内容を保存し直して取り込みを黙って巻き戻す
   await captureConsole(async () => {
     const backend = memoryBackend(WITH_TOKEN);
-    let calls = 0;
     const original = backend.setItem.bind(backend);
+    // base のキーだけ失敗させる。**呼ばれた回数では数えない** ── 指紋のような
+    // 書き込みが増えるたびに数がずれて、テストが別のものを試し始める
     backend.setItem = (k, v) => {
-      // 下書き（1 回目）は通し、base（2 回目）だけ失敗させる
-      if (++calls >= 2) throw new Error("QuotaExceededError");
+      if (k === BASE_KEY) throw new Error("QuotaExceededError");
       original(k, v);
     };
     const store = createStore(backend);
@@ -1308,4 +1322,73 @@ test("sync は画面の文言に使う noun を公開する", () => {
     config: { ...CONFIG, noun: "持ち物リスト" },
   });
   assert.equal(other.noun, "持ち物リスト");
+});
+
+test("時計が巻き戻っていても、内容が変わったリモートは上書きしない", async () => {
+  /*
+   * 設計書 §13 の残存リスク。base に入る updatedAt は公開した端末の時計で
+   * 押されるので、端末間で時計がずれていると順序が保たれない ── あとから
+   * 公開された版のほうが「古い」と読まれ、突き合わせが素通りして
+   * **他の端末の公開を黙って上書きしていた。**
+   *
+   * 指紋は時計を一切見ないので、この形の取りこぼしが無くなる。
+   */
+  await captureConsole(async () => {
+    const remote = plan(REMOTE_STAMP);
+    const backend = memoryBackend(WITH_TOKEN);
+    const store = createStore(backend);
+    const state = { remote };
+    const fetchImpl = fakeFetch((url, init) => {
+      if (init?.method === "PUT") return OK_PUT();
+      if (url.startsWith("https://api.github.com")) {
+        return jsonResponse(200, {
+          sha: "old-sha",
+          content: toBase64Utf8(JSON.stringify(state.remote)),
+        });
+      }
+      return jsonResponse(200, state.remote);
+    });
+    const sync = createSync({ store, fetchImpl, config: CONFIG, now });
+
+    // 起動時にリモートを取り込む → 指紋を覚える
+    await sync.load();
+
+    // 別の端末が公開した。**その端末の時計は遅れていて、updatedAt は
+    // こちらの base より古い**（＝これまでは「進んでいない」と読まれていた）
+    state.remote = plan("2026-08-09T09:00:00.000Z", [ev({ title: "他の端末が直した昼食" })]);
+
+    await assert.rejects(
+      sync.publish(plan(FIXED_ISO)),
+      (error) => error.status === 409,
+      "時計が古い他端末の公開を上書きしています"
+    );
+  });
+});
+
+test("内容が変わっていなければ、指紋があっても公開できる", async () => {
+  // 上のガードが広すぎないことの番人。自分が取り込んだままのリモートなら通す
+  await captureConsole(async () => {
+    const remote = plan(REMOTE_STAMP);
+    const store = createStore(memoryBackend(WITH_TOKEN));
+    const fetchImpl = fakeFetch(siteAndApi({ remote }));
+    const sync = createSync({ store, fetchImpl, config: CONFIG, now });
+
+    await sync.load();
+    const result = await sync.publish(plan(FIXED_ISO));
+    assert.equal(typeof result.commitUrl, "string");
+    assert.equal(result.conflictChecked, true);
+  });
+});
+
+test("指紋をまだ持たない端末は、これまでどおり updatedAt で判断する", async () => {
+  // 移行のあいだだけ通る経路。ここで 409 にすると、この変更を入れた瞬間に
+  // 全端末の 1 回目の公開が失敗する
+  await captureConsole(async () => {
+    const { sync } = setup({
+      initial: { ...SYNCED, ...WITH_TOKEN }, // base はあるが指紋は無い
+      handler: github({ remote: plan(REMOTE_STAMP) }),
+    });
+    const result = await sync.publish(plan(FIXED_ISO));
+    assert.equal(result.conflictChecked, true);
+  });
 });
