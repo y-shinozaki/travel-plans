@@ -21,7 +21,11 @@
   text-transform: uppercase;
   color: var(--ink-2);
 }
+/* p の既定マージンを base.css で 0 にしたので、ここは明示的に空ける。
+   バーの margin-top と同じ 6px にして、名前 → 数字 → バーが等間隔になる形にした
+   （以前は UA の 1em が効いて 22px 空いており、宣言のどこにも無い数字だった） */
 .pkprog__count {
+  margin-top: 6px;
   font-family: var(--serif);
   font-size: 22px;
   font-weight: 300;
