@@ -346,11 +346,19 @@ function fakeSheet() {
   const sheet = {
     opens: [],
     closes: 0,
-    open(title, body, foot = []) {
-      sheet.opens.push({ title, body, foot });
+    open(title, body, foot = [], options = {}) {
+      // canClose を受け取って覚える。実物と同じく open のたびに差し替わる
+      sheet.canClose = typeof options.canClose === "function" ? options.canClose : null;
+      sheet.opens.push({ title, body, foot, options });
     },
-    close() {
-      sheet.closes += 1;
+    /** 実物と同じく、force でなければ述語に断られる。 */
+    close(force = false) {
+      if (!force && sheet.canClose && !sheet.canClose()) {
+        sheet.refused = (sheet.refused ?? 0) + 1;
+        return;
+      }
+      sheet.canClose = null;
+      sheet.closes++;
     },
   };
   return sheet;
@@ -549,5 +557,54 @@ test("不備のある欄すべてに aria-invalid が付き、直すと消える
     assert.equal(h.bodyEl.fields["f-title"].attrs["aria-invalid"], undefined);
     assert.equal(h.bodyEl.fields["f-end"].attrs["aria-invalid"], undefined);
     assert.equal(h.bodyEl.fields["f-error"].attrs.role, undefined, "role=alert が残っています");
+  });
+});
+
+test("未保存の入力があるとき、1 度目の閉じるは断って 2 度目で捨てる", () => {
+  /*
+   * 以前は閉じると未保存の入力を黙って捨てていた（設計書 §13）。
+   * confirm() は使えない規約なので、削除ボタンと同じ「1 度目で身構え、
+   * 2 度目で実行」にした
+   */
+  withDom(() => {
+    const data = copyData();
+    const target = data.events.find((ev) => !ev.allDay);
+    const h = mountEditor(data, target);
+
+    h.editor.select(target);
+    fire(h.sheet.opens[0].foot[0]); // 「この予定を編集」
+
+    // 触っていなければ素通し。守るものが無いのに 2 度押させない
+    assert.equal(typeof h.sheet.canClose, "function", "canClose が渡っていません");
+    assert.equal(h.sheet.canClose(), true, "触っていないのに閉じるのを断っています");
+
+    // 触ったら 1 度目は断る
+    h.bodyEl.fields["f-title"].value = "書きかけのタイトル";
+    h.sheet.close();
+    assert.equal(h.sheet.closes, 0, "未保存のまま閉じています");
+    assert.equal(h.bodyEl.fields["f-error"].attrs.role, "alert", "理由が出ていません");
+
+    // 2 度目で捨てる
+    h.sheet.close();
+    assert.equal(h.sheet.closes, 1, "2 度目でも閉じません");
+    assert.equal(h.commits.length, 0, "破棄したのに保存されています");
+  });
+});
+
+test("保存が通った直後は、未保存の確認で引っかからない", () => {
+  // ここで述語に聞くと、いま保存したばかりの入力を「未保存」と読んで
+  // シートが閉じなくなる
+  withDom(() => {
+    const data = copyData();
+    const target = data.events.find((ev) => !ev.allDay);
+    const h = mountEditor(data, target);
+
+    h.editor.select(target);
+    fire(h.sheet.opens[0].foot[0]);
+    h.bodyEl.fields["f-title"].value = "直したタイトル";
+    fire(h.sheet.opens[1].foot[0]); // 保存
+
+    assert.equal(h.commits.length, 1, "保存されていません");
+    assert.equal(h.sheet.closes, 1, "保存したのにシートが閉じていません");
   });
 });

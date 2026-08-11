@@ -151,6 +151,22 @@ export function createEventEditor({ sheet, bodyEl, getData, commit, fallbackFocu
     return node.type === "checkbox" ? (node.checked ? "on" : "") : node.value;
   }
 
+  /**
+   * いまフォームに入っている値をまとめた文字列。開いた直後の値と比べて
+   * 「触られたか」を見るためだけに使う（canClose）。
+   *
+   * 読めなければ null。フォームが崩れている場面で「触られた」と読んで
+   * シートを閉じられなくすると、出口が無くなる ── 判断できないときは
+   * 止めない側へ倒す。
+   */
+  function readFormText() {
+    try {
+      return JSON.stringify(readEventForm(getValue));
+    } catch {
+      return null;
+    }
+  }
+
   /* ── エラー表示（シートの中に出し、閉じない） ── */
 
   const errorBox = () => bodyEl.querySelector("#f-error");
@@ -251,7 +267,10 @@ export function createEventEditor({ sheet, bodyEl, getData, commit, fallbackFocu
       showFailure(error);
       return;
     }
-    sheet.close();
+    // 保存・削除が通った直後なので、未保存の確認は飛ばす（force）。
+    // ここで述語に聞くと、いま保存したばかりの入力を「未保存」と読んで
+    // シートが閉じなくなる
+    sheet.close(true);
     focusEvent(focusId);
   }
 
@@ -373,7 +392,29 @@ export function createEventEditor({ sheet, bodyEl, getData, commit, fallbackFocu
       foot.push(del);
     }
 
-    sheet.open(original ? "予定を編集" : "予定を追加", body, foot);
+    /*
+     * 閉じると未保存の入力が黙って消える、という穴を塞ぐ（設計書 §13）。
+     * confirm() は使えない規約なので、削除ボタンと同じ「1 度目で身構え、
+     * 2 度目で実行」にする ── 1 度目は閉じずに理由を出し、2 度目で捨てる。
+     *
+     * 触っていないフォームは素通しする。開いて眺めただけの予定を閉じるのに
+     * 2 度押させるのは、守るものが無いのに手間だけ増やすことになる。
+     */
+    const snapshot = readFormText();
+    let discardArmed = false;
+    const canClose = () => {
+      // 読めない（フォームが崩れている）なら止めない。閉じられなくなるほうが困る
+      const current = readFormText();
+      if (current === null || current === snapshot) return true;
+      if (discardArmed) return true;
+      discardArmed = true;
+      showProblems([
+        "保存していない入力があります。もう一度閉じると、この入力は捨てられます。",
+      ]);
+      return false;
+    };
+
+    sheet.open(original ? "予定を編集" : "予定を追加", body, foot, { canClose });
 
     // 終日の予定は時刻を持たないので、切り替えに合わせて時刻欄を出し入れする。
     //
