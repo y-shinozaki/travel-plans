@@ -54,9 +54,18 @@ export function catMeta(cat) {
   return meta;
 }
 
-/** イベント個別指定を優先し、無ければカテゴリ既定のアイコン id を返す。 */
+/**
+ * イベント個別指定を優先し、無ければカテゴリ既定のアイコン id を返す。
+ *
+ * ev.icon があっても cat は必ず検証する。以前は `ev.icon || catMeta(ev.cat).icon`
+ * と書いていたため、個別アイコンを持つイベントだけ未知の cat が素通りし、
+ * **カレンダーには出るが地図と詳細シートでは例外**という不揃いな壊れ方をした
+ * （設計書 §13）。読み込み時の validateEvents が cat を見るので events.json
+ * 経由では到達しないが、検査を経ない描画経路を足した瞬間に復活する。
+ */
 export function iconOf(ev) {
-  return ev.icon || catMeta(ev.cat).icon;
+  const fallback = catMeta(ev.cat).icon;
+  return ev.icon || fallback;
 }
 
 /**

@@ -164,3 +164,35 @@ test("remove が例外を投げても外に出さない", () => {
     console.warn = original;
   }
 });
+
+test("write に undefined を渡すと保存領域に触れずに投げる", () => {
+  // JSON.stringify(undefined) は undefined を返し、setItem がそれを
+  // "undefined" という文字列にして保存してしまう ── 書き込みは成功し、
+  // 次の read が JSON.parse で落ちて既定値になる（＝黙って消える）。
+  const backend = memoryBackend();
+  const seen = [];
+  const original = backend.setItem.bind(backend);
+  backend.setItem = (k, v) => {
+    seen.push(k);
+    original(k, v);
+  };
+  const store = createStore(backend);
+
+  assert.throws(() => store.write("events", undefined), TypeError);
+  assert.deepEqual(seen, [], "保存領域に書きに行っています");
+  assert.equal(store.read("events", "既定値"), "既定値");
+});
+
+test("write の undefined ガードは StoreWriteError ではない", () => {
+  // 呼び出し側の誤りなので、容量不足の顔をして人向けの文言に化けないこと
+  assert.throws(
+    () => createStore(memoryBackend()).write("events", undefined),
+    (error) => error instanceof TypeError && !(error instanceof StoreWriteError)
+  );
+});
+
+test("null は保存できる（undefined とは別物）", () => {
+  const store = createStore(memoryBackend());
+  assert.doesNotThrow(() => store.write("events", null));
+  assert.equal(store.read("events", "既定値"), null);
+});

@@ -18,6 +18,7 @@ import { createGitHub, GitHubError, CONFLICT_MESSAGE } from "./github.js";
 import { validateEvents } from "./validate.js";
 import { readToken } from "./token.js";
 import { passthroughCodec, DecryptError } from "./crypto.js";
+import { isPlainObject } from "./plain-object.js";
 
 /**
  * 公開先と、ファイルごとに違う 6 つ。ここ以外に owner / repo / branch / path を書かないこと。
@@ -75,7 +76,6 @@ export const DEFAULT_CONFIG = {
  */
 const UNCOMPARABLE = "";
 
-const isPlainObject = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
 
 /** ISO8601 の文字列だけを時刻として認める。 */
 const stampOf = (data) => (typeof data?.updatedAt === "string" ? data.updatedAt : null);

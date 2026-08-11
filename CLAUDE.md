@@ -426,12 +426,15 @@ validateEvents → 暗号化 → GET で sha と本文 → updatedAt の突き�
 - `img-src` が `https:` のワイルドカードなのは、`events.json` と `menu.js` が
   複数の外部ホストから画像を直リンクしているため（設計書 §13 の負債）
 
-`tests/csp.test.js` の 7 件が機械的に検査している。4 ページすべてを見るのが
+`tests/csp.test.js` の 8 件が機械的に検査している。4 ページすべてを見るのが
 「CSP がある」「`script-src` が `'self'` のみ」「インライン script が 1 つも無い」
-「`on*` 属性が 1 つも無い」「`connect-src` に GitHub API がある」の 5 件、
+「`on*` 属性が 1 つも無い」「`connect-src` に GitHub API がある」「`img-src` に
+地図タイル、`font-src` にフォント」の 6 件と、**4 ページの CSP が完全に同一である**
+ことを見る 1 件（正規化して突き合わせる。ページごとの検査は「そのディレクティブが
+あるか」しか見ないので、1 ページにだけ緩い指定を足しても他のどれも落ちない）。
 `archive.html`（取りやめた仮ページ）が実ファイルとして残っていないことを見るのが
-ページを見ない 1 件、残る 1 件（`img-src` に地図タイル、`font-src` にフォント）だけは
-`schedule.html` しか見ていない（設計書 §13 のテストの穴）。
+ページを見ない 1 件。**意図してページごとに CSP を変えるなら、同一性の検査を
+消すのではなく「どう違ってよいか」に書き換えること。**
 
 ## デザインシステム
 
@@ -469,11 +472,10 @@ validateEvents → 暗号化 → GET で sha と本文 → updatedAt の突き�
 （写すと 1 だけ足して CSS を忘れた状態が素通りする）。
 新しいカテゴリは `tests/categories.test.js` の `CATEGORIES`（Phase A の想定一覧）にも足す。
 
-`tokens.test.js` の色リテラル検査（次項）は対象ファイルをハードコードしたリストで持っている。
-Phase B2 で `packing.css` を、Phase B5 で `souvenirs.css` をそのリストへ足した実績がある。
-**リストがハードコードのままなので、次に新しい CSS ファイルを足すときも同じ手順
-（このリストへの追加）が要る** ── 忘れても検査は何も言わずに素通りする
-（設計書 §13「小さいもの」）。
+`tokens.test.js` の色リテラル検査（次項）は、対象ファイルを `assets/css/` の走査で
+導く（`tokens.css` 以外のすべて）。**新しい CSS ファイルは黙って対象に入るので、
+テスト側に足す作業は要らない。書き写さないこと。** 走査が壊れて 0 件になれば
+検査がループ 0 回で素通りするので、件数そのものを見る検査も別に置いてある。
 
 ### データの検査（`assets/js/validate.js`）
 
@@ -657,8 +659,9 @@ Phase B5 で追加したもの:
 `tokens.test.js` は色そのものに加えて次の約束も機械的に守らせている:
 
 - `--hour-h`（tokens.css）と `HOUR_H`（calendar.js）が同じ値であること
-- `base.css` / `controls.css` / `calendar.css` / `packing.css` / `souvenirs.css` に
-  色リテラルを書かないこと
+- `tokens.css` 以外の CSS（対象は `assets/css/` の走査で導く。テストに書き写さない）に
+  色リテラルを書かないこと。16 進・色関数に加えて、値の位置に現れた名前付き色
+  （`red` / `white` など）も弾く
   （半透明が必要なら `rgb(var(--ink-rgb) / 0.14)` のようにチャンネルトークンを使う）
 - `CAT_META` の各カテゴリに `tokens.css` の 3 値と `calendar.css` の `.cat-xxx` が揃っていること
   （「新しいカテゴリを追加」参照。カテゴリ一覧は `CAT_META` から導いている）

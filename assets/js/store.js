@@ -44,7 +44,26 @@ export function createStore(backend = globalThis.localStorage) {
     }
   }
 
+  /**
+   * JSON にして書く。失敗は StoreWriteError で知らせる。
+   *
+   * undefined だけは保存領域に触れる前に弾く。JSON.stringify(undefined) は
+   * 文字列ではなく undefined を返すので、setItem がそれを "undefined" という
+   * 文字列に変換して保存し、**書き込みは成功する**。壊れるのは次の read で、
+   * JSON.parse("undefined") が投げて既定値に落ちる ── 「書けたつもりで
+   * 消えている」という、この層が一番避けたい壊れ方になる。
+   *
+   * StoreWriteError ではなく TypeError なのは、これが保存領域の都合ではなく
+   * 呼び出し側の誤りだから。StoreWriteError にすると、それを「保存できません
+   * でした」と人向けに読み替える経路（publish-ui.js）に紛れて、
+   * プログラムの誤りが容量不足の顔をして表示される。
+   */
   function write(key, value) {
+    if (value === undefined) {
+      throw new TypeError(
+        `${fullKey(key)} に undefined は保存できません（"undefined" という文字列が保存され、次の読み出しで既定値に落ちます）`
+      );
+    }
     try {
       backend.setItem(fullKey(key), JSON.stringify(value));
     } catch (error) {

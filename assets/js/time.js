@@ -25,6 +25,12 @@ export function hhmmToDec(s) {
   const m = Number(matched[2]);
   if (h > 24) throw new RangeError(`hhmmToDec: 時が範囲外です: ${s}`);
   if (m > 59) throw new RangeError(`hhmmToDec: 分が範囲外です: ${s}`);
+  // 24 時台は "24:00" だけ。以前は h > 24 でしか見ていなかったので "24:30" が
+  // 24.5 として通り、0〜24 に収まらない値がここから出ていた。
+  // フォーム経路では formProblems → validateEvent が 0〜24 に制限するので
+  // 保存前に弾かれるが、それはこの関数を直接呼ぶ経路を足した瞬間に消える保護
+  // （設計書 §13）。範囲の約束はこの関数自身に持たせる。
+  if (h === 24 && m > 0) throw new RangeError(`hhmmToDec: 24 時台は 24:00 のみです: ${s}`);
   return h + m / 60;
 }
 

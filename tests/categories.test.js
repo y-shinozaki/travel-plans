@@ -73,3 +73,12 @@ test("旅程データのカテゴリがすべて既知である", () => {
     assert.ok(ICON_IDS.includes(iconOf(ev)), `${ev.title}: ${iconOf(ev)} がスプライトにありません`);
   }
 });
+
+test("iconOf は個別アイコンがあってもカテゴリを検証する", () => {
+  // ev.icon があると cat を見ずに返していたため、カレンダーだけ未知の cat が
+  // 素通りし、地図と詳細シートでだけ例外になっていた（設計書 §13）
+  assert.throws(() => iconOf({ cat: "cat-nope", icon: "i-flight" }), /未知のカテゴリ/);
+  // 既知のカテゴリでは、これまでどおり個別指定が優先される
+  assert.equal(iconOf({ cat: "cat-food", icon: "i-flight" }), "i-flight");
+  assert.equal(iconOf({ cat: "cat-food" }), CAT_META["cat-food"].icon);
+});

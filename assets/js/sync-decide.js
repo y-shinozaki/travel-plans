@@ -23,8 +23,22 @@ export function toTime(value) {
 }
 
 export function decideSync({ remoteUpdatedAt, localUpdatedAt, baseUpdatedAt, hasLocal }) {
+  // リモートが取れていない。手元にあるものを見せ続けるしかないので offline。
+  // ここで use-local を返さないのは、「リモートを見に行けたが進んでいなかった」と
+  // 「そもそも見に行けなかった」を画面が区別できなくなるため ── 前者は同期済み、
+  // 後者は「最新かどうか分からない」で、人に伝えるべきことが違う。
   if (remoteUpdatedAt == null) return "offline";
-  if (!hasLocal) return "use-remote";
+
+  // 使える下書きが無い。守るべき手元の編集が存在しないので、黙ってリモートを
+  // 採ってよい唯一の経路（この関数は原則「迷ったら人に聞く」に倒す）。
+  if (!hasLocal) {
+    // hasLocal が false なのに下書きの updatedAt が渡っているのは、呼び出し側の
+    // 2 つの値が食い違っているということ。**どちらが正しいか、この関数には
+    // 判断材料が無い。** そのまま use-remote を返すと、実際には下書きがある場合に
+    // load() が storeAdopted() で上書きしてしまうので、人に選ばせる側へ倒す。
+    if (localUpdatedAt != null) return "remote-is-newer";
+    return "use-remote";
+  }
 
   const remote = toTime(remoteUpdatedAt);
   const local = toTime(localUpdatedAt);

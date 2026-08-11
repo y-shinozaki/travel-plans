@@ -15,6 +15,7 @@ import { CAT_META } from "./categories.js";
 import { decToHHMM, hhmmToDec } from "./time.js";
 import { escapeHtml, safeHttpUrl } from "./dom.js";
 import { validateEvent } from "./validate.js";
+import { isPlainObject } from "./plain-object.js";
 
 /**
  * 採番前の新規イベントを検査に掛けるための仮 id。
@@ -262,6 +263,12 @@ export function readEventForm(getValue) {
  * 項目を JSON のキー名（lat、endDay …）で名指しする。フォームの利用者は
  * そのキーを見ていないので、画面に出ている項目名へ言い換える。
  * 言い換えるのは言葉だけで、規則そのものは validateEvent 側にしか無い。
+ *
+ * **この表は validateEvent が返す Problem の message() へ渡すだけ**で、
+ * 出来上がった文章に正規表現を当てるのではない。以前は本文を
+ * 置換していたので、置換対象がキー名だけでなく**値の中にも当たった**
+ * （cat や location に "start" を含む文字列があれば、そこまで
+ * 「開始時刻」に書き換わる）。設計書 §13。
  */
 const FIELD_WORDS = {
   startDay: "開始日",
@@ -272,36 +279,21 @@ const FIELD_WORDS = {
   cat: "カテゴリ",
   lat: "緯度",
   lng: "経度",
+  id: "ID",
 };
 
-// 長い名前から順に当てる（endDay を end + Day に割らないため）。
-// 直後が "-" のものは cat-hotel のような「値」の一部なので置き換えない
-const FIELD_RE = new RegExp(
-  `\\b(${Object.keys(FIELD_WORDS)
-    .sort((a, b) => b.length - a.length)
-    .join("|")})\\b(?!-)`,
-  "g"
-);
+/** Problem.message() へ渡す。表に無いキーはそのまま出す。 */
+const formName = (key) => FIELD_WORDS[key] ?? key;
+
+/** 不備 1 件をフォームの言葉にする。名指しの切り出しはもう要らない。 */
+const inFormWords = (p) => p.message(formName);
 
 /**
- * validate.js が本文の前に付ける名指し。フォームは 1 件しか扱わないので落とす。
- *
- * 検査に渡す写しは id が DRAFT_ID・title が空（下の formProblems を参照）なので、
- * validate.js の labelOf が付ける名指しはこの 1 通りに固定される。
- * 「最後の ": " で切る」ような当て推量にしないのは、タイトルや cat に ": " が
- * 入っているだけで本文の頭が削れてしまうため（cat: "a: b" で実際に起きた）。
+ * イベントとして扱える形か。
+ * validate.js の isPlainObject と同じ判定なので、そちらから import する
+ * （2 か所に置くと、片方だけ緩めたときに気付けない。設計書 §13）。
  */
-const LABEL_PREFIX = `${DRAFT_ID}: `;
-
-function inFormWords(message) {
-  const body = message.startsWith(LABEL_PREFIX)
-    ? message.slice(LABEL_PREFIX.length)
-    : message;
-  return body.replace(FIELD_RE, (name) => FIELD_WORDS[name]);
-}
-
-/** イベントとして扱える形か（validate.js の isPlainObject と同じ判定）。 */
-const isEventObject = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
+const isEventObject = isPlainObject;
 
 /**
  * 保存してよいかを調べ、直すべき点の一覧を返す（空配列なら保存してよい）。
@@ -329,11 +321,12 @@ export function formProblems(ev, dayCount) {
     problems.push("タイトルを入力してください。");
   }
 
-  // 検査には仮 id を被せた写しを渡す。title を空にするのは、validate.js が
-  // 付ける名指しを DRAFT_ID 1 つに固定して、メッセージの切り出し（inFormWords）が
-  // 入力値に左右されないようにするため。title の型と中身は直前の必須チェックが
-  // 見ているので、validateEvent 側の「title が文字列か」を外しても抜けはない
-  // （必須チェックのほうが厳しい）
+  // 検査には仮 id を被せた写しを渡す（validateEvent は id を必須とするが、
+  // 採番は保存側の仕事なのでフォームは持っていない）。
+  // title を空にするのは、直前の必須チェックと二重に文句を言わせないため
+  // ── そちらのほうが厳しいので、validateEvent 側の「title が文字列か」を
+  // 外しても抜けはない。
+  // （名指しの切り出しはもう無いので、title を空にする理由はこれだけになった）
   const draft = { ...ev, id: DRAFT_ID, title: "" };
   problems.push(...validateEvent(draft, dayCount).map(inFormWords));
 

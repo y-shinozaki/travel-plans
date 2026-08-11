@@ -258,9 +258,9 @@ test("値に「: 」が入っていても文言が欠けない", () => {
   assert.match(problems[0], /^未知のカテゴリです/);
 });
 
-test("validate.js の名指しは「id: 本文」の形", () => {
-  // event-form.js の inFormWords がこの形を前提に名指しだけを落としている。
-  // validate.js が継ぎ方を変えたらここで落ちる
+test("validateEvent は {field, message} を返し、名指しを付けない", () => {
+  // 名指し（"ev-x: "）を付けるのは validateEvents 側だけ。ここが文字列を
+  // 返す形に戻ると、1 件しか扱わないフォームがまた切り直す羽目になる
   const base = { id: "ev-x", title: "", cat: "cat-food", allDay: false, startDay: 0, endDay: 0, start: 12, end: 13, lat: null, lng: null };
   const broken = [
     { cat: "cat-x" },
@@ -279,10 +279,51 @@ test("validate.js の名指しは「id: 本文」の形", () => {
   for (const over of broken) {
     const problems = validateEvent({ ...base, ...over }, 3);
     assert.ok(problems.length > 0, `不備が出ません: ${JSON.stringify(over)}`);
-    for (const message of problems) {
+    for (const p of problems) {
       seen++;
-      assert.ok(message.startsWith("ev-x: "), `名指しの形が違います: ${message}`);
+      assert.equal(typeof p.message, "function", "message は本文を作る関数");
+      const body = p.message((key) => key);
+      assert.ok(!body.startsWith("ev-x"), `名指しが混ざっています: ${body}`);
+      // field は入力欄を指せる値か、イベント全体を指す null のどちらか
+      assert.ok(
+        p.field === null || typeof p.field === "string",
+        `field が不正です: ${JSON.stringify(p.field)}`
+      );
     }
   }
   assert.ok(seen >= broken.length);
+});
+
+test("validateEvents は名指しを付けて 1 本の文言にする", () => {
+  // 名指しの形（"id「タイトル」: 本文"）は JSON を直接読む人向けの見え方。
+  // 画面のエラー一覧はこれをそのまま出す
+  const data = {
+    days: [{ date: "8/12", dow: "火" }],
+    events: [{ id: "ev-x", title: "出国", cat: "cat-nope", allDay: true, startDay: 0, endDay: 0, lat: null, lng: null }],
+  };
+  assert.throws(
+    () => validateEvents(data),
+    (error) => /ev-x「出国」: 未知のカテゴリです/.test(error.message)
+  );
+});
+
+test("項目名の言い換えが値まで書き換えない", () => {
+  /*
+   * 以前は出来上がった本文に正規表現を当ててキー名を置換していたので、
+   * **値の中に "start" や "title" を含む文字列があると、そこまで
+   * 「開始時刻」「タイトル」に化けた**（設計書 §13）。
+   * いまは message(nameOf) がキーの位置だけを名前にするので起こらない。
+   */
+  const problems = formProblems({ ...emptyEvent(3), cat: "start-end-title" }, 3);
+  assert.equal(problems.length, 1);
+  assert.match(problems[0], /"start-end-title"/, `値が書き換わっています: ${problems[0]}`);
+  assert.ok(!problems[0].includes("開始時刻-終了時刻-タイトル"));
+});
+
+test("フォームの文言は項目名を日本語で名指しする", () => {
+  // 規則は validate.js にしかない。ここで見るのは言い換えだけ
+  const problems = formProblems({ ...emptyEvent(3), lat: 13.7, lng: null }, 3);
+  assert.equal(problems.length, 1);
+  assert.match(problems[0], /緯度 \/ 経度/, problems[0]);
+  assert.ok(!problems[0].includes("lat"), `キー名が残っています: ${problems[0]}`);
 });
