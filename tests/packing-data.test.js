@@ -353,9 +353,21 @@ test("groupProgressOf は na を持つ項目を、不要な人を除く全員が
 });
 
 test("groupProgressOf は na が無ければ両方チェックされた項目だけを数える", () => {
-  const group = NA_DATA.groups[0];
-  // i1 は両方 true、i2 は朱汰に不要（a だけ true なので完了）、i3 は両方 false
-  assert.deepEqual(groupProgressOf(group), { done: 2, total: 3 });
+  // na を 1 つも持たない区分での基本挙動を見る。na が無い項目では
+  // required が常に ["a","b"] になるので、この形の入力では正しい実装と
+  // 旧ロジック（i.a && i.b）は式として一致し、この 1 本だけでは退行を
+  // 検出できない ── na があるときに両者が食い違うことは、直前の
+  // 「na を持つ項目を、不要な人を除く全員が詰めたら完了として数える」テストが見る
+  const group = {
+    id: "g1",
+    name: "貴重品",
+    items: [
+      { id: "i1", name: "パスポート", a: true, b: true }, // 両方 true → 完了
+      { id: "i2", name: "現金", a: true, b: false }, // 片方だけ → 未完了
+      { id: "i3", name: "保険証", a: false, b: false }, // 両方 false → 未完了
+    ],
+  };
+  assert.deepEqual(groupProgressOf(group), { done: 1, total: 3 });
 });
 
 test("groupProgressOf は項目が無い区分でも落ちない", () => {
