@@ -21,7 +21,7 @@
 
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
-import { progressOf, PLACE_META, PLACE_KEYS } from "./packing-data.js";
+import { progressOf, groupProgressOf, PLACE_META, PLACE_KEYS } from "./packing-data.js";
 import { itemFocusKey, groupFocusKey } from "./focus-key.js";
 import { iconButton, armedIconButton, CHECK_MARK } from "./row-controls.js";
 
@@ -54,8 +54,11 @@ export function renderProgress({ mount, data }) {
 }
 
 /**
- * チェックボックス 1 つ。**編集モードでなくても押せる**
- * （チェックを付けるのは「編集」ではなく、このページの主目的そのもの）。
+ * チェックボックス 1 つ。**編集モードでは出さない**（`itemRow()` 参照）。
+ * 編集モードの人ごとの欄は `naCell()` の「不要にする」トグルに変わる ──
+ * 役割を分けるため、チェックを付け外しできるのは通常モードだけになった
+ * （plans/packing-not-applicable.md。旧版はここが逆で、編集モードでも
+ * チェックを押せた）。
  *
  * マークアップは controls.css の `.check` の契約に合わせる:
  *   label.switch > span.check > (input[type=checkbox] + span.check__box > svg) , span
@@ -294,8 +297,11 @@ function groupBlock(group, data, editing, handlers) {
     head.appendChild(el("h2", "pkgroup__name", group.name));
   }
 
-  const done = group.items.filter((i) => i.a && i.b).length;
-  head.appendChild(el("p", "pkgroup__count", `${done} / ${group.items.length}`));
+  // groupProgressOf() は na の人を除いた残り全員がチェック済みかで数える
+  // （packing-data.js）。ここで `i.a && i.b` を書き写すと、na を無視した
+  // ままの分母に逆戻りする
+  const { done, total } = groupProgressOf(group);
+  head.appendChild(el("p", "pkgroup__count", `${done} / ${total}`));
 
   if (editing) {
     const acts = el("div", "pkgroup__acts");

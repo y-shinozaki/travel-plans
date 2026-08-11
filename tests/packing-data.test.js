@@ -11,6 +11,7 @@ import {
   moveItem,
   moveGroup,
   progressOf,
+  groupProgressOf,
   withNa,
 } from "../assets/js/packing-data.js";
 import { validatePacking } from "../assets/js/packing-validate.js";
@@ -333,4 +334,33 @@ test("withNa は元の項目を書き換えない", () => {
   const item = { id: "i", name: "カード", a: true, b: true };
   withNa(item, "b", true);
   assert.equal("na" in item, false, "元の項目が書き換えられています");
+});
+
+test("groupProgressOf は na を持つ項目を、不要な人を除く全員が詰めたら完了として数える", () => {
+  // i2 は朱汰(b)には不要。雄一(a)だけが対象で、a はすでに true なので
+  // 「詰め終わった」項目として数える ── i.a && i.b のままだと b が false のぶん
+  // 永久に未完了に見える
+  const group = {
+    id: "g1",
+    name: "貴重品",
+    items: [
+      { id: "i1", name: "パスポート", a: true, b: true },
+      { id: "i2", name: "クレジットカード", a: true, b: false, na: ["b"] },
+      { id: "i3", name: "現金", a: false, b: false },
+    ],
+  };
+  assert.deepEqual(groupProgressOf(group), { done: 2, total: 3 });
+});
+
+test("groupProgressOf は na が無ければ両方チェックされた項目だけを数える", () => {
+  const group = NA_DATA.groups[0];
+  // i1 は両方 true、i2 は朱汰に不要（a だけ true なので完了）、i3 は両方 false
+  assert.deepEqual(groupProgressOf(group), { done: 2, total: 3 });
+});
+
+test("groupProgressOf は項目が無い区分でも落ちない", () => {
+  assert.deepEqual(groupProgressOf({ id: "g-empty", name: "空", items: [] }), {
+    done: 0,
+    total: 0,
+  });
 });

@@ -210,6 +210,28 @@ export function progressOf(data, member) {
 }
 
 /**
+ * 区分の進捗（達成数と件数）。区分見出しの `N / M` が読む。
+ *
+ * progressOf() と軸が違う ── あちらは「1 人分の分母」から不要な人を外すが、
+ * こちらは「1 項目」を単位に数える。**その項目の done は、不要な人を除いた
+ * 残り全員がチェック済みかどうか**で決める。`na: ["a","b"]`（全員不要）は
+ * validateItem() が弾くので、残りが空集合になる心配はない。
+ *
+ * done をここで数え直さず `progressOf()` を呼ばないのは、`progressOf()` の
+ * 単位が「人」で、区分見出しの単位が「項目」だから ── 人ごとの done を
+ * 足し合わせても項目の完了数にはならない（1 人だけ詰め終わった項目を
+ * 半分の 0.5 件として数えるような形になり、`N / M` が整数にならない）。
+ */
+export function groupProgressOf(group) {
+  let done = 0;
+  for (const item of group.items) {
+    const required = ["a", "b"].filter((m) => !item.na?.includes(m));
+    if (required.every((m) => item[m] === true)) done++;
+  }
+  return { done, total: group.items.length };
+}
+
+/**
  * 項目 1 件の「その人には不要」を切り替えた**新しい項目**を返す。
  * データ全体ではなく項目 1 件を受けるのは、呼び出し側が withItem() と
  * 組み合わせて使うため（既存の onToggle と同じ形）。

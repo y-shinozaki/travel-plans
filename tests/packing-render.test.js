@@ -566,7 +566,11 @@ test("「項目を追加」ボタンは onAddItem(groupId) を呼ぶ", () => {
   assert.deepEqual(calls, ["g-valuables"]);
 });
 
-test("区分ヘッダーの達成数は a かつ b が true の項目数（progressOf とは別の集計）", () => {
+test("区分ヘッダーの達成数は groupProgressOf() の結果をそのまま出す（progressOf とは別の集計）", () => {
+  // PACKING フィクスチャに na を持つ項目は無いので、groupProgressOf() の結果は
+  // 「a かつ b が true」と一致する。na がある場合の分岐は packing-data.test.js の
+  // groupProgressOf() のテストで見る（ここで書き写すと groupProgressOf() の
+  // 判定規則がこのテストにも複製される）
   const { make } = stubDocument();
   const mount = make("div");
   renderTable({ mount, data: PACKING, editing: false, handlers: {} });

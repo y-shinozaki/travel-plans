@@ -192,7 +192,8 @@
   width: 22px;
   height: 22px;
   color: var(--ink-2);
-  font-size: 12px;
+  /* font-size は書かない。controls.css の .switch span（13px）が詳細度で勝つので
+     ここに書いても効かない（Final review で指摘。実測 13px） */
 }
 .pkitem__acts {
   display: flex;
