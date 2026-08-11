@@ -10,7 +10,7 @@
  * 定数だけ。ブラウザで入力した文字列を、リポジトリ書き込み権限を持つトークンを
  * 抱えたページ自身が描画するため（CLAUDE.md の規約）。
  *
- * すべての操作コントロール（↑↓・削除・名前とメモの入力欄・チェックボックス）に
+ * すべての操作コントロール（↑↓・削除・名前とメモの入力欄・人ごとの状態ボタン）に
  * `dataset.focusKey` を付ける。`itemFocusKey()` / `groupFocusKey()`（focus-key.js）が
  * id から作る ── 位置から作ると、並べ替えたその瞬間に「動いた」という事実そのものでキーが変わってしまい、
  * 何のためのキーか分からなくなる。packing.js の draw() が再描画のたびに
@@ -24,6 +24,22 @@ import { icon } from "./icons.js";
 import { progressOf, groupProgressOf, PLACE_META, PLACE_KEYS } from "./packing-data.js";
 import { itemFocusKey, groupFocusKey } from "./focus-key.js";
 import { iconButton, armedIconButton, CHECK_MARK } from "./row-controls.js";
+
+/** 不要の印。「—」は薄く出す（packing.css の .pkcycle__box--na）。 */
+const NA_MARK = "—";
+
+/** 3 状態のうち、いまどれか。na → checked → blank の順で確かめる。 */
+function cycleState(item, member) {
+  if (item.na?.includes(member) === true) return "na";
+  if (item[member] === true) return "checked";
+  return "blank";
+}
+
+/** 読み上げ文言。状態を言葉にする（設計書: 「雄一: パスポート、未チェック」など）。 */
+function cycleLabel(item, memberName, state) {
+  const status = state === "checked" ? "チェック済み" : state === "na" ? "不要" : "未チェック";
+  return `${memberName}: ${item.name}、${status}`;
+}
 
 /**
  * 2 人分の進捗。達成数と細いバー（設計書 §7.3）。
@@ -54,82 +70,44 @@ export function renderProgress({ mount, data }) {
 }
 
 /**
- * チェックボックス 1 つ。**編集モードでは出さない**（`itemRow()` 参照）。
- * 編集モードの人ごとの欄は `naCell()` の「不要にする」トグルに変わる ──
- * 役割を分けるため、チェックを付け外しできるのは通常モードだけになった
- * （plans/packing-not-applicable.md。旧版はここが逆で、編集モードでも
- * チェックを押せた）。
+ * 人ごとの欄。ひとつのボタンが押すたびに 3 段階を回る
+ * （ブランク → チェック → 不要 → ブランク …）。**モードで役割を変えない** ──
+ * 通常モードでも編集モードでも同じボタンが同じように動く（設計を最初
+ * 「通常はチェックボックス、編集はピル」で作ってしまい、書き直した経緯は
+ * plans/packing-not-applicable.md「描画」参照）。
  *
- * マークアップは controls.css の `.check` の契約に合わせる:
- *   label.switch > span.check > (input[type=checkbox] + span.check__box > svg) , span
- * input と .check__box が**隣接兄弟**であること（`.check input:checked + .check__box`）。
- * 間に何か挟むと、チェックしても色が変わらない。
- */
-function checkCell(item, member, memberName, onToggle) {
-  const label = el("label", "switch");
-
-  const wrap = el("span", "check");
-  const input = document.createElement("input");
-  input.type = "checkbox";
-  input.checked = item[member] === true;
-  input.setAttribute("aria-label", `${memberName}: ${item.name}`);
-  input.dataset.focusKey = itemFocusKey(item.id, `check:${member}`);
-  input.addEventListener("change", () => onToggle?.(item.id, member, input.checked));
-
-  const box = el("span", "check__box");
-  box.innerHTML = CHECK_MARK; // 定数のみ。値は混ぜない
-
-  wrap.appendChild(input);
-  wrap.appendChild(box);
-
-  label.appendChild(wrap);
-  label.appendChild(el("span", null, memberName));
-  return label;
-}
-
-/** 不要の印。押せないことが分かるよう、ボタンにしない。 */
-const NA_MARK = "—";
-
-/**
- * 通常モードで、その人に不要な項目の欄。読むだけ。
- * チェックボックスを出さないのは、押せてしまうと「不要なのにチェックが付く」
- * 状態を作れるため（進捗からは外れているので、画面と数字が食い違う）。
+ * `<input type="checkbox">` ではなく `<button>` にする理由: チェックボックスは
+ * 2 状態しか持てず、3 つ目を `indeterminate` で表しても HTML からは設定できない上、
+ * 支援技術には「mixed」としか読まれない（「不要」とは意味が違う）。加えて
+ * クリックの既定動作（checked の反転）を毎回止める必要が生まれる。
  *
- * checkCell() と同じ「印＋名前」の並びに揃える（`.switch` を流用）。
- * 「—」だけだと checkCell() の label.switch（印＋名前）より狭くなり、
- * 不要な行だけ隣の列がずれる。加えて誰の欄かが見た目から分からなくなる
- * （2026-08-11 実機確認で判明。plans/packing-not-applicable.md）。
- * `label` にしないのは押せてはいけないため（`.switch` は流用するが、
- * cursor は packing.css 側で default に戻す）。
- */
-function naMark(item, memberName) {
-  const cell = el("span", "switch pkitem__na");
-  cell.appendChild(el("span", "pkitem__nadash", NA_MARK));
-  cell.appendChild(el("span", null, memberName));
-  cell.setAttribute("aria-label", `${memberName}には不要: ${item.name}`);
-  return cell;
-}
-
-/**
- * 編集モードの人ごとの欄。「その人には不要」を切り替える。
+ * いまの状態は cycleState()（このファイル内、item の na / a・b から**読むだけ**）
+ * が決める。次の状態への**遷移**は packing-data.js の cycleMember() が持つ ──
+ * 描画は状態を読んで見た目を出すだけで、遷移の規則を書き写さない。
  *
- * **チェックボックスとは見た目を変えること。** 同じ四角が、モードによって
- * 「詰めたか」と「要るか」を切り替えると、取り違えが進捗の分母を動かす ──
- * 画面を見ただけでは気付けない壊れ方になる（plans/packing-not-applicable.md）。
+ * 3 状態とも同じ 22px の四角にする（packing.css の .pkcycle__box）。
+ * 大きさが揃っていれば、どの状態の行でも列が自然に揃う。
  */
-function naCell(item, member, memberName, onToggleNa) {
-  const notNeeded = item.na?.includes(member) === true;
-  const button = el("button", notNeeded ? "napill napill--off" : "napill");
+function cycleCell(item, member, memberName, onCycle) {
+  const state = cycleState(item, member);
+
+  const wrap = el("span", "pkcycle");
+
+  const button = el("button", `pkcycle__box${state === "blank" ? "" : ` pkcycle__box--${state}`}`);
   button.type = "button";
-  // 文字は textContent で入れる。値は innerHTML に混ぜない
-  button.appendChild(el("span", null, notNeeded ? NA_MARK : "不要にする"));
-  button.setAttribute(
-    "aria-label",
-    notNeeded ? `${memberName}に戻す: ${item.name}` : `${memberName}には不要にする: ${item.name}`
-  );
-  button.dataset.focusKey = itemFocusKey(item.id, `na:${member}`);
-  button.addEventListener("click", () => onToggleNa?.(item.id, member, !notNeeded));
-  return button;
+  if (state === "checked") {
+    button.innerHTML = CHECK_MARK; // 定数のみ。値は混ぜない
+  } else if (state === "na") {
+    button.appendChild(el("span", null, NA_MARK));
+  }
+  // ブランクは枠だけの四角（何も入れない）
+  button.setAttribute("aria-label", cycleLabel(item, memberName, state));
+  button.dataset.focusKey = itemFocusKey(item.id, `check:${member}`);
+  button.addEventListener("click", () => onCycle?.(item.id, member));
+
+  wrap.appendChild(button);
+  wrap.appendChild(el("span", null, memberName));
+  return wrap;
 }
 
 /** 名前とメモ。編集モードでは入力欄になる（設計書 §7.3「行がそのまま入力欄になる」）。 */
@@ -227,17 +205,10 @@ function itemRow(item, data, editing, handlers) {
   const place = placeCell(item, editing, handlers.onSetPlace);
   if (place) row.appendChild(place);
 
+  // モードに関わらず同じボタンが同じように 3 段階を回る（cycleCell 参照）
   const checks = el("div", "pkitem__checks");
   for (const member of ["a", "b"]) {
-    const memberName = data.members[member];
-    if (editing) {
-      // 編集モードでは「要るかどうか」を切り替える。チェックは通常モードで付ける
-      checks.appendChild(naCell(item, member, memberName, handlers.onToggleNa));
-    } else if (item.na?.includes(member)) {
-      checks.appendChild(naMark(item, memberName));
-    } else {
-      checks.appendChild(checkCell(item, member, memberName, handlers.onToggle));
-    }
+    checks.appendChild(cycleCell(item, member, data.members[member], handlers.onCycle));
   }
   row.appendChild(checks);
 

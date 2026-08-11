@@ -147,53 +147,63 @@
   gap: 14px;
   flex: 0 0 auto;
 }
-/* 編集モードの「不要にする」。**四角いチェックと見た目を変えるのが目的**なので、
-   ピルにする（同じ四角が意味だけ変えると取り違えが起きる。設計書 §13 と
-   plans/packing-not-applicable.md） */
-.napill {
+/* 人ごとの欄。ひとつのボタンが 3 段階（ブランク・チェック・不要）を回る
+   （packing-render.js の cycleCell）。モードで見た目を変えない
+   （plans/packing-not-applicable.md「描画」── 最初の実装はここが
+   モードで分かれていて、書き直した）。 */
+.pkcycle {
   display: inline-flex;
   align-items: center;
-  padding: 4px 10px;
-  border: 1px solid var(--line-soft);
-  border-radius: var(--r-pill);
-  background: transparent;
-  color: var(--ink-2);
-  font-size: 10px;
-  letter-spacing: 1px;
-  white-space: nowrap;
+  gap: 12px;
+  cursor: pointer;
 }
-.napill:hover {
+.pkcycle span:last-child {
+  font-size: 13px;
+  letter-spacing: 0.4px;
   color: var(--ink);
-  border-color: var(--ink);
 }
-/* 不要になっている側。枠を濃くして、押せば戻ることを見た目で示す */
-.napill--off {
-  color: var(--ink);
-  border-color: var(--ink);
-}
-/* 通常モードの「—」。checkCell() の label.switch（印＋名前）と同じ幅に
-   揃えるため .switch を流用するが、押せてはいけないのでポインタは戻す。
-   薄くするのは「—」だけ（.pkitem__nadash）── 名前まで薄くすると
-   誰の欄か読みにくくなる。色は --ink-2（副次テキスト）。--ink-3 は
-   tokens.css では「濃色パネル」で --ink-2 より**濃い**ので、薄い印には使わない */
-.pkitem__na {
-  cursor: default;
-}
-/* 「—」はチェックの箱（controls.css の .check__box）と同じ場所に立つので、
-   同じ 22px 四方を占めさせる。幅を合わせないと、その行だけ名前の開始位置が
-   ずれて .pkitem__checks の列が崩れる（2026-08-11 実測、48px → 9px → ここで解消）。
-   **22px は .check__box からの書き写し。あちらの数値を変えたら、ここも
-   合わせて変えること**（tokens.css に共有トークンが無いための負債。
-   plans/packing-not-applicable.md） */
-.pkitem__nadash {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+/* 3 状態とも同じ 22px 四方にする（controls.css の .check__box を下敷きに
+   したサイズ）。大きさが揃っていれば、どの状態の行でも列が自然に揃う ──
+   前の実装は「—」だけ細く、その行だけ列がずれた（plans/packing-not-applicable.md）。
+   input ではなく button なので `:checked` セレクタは使えず、状態は
+   class（--checked / --na）で切り替える。 */
+.pkcycle__box {
+  display: grid;
+  place-items: center;
   width: 22px;
   height: 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-xs);
   color: var(--ink-2);
-  /* font-size は書かない。controls.css の .switch span（13px）が詳細度で勝つので
-     ここに書いても効かない（Final review で指摘。実測 13px） */
+  background: transparent;
+  font-size: 13px;
+  transition: background var(--t-fast) var(--e-out), border-color var(--t-fast) var(--e-out);
+}
+.pkcycle__box:hover {
+  border-color: var(--ink);
+}
+.pkcycle__box:focus-visible {
+  outline: 1px solid var(--ink);
+  outline-offset: 2px;
+}
+.pkcycle__box svg {
+  width: 13px;
+  height: 13px;
+  stroke: var(--sand);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+}
+/* チェック済み。controls.css の `.check input:checked + .check__box` と同じ塗り */
+.pkcycle__box--checked {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+/* 不要。「—」は薄く出す。--ink-3 は tokens.css では「濃色パネル」で
+   --ink-2 より**濃い**ので、薄い印には使わない */
+.pkcycle__box--na {
+  color: var(--ink-2);
 }
 .pkitem__acts {
   display: flex;

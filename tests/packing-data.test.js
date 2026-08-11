@@ -13,6 +13,7 @@ import {
   progressOf,
   groupProgressOf,
   withNa,
+  cycleMember,
 } from "../assets/js/packing-data.js";
 import { validatePacking } from "../assets/js/packing-validate.js";
 import { PACKING } from "./fixtures/packing.js";
@@ -334,6 +335,42 @@ test("withNa は元の項目を書き換えない", () => {
   const item = { id: "i", name: "カード", a: true, b: true };
   withNa(item, "b", true);
   assert.equal("na" in item, false, "元の項目が書き換えられています");
+});
+
+test("cycleMember はブランク→チェック→不要→ブランクの順で一周する", () => {
+  const blank = { id: "i", name: "カード", a: false, b: false };
+
+  const checked = cycleMember(blank, "a");
+  assert.equal(checked.a, true, "ブランクの次はチェックのはず");
+  assert.equal("na" in checked, false);
+
+  const notNeeded = cycleMember(checked, "a");
+  assert.deepEqual(notNeeded.na, ["a"], "チェックの次は不要のはず");
+  assert.equal(notNeeded.a, true, "不要に入るときはチェックの値を保持する");
+
+  const backToBlank = cycleMember(notNeeded, "a");
+  assert.equal("na" in backToBlank, false, "不要の次はブランクに戻るはず");
+  assert.equal(backToBlank.a, false, "不要を抜けるときはチェックも外す");
+
+  // 一周して同じ形に戻ること
+  assert.deepEqual(backToBlank, blank);
+});
+
+test("cycleMember はもう一方の人（b）には影響しない", () => {
+  const item = { id: "i", name: "カード", a: false, b: true };
+  const next = cycleMember(item, "a");
+  assert.equal(next.b, true, "b の値が変わっています");
+});
+
+test("cycleMember は元の項目を書き換えない（3 つの遷移経路すべて）", () => {
+  const blank = deepFreeze({ id: "i", name: "カード", a: false, b: false });
+  const checked = deepFreeze({ id: "i", name: "カード", a: true, b: false });
+  const notNeeded = deepFreeze({ id: "i", name: "カード", a: true, b: false, na: ["a"] });
+  assert.doesNotThrow(() => {
+    cycleMember(blank, "a"); // ブランク → チェック
+    cycleMember(checked, "a"); // チェック → 不要
+    cycleMember(notNeeded, "a"); // 不要 → ブランク
+  });
 });
 
 test("groupProgressOf は na を持つ項目を、不要な人を除く全員が詰めたら完了として数える", () => {

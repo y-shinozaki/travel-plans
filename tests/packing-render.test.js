@@ -225,21 +225,28 @@ test("読み取りモードでは編集用のボタンを組み立てない", ()
  * 元の大小比較テストは落ちなかった）ので、読み取りモードのボタン数が
  * 厳密に 0 であることを見る、より強いテストに置き換える。
  */
-test("読み取りモードにはボタンが 1 つも無い（大小比較では見逃す不備を拾う）", () => {
+test("読み取りモードには編集専用のボタンが 1 つも無い（大小比較では見逃す不備を拾う）", () => {
   const { make } = stubDocument();
   const readOnly = make("div");
   renderTable({ mount: readOnly, data: PACKING, editing: false, handlers: {} });
-  const buttons = findAll(readOnly, (n) => n.tagName === "BUTTON");
+  // 人ごとの状態ボタン（pkcycle__box）はモードに関わらず出る、唯一の例外
+  // （plans/packing-not-applicable.md「描画」）。それ以外のボタン（削除・
+  // 並べ替え・追加など）は読み取りモードに 1 つも無いこと
+  const buttons = findAll(
+    readOnly,
+    (n) => n.tagName === "BUTTON" && !(n.className ?? "").startsWith("pkcycle__box")
+  );
   assert.equal(buttons.length, 0);
 });
 
-test("読み取りモードでは項目名・区分名・メモの入力欄を作らない（チェックボックスの分だけ INPUT が残る）", () => {
+test("読み取りモードでは項目名・区分名・メモの入力欄を作らない（INPUT は 1 つも無い）", () => {
   const { make } = stubDocument();
   const readOnly = make("div");
   renderTable({ mount: readOnly, data: PACKING, editing: false, handlers: {} });
+  // 人ごとの欄は <input type="checkbox"> ではなく <button> になった
+  // （3 段階を回すコントロール。plans/packing-not-applicable.md「描画」）
   const inputCount = findAll(readOnly, (n) => n.tagName === "INPUT").length;
-  // PACKING は 4 項目 × 2 人分のチェックボックスのみ
-  assert.equal(inputCount, 8);
+  assert.equal(inputCount, 0);
 });
 
 test("編集モードでは項目名・区分名・メモの入力欄が増える", () => {
@@ -247,9 +254,8 @@ test("編集モードでは項目名・区分名・メモの入力欄が増え�
   const editing = make("div");
   renderTable({ mount: editing, data: PACKING, editing: true, handlers: {} });
   const inputCount = findAll(editing, (n) => n.tagName === "INPUT").length;
-  // 項目名 4 + メモ 4 + 区分名 3 = 11。
-  // **チェックボックスは編集モードには無い**（人ごとの欄は「不要にする」の
-  // トグルになる。plans/packing-not-applicable.md）
+  // 項目名 4 + メモ 4 + 区分名 3 = 11。人ごとの欄はどちらのモードでも
+  // <button> なので INPUT には現れない
   assert.equal(inputCount, 11);
 });
 
@@ -315,19 +321,18 @@ test("handlers を渡さなくても renderTable は落ちない（handlers 省�
   assert.doesNotThrow(() => renderTable({ mount, data: PACKING, editing: true }));
 });
 
-test("行の操作ハンドラも個別に省略できる（onToggle などが無くても押せる）", () => {
+test("行の操作ハンドラも個別に省略できる（onCycle などが無くても押せる）", () => {
   const { make } = stubDocument();
-  const mount = make("div");
-  // チェックボックスは編集モードから消えたので、通常モードで引く
-  renderTable({ mount, data: PACKING, editing: false, handlers: {} });
-  const checkbox = findFirst(mount, (n) => n.tagName === "INPUT" && n.type === "checkbox");
-  assert.doesNotThrow(() => checkbox.dispatch("change"));
+  // 人ごとの欄はモードに関わらず同じボタン。両方のモードで押せることを見る
+  const readOnly = make("div");
+  renderTable({ mount: readOnly, data: PACKING, editing: false, handlers: {} });
+  const cycleReadOnly = findFirst(readOnly, (n) => n.dataset?.focusKey === "item:passport:check:a");
+  assert.doesNotThrow(() => cycleReadOnly.dispatch("click"));
 
-  // 編集モードの「不要にする」トグルもハンドラ無しで押せること（onToggleNa 省略可）
   const editing = make("div");
   renderTable({ mount: editing, data: PACKING, editing: true, handlers: {} });
-  const pill = findFirst(editing, (n) => n.dataset?.focusKey === "item:passport:na:a");
-  assert.doesNotThrow(() => pill.dispatch("click"));
+  const cycleEditing = findFirst(editing, (n) => n.dataset?.focusKey === "item:passport:check:a");
+  assert.doesNotThrow(() => cycleEditing.dispatch("click"));
 });
 
 test("項目の削除ボタンは 1 回目で武装し、2 回目で onDeleteItem(itemId) を呼ぶ", () => {
@@ -390,24 +395,22 @@ test("チェックの印は icon('i-check') の <use> ではなく生の SVG（s
   assert.ok(!html.includes("#i-check"), "icon('i-check') の <use> 参照が使われています");
 });
 
-test("チェックボックスのマークアップは label.switch > span.check > (input + span.check__box) の隣接兄弟", () => {
+test("人ごとの欄は span.pkcycle > (button.pkcycle__box, span) の並び", () => {
   const { make } = stubDocument();
   const mount = make("div");
   renderTable({ mount, data: PACKING, editing: false, handlers: {} });
 
-  const switchLabel = findFirst(mount, (n) => n.className === "switch");
-  assert.ok(switchLabel, "label.switch が見つかりません");
-  const check = switchLabel.children.find((c) => c.className === "check");
-  assert.ok(check, "span.check が見つかりません");
-  assert.equal(check.children[0].type, "checkbox", "input が check の最初の子ではありません");
-  assert.equal(
-    check.children[1].className,
-    "check__box",
-    "input の直後（隣接兄弟）が check__box ではありません"
-  );
+  const wrap = findFirst(mount, (n) => n.className === "pkcycle");
+  assert.ok(wrap, "span.pkcycle が見つかりません");
+  assert.equal(wrap.children.length, 2, "ボタンと名前の 2 要素構成ではありません");
+  const [button, name] = wrap.children;
+  assert.equal(button.tagName, "BUTTON", "1 つ目の子が button ではありません");
+  assert.match(button.className, /^pkcycle__box/, "button に pkcycle__box が付いていません");
+  assert.equal(name.tagName, "SPAN", "2 つ目の子が名前の span ではありません");
+  assert.equal(name.textContent, "雄一", "名前が入っていません");
 });
 
-test("チェックを入れると onToggle(itemId, member, checked) が呼ばれる", () => {
+test("押すたびに onCycle(itemId, member) が呼ばれる", () => {
   const { make } = stubDocument();
   const mount = make("div");
   const calls = [];
@@ -415,13 +418,19 @@ test("チェックを入れると onToggle(itemId, member, checked) が呼ばれ
     mount,
     data: PACKING,
     editing: false,
-    handlers: { onToggle: (id, member, checked) => calls.push([id, member, checked]) },
+    handlers: { onCycle: (id, member) => calls.push([id, member]) },
   });
 
-  const checkbox = findFirst(mount, (n) => n.tagName === "INPUT" && n.type === "checkbox");
-  checkbox.checked = true;
-  checkbox.dispatch("change");
-  assert.deepEqual(calls, [["passport", "a", true]]);
+  // passport の a は checked（fixture）。押すと次の状態（不要）へ、という
+  // 判断は cycleMember() の役目で、ここではボタンが itemId と member を
+  // そのまま渡すことだけを見る
+  const button = findFirst(
+    mount,
+    (n) => n.tagName === "BUTTON" && n.dataset?.focusKey === "item:passport:check:a"
+  );
+  assert.ok(button, "人ごとの欄のボタンが見つかりません");
+  button.dispatch("click");
+  assert.deepEqual(calls, [["passport", "a"]]);
 });
 
 /*
@@ -603,10 +612,9 @@ test("項目・区分の操作コントロールに data-focus-key が付く（i
   assert.ok(keys.has("item:passport:del"), "項目の削除ボタンにキーが無い");
   assert.ok(keys.has("item:passport:name"), "項目名の入力欄にキーが無い");
   assert.ok(keys.has("item:passport:note"), "メモの入力欄にキーが無い");
-  // check:a / check:b は編集モードには無くなった。人ごとの欄は「不要にする」の
-  // トグル（na:a / na:b）になる（plans/packing-not-applicable.md）
-  assert.ok(keys.has("item:passport:na:a"), "不要にするボタン(a)にキーが無い");
-  assert.ok(keys.has("item:passport:na:b"), "不要にするボタン(b)にキーが無い");
+  // 人ごとの欄はモードに関わらず同じボタン・同じキー（check:a / check:b）
+  assert.ok(keys.has("item:passport:check:a"), "人ごとの欄のボタン(a)にキーが無い");
+  assert.ok(keys.has("item:passport:check:b"), "人ごとの欄のボタン(b)にキーが無い");
 
   // 区分（g-valuables）まわり
   assert.ok(keys.has("group:g-valuables:name"), "区分名の入力欄にキーが無い");
@@ -615,15 +623,14 @@ test("項目・区分の操作コントロールに data-focus-key が付く（i
   assert.ok(keys.has("group:g-valuables:del"), "区分の削除ボタンにキーが無い");
   assert.ok(keys.has("group:g-valuables:add"), "「項目を追加」ボタンにキーが無い");
 
-  // check:a / check:b の検査は消さず、通常モードへ移す ── 通常モードの
-  // チェックボックスにフォーカスキーが要るのは変わらない
+  // 通常モードでも同じキーで引けること（モードで役割を変えないため）
   const readOnly = make("div");
   renderTable({ mount: readOnly, data: PACKING, editing: false, handlers: {} });
   const readKeys = new Set(
     findAll(readOnly, (n) => n.dataset?.focusKey).map((n) => n.dataset.focusKey)
   );
-  assert.ok(readKeys.has("item:passport:check:a"), "項目のチェックボックス(a)にキーが無い");
-  assert.ok(readKeys.has("item:passport:check:b"), "項目のチェックボックス(b)にキーが無い");
+  assert.ok(readKeys.has("item:passport:check:a"), "人ごとの欄のボタン(a)にキーが無い");
+  assert.ok(readKeys.has("item:passport:check:b"), "人ごとの欄のボタン(b)にキーが無い");
 });
 
 test("読み取りモードでは data-focus-key を持つ要素が 1 つも無い（操作コントロール自体が無い）", () => {
@@ -782,9 +789,50 @@ test("選択欄の focusKey は id 由来（並べ替えても変わらない）
   assert.equal(keyOf(moved), 1, "並べ替えで focusKey が変わりました");
 });
 
-/* ── 「その人には不要」（na）── */
+/* ── 人ごとの欄（ひとつのボタンが 3 段階を回る）── */
 
-test("通常モードでは、不要な人の欄はチェックではなく「—」になる", () => {
+test("ブランクの状態では枠だけの四角（アイコンも「—」も無い）", () => {
+  const { make } = stubDocument();
+  const mount = make("div");
+  const data = {
+    members: { a: "雄一", b: "朱汰" },
+    groups: [{ id: "g1", name: "貴重品", icon: "i-note", items: [
+      { id: "i1", name: "カード", note: "", a: false, b: false },
+    ] }],
+  };
+  renderTable({ mount, data, editing: false, handlers: {} });
+
+  const button = findFirst(
+    mount,
+    (n) => n.tagName === "BUTTON" && n.dataset?.focusKey === "item:i1:check:a"
+  );
+  assert.ok(button, "人ごとの欄のボタンが見つかりません");
+  assert.equal(button.className, "pkcycle__box", "ブランクに状態のクラスが付いています");
+  assert.equal(button.attrs["aria-label"], "雄一: カード、未チェック");
+  assert.equal(button.children.length, 0, "ブランクなのに中身があります");
+});
+
+test("チェック済みの状態ではチェックマークが入り、aria-label がそう言う", () => {
+  const { make, htmlSink } = stubDocument();
+  const mount = make("div");
+  const data = {
+    members: { a: "雄一", b: "朱汰" },
+    groups: [{ id: "g1", name: "貴重品", icon: "i-note", items: [
+      { id: "i1", name: "カード", note: "", a: true, b: false },
+    ] }],
+  };
+  renderTable({ mount, data, editing: false, handlers: {} });
+
+  const button = findFirst(
+    mount,
+    (n) => n.tagName === "BUTTON" && n.dataset?.focusKey === "item:i1:check:a"
+  );
+  assert.equal(button.className, "pkcycle__box pkcycle__box--checked");
+  assert.equal(button.attrs["aria-label"], "雄一: カード、チェック済み");
+  assert.match(htmlSink.join("\n"), /<path d="m4\.5 12\.6 5\.2 5\.2L19\.5 6\.6"\/>/);
+});
+
+test("不要の状態では「—」が入り、aria-label がそう言う", () => {
   const { make, textSink } = stubDocument();
   const mount = make("div");
   const data = {
@@ -795,103 +843,61 @@ test("通常モードでは、不要な人の欄はチェックではなく「�
   };
   renderTable({ mount, data, editing: false, handlers: {} });
 
-  const checks = findAll(mount, (n) => n.tagName === "INPUT");
-  assert.equal(checks.length, 1, "不要な人にもチェックが出ています");
-  assert.equal(checks[0].attrs["aria-label"], "雄一: カード");
-
-  const mark = findFirst(mount, (n) => n.attrs?.["aria-label"] === "朱汰には不要: カード");
-  assert.ok(mark, "不要の印がありません");
-  assert.ok(textSink.includes("—"), "「—」が textContent に入っていません");
-  // 「—」だけでは誰の欄か目で分からず、checkCell() の幅（印＋名前）とも
-  // 揃わない（2026-08-11 実機確認）。名前も並んで出ていること
-  assert.ok(
-    textSink.includes("朱汰"),
-    "「—」の隣に名前が出ていません（checkCell() と幅が揃いません）"
+  const button = findFirst(
+    mount,
+    (n) => n.tagName === "BUTTON" && n.dataset?.focusKey === "item:i1:check:b"
   );
+  assert.equal(button.className, "pkcycle__box pkcycle__box--na");
+  assert.equal(button.attrs["aria-label"], "朱汰: カード、不要");
+  assert.ok(textSink.includes("—"), "「—」が textContent に入っていません");
 });
 
 /*
- * Review finding (2026-08-11、実機確認): テキストが出ているだけでは幅の一致は
- * 保証しない。checkCell() は label.switch（.switch の flex + gap）の中に
- * 「印＋名前」を並べており、その幅は .check__box（controls.css、22px 四方）で
- * 決まる。naMark() 側が .switch を失う、または印の要素から .pkitem__nadash
- * （packing.css が 22px 四方を与えるクラス）が外れると、印の実寸だけ
- * checkCell() と食い違い、その行だけ列がずれる ── ブラウザでしか気付けない
- * 壊れ方（実際に 2 度起きた: 48px → 9px → ここで解消）。node --test は幅の
- * ピクセル値までは検査できないので、代わりに構造（.switch を持つこと、
- * 印の要素が .pkitem__nadash を持つこと）を固定する。
+ * モードで役割を変えないのが今回の設計（plans/packing-not-applicable.md
+ * 「描画」── 最初の実装は通常/編集でボタンの意味が変わってしまい、書き直した）。
+ * 同じデータを editing: false / true の両方で描画し、人ごとの欄（キー・クラス・
+ * aria-label）が一致することを確かめる。
  */
-test("不要な行のセルは checkCell() と同じ .switch 構造を持つ（印に .pkitem__nadash、隣に名前）", () => {
-  const { make } = stubDocument();
-  const mount = make("div");
+test("モードで見た目を変えない（通常モードと編集モードで同じ状態・同じキー）", () => {
   const data = {
     members: { a: "雄一", b: "朱汰" },
     groups: [{ id: "g1", name: "貴重品", icon: "i-note", items: [
       { id: "i1", name: "カード", note: "", a: true, b: true, na: ["b"] },
     ] }],
   };
-  renderTable({ mount, data, editing: false, handlers: {} });
 
-  const mark = findFirst(mount, (n) => n.attrs?.["aria-label"] === "朱汰には不要: カード");
-  assert.ok(mark, "不要の印がありません");
-  assert.ok(
-    (mark.className ?? "").split(" ").includes("switch"),
-    "checkCell() の label.switch と同じ .switch を持っていません（幅がずれます）"
-  );
-  assert.equal(mark.children.length, 2, "印と名前の 2 要素構成ではありません");
-  const [dash, name] = mark.children;
-  assert.equal(
-    dash.className,
-    "pkitem__nadash",
-    "印の要素に .pkitem__nadash が付いていません（controls.css の .check__box と同じ 22px 四方を確保できません）"
-  );
-  assert.equal(dash.textContent, "—");
-  assert.equal(name.textContent, "朱汰", "印の隣に名前が出ていません");
+  const readState = (editing) => {
+    const { make } = stubDocument();
+    const mount = make("div");
+    renderTable({ mount, data, editing, handlers: {} });
+    return findAll(mount, (n) => n.dataset?.focusKey?.startsWith("item:i1:check:")).map((n) => [
+      n.dataset.focusKey,
+      n.className,
+      n.attrs["aria-label"],
+    ]);
+  };
+
+  assert.deepEqual(readState(false), readState(true));
 });
 
-test("編集モードでは、不要でない人の欄もトグルになる（チェックは出ない）", () => {
-  const { make } = stubDocument();
-  const mount = make("div");
-  const data = {
-    members: { a: "雄一", b: "朱汰" },
-    groups: [{ id: "g1", name: "貴重品", icon: "i-note", items: [
-      { id: "i1", name: "カード", note: "", a: true, b: true },
-    ] }],
-  };
-  renderTable({ mount, data, editing: true, handlers: {} });
+test("押すと onCycle(itemId, member) が呼ばれる（モードに関わらず同じハンドラ）", () => {
+  for (const editing of [false, true]) {
+    const { make } = stubDocument();
+    const mount = make("div");
+    const calls = [];
+    const data = {
+      members: { a: "雄一", b: "朱汰" },
+      groups: [{ id: "g1", name: "貴重品", icon: "i-note", items: [
+        { id: "i1", name: "カード", note: "", a: false, b: false },
+      ] }],
+    };
+    renderTable({ mount, data, editing, handlers: { onCycle: (...args) => calls.push(args) } });
 
-  assert.equal(
-    findAll(mount, (n) => n.tagName === "INPUT" && n.type === "checkbox").length,
-    0,
-    "編集モードにチェックボックスが残っています"
-  );
-  const labels = findAll(mount, (n) => n.tagName === "BUTTON")
-    .map((b) => b.attrs["aria-label"])
-    .filter(Boolean);
-  assert.ok(labels.includes("雄一には不要にする: カード"), labels.join(" / "));
-  assert.ok(labels.includes("朱汰には不要にする: カード"), labels.join(" / "));
-});
-
-test("編集モードで不要な人の欄は「戻す」になり、押すと解除を伝える", () => {
-  const { make } = stubDocument();
-  const mount = make("div");
-  const data = {
-    members: { a: "雄一", b: "朱汰" },
-    groups: [{ id: "g1", name: "貴重品", icon: "i-note", items: [
-      { id: "i1", name: "カード", note: "", a: true, b: true, na: ["b"] },
-    ] }],
-  };
-  const calls = [];
-  renderTable({
-    mount, data, editing: true,
-    handlers: { onToggleNa: (...args) => calls.push(args) },
-  });
-
-  const back = findFirst(
-    mount,
-    (n) => n.tagName === "BUTTON" && n.attrs?.["aria-label"] === "朱汰に戻す: カード"
-  );
-  assert.ok(back, "戻すボタンがありません");
-  back.dispatch("click");
-  assert.deepEqual(calls, [["i1", "b", false]]);
+    const button = findFirst(
+      mount,
+      (n) => n.tagName === "BUTTON" && n.dataset?.focusKey === "item:i1:check:a"
+    );
+    button.dispatch("click");
+    assert.deepEqual(calls, [["i1", "a"]], `editing=${editing} で呼ばれ方が違います`);
+  }
 });

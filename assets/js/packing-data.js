@@ -234,7 +234,10 @@ export function groupProgressOf(group) {
 /**
  * 項目 1 件の「その人には不要」を切り替えた**新しい項目**を返す。
  * データ全体ではなく項目 1 件を受けるのは、呼び出し側が withItem() と
- * 組み合わせて使うため（既存の onToggle と同じ形）。
+ * 組み合わせて使うため（cycleMember() と同じ形）。
+ *
+ * cycleMember() の内部から呼ばれるほか、単体でも export したままにしてある
+ * （withNa 自体のテストが直接使うため）。
  *
  * **a / b の値は触らない。** 不要を解除したら以前のチェックが戻るようにするため
  * ── 消してしまうと「間違えて不要にした」を無傷で取り消せない。
@@ -251,4 +254,28 @@ export function withNa(item, member, notNeeded) {
     : current.filter((m) => m !== member);
   const { na, ...rest } = item;
   return next.length ? { ...rest, na: next } : rest;
+}
+
+/**
+ * 項目 1 件の、ある人の欄を次の状態へ進めた**新しい項目**を返す。
+ *
+ * ブランク → チェック → 不要 → ブランク … の 3 段階を 1 つのコントロールで
+ * 回す（packing-render.js の人ごとの欄はモードに関わらずこの 1 関数だけで
+ * 状態を決める。plans/packing-not-applicable.md「状態の遷移」）。
+ *
+ * **不要を抜けるときだけチェックも外す。** チェック → 不要のときは値を
+ * 保持する（withNa と同じ理由 ── 間違えて不要にしても、以前のチェックが
+ * 無傷で戻る）。不要 → ブランクは「ブランクの次はチェック」という見た目の
+ * 約束に揃えるため、ここだけ値も外す。保持すると「ブランクに見えるのに
+ * チェック済み」という、画面からは見えない食い違いが進捗の数字にだけ出る。
+ */
+export function cycleMember(item, member) {
+  const notNeeded = item.na?.includes(member) === true;
+  if (notNeeded) {
+    return { ...withNa(item, member, false), [member]: false };
+  }
+  if (item[member] === true) {
+    return withNa(item, member, true);
+  }
+  return { ...item, [member]: true };
 }
