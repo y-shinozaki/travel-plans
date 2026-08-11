@@ -188,15 +188,67 @@ export function moveGroup(data, groupId, delta) {
  * total を分母に使う側（進捗バー）がゼロ除算にならないよう、件数をそのまま返して
  * 割り算は呼び出し側に任せる。項目が 1 つも無い状態は実際に起こる
  * （まだ何も足していないリスト）。
+ *
+ * その人に不要な項目は分母からも分子からも外す。
+ * **分子からも外すこと** ── 不要にしても a / b の値は保持するので
+ * （withNa 参照）、分子だけ残すと done > total が起こる。
  */
 export function progressOf(data, member) {
   let done = 0;
   let total = 0;
   for (const group of data.groups) {
     for (const item of group.items) {
+      // その人に不要な項目は分母からも分子からも外す。
+      // **分子からも外すこと** ── 不要にしても a / b の値は保持するので
+      // （withNa 参照）、分子だけ残すと done > total が起こる
+      if (item.na?.includes(member)) continue;
       total++;
       if (item[member] === true) done++;
     }
   }
   return { done, total };
+}
+
+/**
+ * 区分の進捗（達成数と件数）。区分見出しの `N / M` が読む。
+ *
+ * progressOf() と軸が違う ── あちらは「1 人分の分母」から不要な人を外すが、
+ * こちらは「1 項目」を単位に数える。**その項目の done は、不要な人を除いた
+ * 残り全員がチェック済みかどうか**で決める。`na: ["a","b"]`（全員不要）は
+ * validateItem() が弾くので、残りが空集合になる心配はない。
+ *
+ * done をここで数え直さず `progressOf()` を呼ばないのは、`progressOf()` の
+ * 単位が「人」で、区分見出しの単位が「項目」だから ── 人ごとの done を
+ * 足し合わせても項目の完了数にはならない（1 人だけ詰め終わった項目を
+ * 半分の 0.5 件として数えるような形になり、`N / M` が整数にならない）。
+ */
+export function groupProgressOf(group) {
+  let done = 0;
+  for (const item of group.items) {
+    const required = ["a", "b"].filter((m) => !item.na?.includes(m));
+    if (required.every((m) => item[m] === true)) done++;
+  }
+  return { done, total: group.items.length };
+}
+
+/**
+ * 項目 1 件の「その人には不要」を切り替えた**新しい項目**を返す。
+ * データ全体ではなく項目 1 件を受けるのは、呼び出し側が withItem() と
+ * 組み合わせて使うため（既存の onToggle と同じ形）。
+ *
+ * **a / b の値は触らない。** 不要を解除したら以前のチェックが戻るようにするため
+ * ── 消してしまうと「間違えて不要にした」を無傷で取り消せない。
+ *
+ * 空になったら na のキーごと落とす。「省略＝誰も不要でない」という既定に
+ * 戻すためで、空配列を残すと同じ意味の書き方が 2 通りになる。
+ */
+export function withNa(item, member, notNeeded) {
+  const current = Array.isArray(item.na) ? item.na : [];
+  const next = notNeeded
+    ? current.includes(member)
+      ? current
+      : [...current, member]
+    : current.filter((m) => m !== member);
+  const { na, ...rest } = item;
+  return next.length ? { ...rest, na: next } : rest;
 }

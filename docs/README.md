@@ -13,7 +13,7 @@
 | 目的 | ファイル |
 |---|---|
 | **いま何が正しいのか**を知りたい | [`spec/travel-plans-redesign.md`](spec/travel-plans-redesign.md) |
-| **次に何をするのか**を知りたい | [`handoff/2026-08-10.md`](handoff/2026-08-10.md) |
+| **次に何をするのか**を知りたい | [`handoff/2026-08-11.md`](handoff/2026-08-11.md) |
 | 色・余白・タイポグラフィの値を知りたい | [`design/design-system.md`](design/design-system.md) |
 | 実装のときに手を動かす手順が要る | [`plans/`](plans/) の該当フェーズ |
 
@@ -38,6 +38,7 @@
 | [`phase-b2-packing.md`](plans/phase-b2-packing.md) | 持ち物リストとそのエディタ | 完了 |
 | [`phase-b4-passphrase-and-encryption.md`](plans/phase-b4-passphrase-and-encryption.md) | 合言葉、PBKDF2 + AES-GCM による暗号化 | 完了 |
 | [`phase-b5-souvenirs.md`](plans/phase-b5-souvenirs.md) | ページ共通部品の抽出とお土産リスト | 完了 |
+| [`packing-not-applicable.md`](plans/packing-not-applicable.md) | 持ち物の「その人には不要」 | 完了 |
 
 **次は Phase B3**（コメント機能）。仕様は `spec/` の §4.3 / §7.5。
 B5 で `page-notice.js` / `focus-key.js` / `row-controls.js` へ共通部品を抽出したので、

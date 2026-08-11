@@ -30,6 +30,7 @@ import {
   withoutGroup,
   withItem,
   withoutItem,
+  withNa,
   moveItem,
   moveGroup,
 } from "./packing-data.js";
@@ -191,6 +192,11 @@ const handlers = {
     const item = state.data.groups.flatMap((g) => g.items).find((i) => i.id === itemId);
     if (!item) return;
     apply(withItem(state.data, null, { ...item, [member]: checked }));
+  },
+  onToggleNa(itemId, member, notNeeded) {
+    const item = state.data.groups.flatMap((g) => g.items).find((i) => i.id === itemId);
+    if (!item) return;
+    apply(withItem(state.data, null, withNa(item, member, notNeeded)));
   },
   onRenameItem(itemId, patch) {
     const item = state.data.groups.flatMap((g) => g.items).find((i) => i.id === itemId);

@@ -11,6 +11,8 @@ import {
   moveItem,
   moveGroup,
   progressOf,
+  groupProgressOf,
+  withNa,
 } from "../assets/js/packing-data.js";
 import { validatePacking } from "../assets/js/packing-validate.js";
 import { PACKING } from "./fixtures/packing.js";
@@ -278,5 +280,99 @@ test("どの操作も入力を変更しない（凍結したデータへの書�
     moveGroup(frozen, "g-clothes", -1);
     moveGroup(frozen, "g-valuables", -1); // 全体の先頭での no-op 経路
     progressOf(frozen, "a");
+  });
+});
+
+const NA_DATA = {
+  members: { a: "雄一", b: "朱汰" },
+  groups: [
+    {
+      id: "g1",
+      name: "貴重品",
+      items: [
+        { id: "i1", name: "パスポート", a: true, b: true },
+        // 朱汰には不要。しかも a も b も true のまま（不要にしても値は保持する）
+        { id: "i2", name: "クレジットカード", a: true, b: true, na: ["b"] },
+        { id: "i3", name: "現金", a: false, b: false },
+      ],
+    },
+  ],
+};
+
+test("進捗は不要な人の項目を分母から外す", () => {
+  assert.deepEqual(progressOf(NA_DATA, "a"), { done: 2, total: 3 });
+  // 朱汰は i2 が消えるので 3 → 2 件
+  assert.deepEqual(progressOf(NA_DATA, "b"), { done: 1, total: 2 });
+});
+
+test("不要な項目は分子からも外す（done > total を作らない）", () => {
+  // 不要にしてもチェックの値は保持するので、i2 の b は true のまま。
+  // 分子だけ残すと done(2) > total(2) にはならないが、項目が増えれば必ず起こる
+  const { done, total } = progressOf(NA_DATA, "b");
+  assert.ok(done <= total, `done(${done}) が total(${total}) を超えています`);
+});
+
+test("withNa は不要にしてもチェックの値を消さない", () => {
+  const item = { id: "i", name: "カード", a: true, b: true };
+  const off = withNa(item, "b", true);
+  assert.deepEqual(off.na, ["b"]);
+  assert.equal(off.b, true, "解除したときに戻せなくなります");
+});
+
+test("withNa は空になったら na のキーごと落とす", () => {
+  const item = { id: "i", name: "カード", a: true, b: true, na: ["b"] };
+  const on = withNa(item, "b", false);
+  assert.equal("na" in on, false, "空配列が残っています");
+});
+
+test("withNa は同じ人を 2 回入れない", () => {
+  const item = { id: "i", name: "カード", a: true, b: true, na: ["b"] };
+  assert.deepEqual(withNa(item, "b", true).na, ["b"]);
+});
+
+test("withNa は元の項目を書き換えない", () => {
+  const item = { id: "i", name: "カード", a: true, b: true };
+  withNa(item, "b", true);
+  assert.equal("na" in item, false, "元の項目が書き換えられています");
+});
+
+test("groupProgressOf は na を持つ項目を、不要な人を除く全員が詰めたら完了として数える", () => {
+  // i2 は朱汰(b)には不要。雄一(a)だけが対象で、a はすでに true なので
+  // 「詰め終わった」項目として数える ── i.a && i.b のままだと b が false のぶん
+  // 永久に未完了に見える
+  const group = {
+    id: "g1",
+    name: "貴重品",
+    items: [
+      { id: "i1", name: "パスポート", a: true, b: true },
+      { id: "i2", name: "クレジットカード", a: true, b: false, na: ["b"] },
+      { id: "i3", name: "現金", a: false, b: false },
+    ],
+  };
+  assert.deepEqual(groupProgressOf(group), { done: 2, total: 3 });
+});
+
+test("groupProgressOf は na が無ければ両方チェックされた項目だけを数える", () => {
+  // na を 1 つも持たない区分での基本挙動を見る。na が無い項目では
+  // required が常に ["a","b"] になるので、この形の入力では正しい実装と
+  // 旧ロジック（i.a && i.b）は式として一致し、この 1 本だけでは退行を
+  // 検出できない ── na があるときに両者が食い違うことは、直前の
+  // 「na を持つ項目を、不要な人を除く全員が詰めたら完了として数える」テストが見る
+  const group = {
+    id: "g1",
+    name: "貴重品",
+    items: [
+      { id: "i1", name: "パスポート", a: true, b: true }, // 両方 true → 完了
+      { id: "i2", name: "現金", a: true, b: false }, // 片方だけ → 未完了
+      { id: "i3", name: "保険証", a: false, b: false }, // 両方 false → 未完了
+    ],
+  };
+  assert.deepEqual(groupProgressOf(group), { done: 1, total: 3 });
+});
+
+test("groupProgressOf は項目が無い区分でも落ちない", () => {
+  assert.deepEqual(groupProgressOf({ id: "g-empty", name: "空", items: [] }), {
+    done: 0,
+    total: 0,
   });
 });

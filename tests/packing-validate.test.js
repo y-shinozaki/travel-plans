@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { validatePacking, PackingDataError } from "../assets/js/packing-validate.js";
+import { validatePacking, validateItem, PackingDataError } from "../assets/js/packing-validate.js";
 import { DataError } from "../assets/js/data-error.js";
 import { PACKING } from "./fixtures/packing.js";
 
@@ -221,4 +221,40 @@ test("PLACE_META のキーはすべて検証を通る（定義と検査がずれ
     data.groups[0].items[0].where = key;
     assert.equal(validatePacking(data), data, `${key} が検証に落ちました`);
   }
+});
+
+/* ── na（その人には不要）── */
+
+test("na は省略できる（既存の項目がそのまま通る）", () => {
+  const item = { id: "x", name: "現金", a: true, b: false };
+  assert.deepEqual(validateItem(item), []);
+});
+
+test("na が配列でなければ弾く", () => {
+  const item = { id: "x", name: "現金", a: true, b: false, na: "b" };
+  const problems = validateItem(item);
+  assert.equal(problems.length, 1);
+  assert.match(problems[0], /na が配列ではありません/);
+});
+
+test("na に未知の人が入っていれば弾く", () => {
+  const item = { id: "x", name: "現金", a: true, b: false, na: ["c"] };
+  assert.match(validateItem(item)[0], /na に未知の人/);
+});
+
+test("na の重複を弾く", () => {
+  const item = { id: "x", name: "現金", a: true, b: false, na: ["b", "b"] };
+  assert.match(validateItem(item)[0], /2 回/);
+});
+
+test("全員に不要な項目は弾く", () => {
+  // どちらの分母にも入らない項目は、リストに在っても誰の役にも立たない。
+  // 許すと「進捗は 39/39 なのに画面には項目が並んでいる」が作れてしまう
+  const item = { id: "x", name: "現金", a: true, b: false, na: ["a", "b"] };
+  assert.match(validateItem(item).join("\n"), /全員に不要/);
+});
+
+test("na があっても a / b の真偽値必須は変わらない", () => {
+  const item = { id: "x", name: "現金", a: "true", b: false, na: ["b"] };
+  assert.match(validateItem(item)[0], /真偽値ではありません/);
 });

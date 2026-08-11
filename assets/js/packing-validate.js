@@ -140,6 +140,30 @@ export function validateItem(item, seenIds = new Set(), where = "項目") {
     }
   }
 
+  // na（その人には不要）は省略できる。あるときだけ形を見る。
+  // a / b の規則には触らない ── 不要にしてもチェックの値は保持するので、
+  // 「不要だが真偽値としては壊れている」も不備として出したい
+  if (item.na !== undefined) {
+    if (!Array.isArray(item.na)) {
+      problems.push(`${label}: na が配列ではありません（${show(item.na)}）`);
+    } else {
+      const seen = new Set();
+      for (const member of item.na) {
+        if (member !== "a" && member !== "b") {
+          problems.push(
+            `${label}: na に未知の人が入っています（${show(member)} / 有効な値は a, b）`
+          );
+        } else if (seen.has(member)) {
+          problems.push(`${label}: na に ${member} が 2 回入っています`);
+        }
+        seen.add(member);
+      }
+      if (seen.has("a") && seen.has("b")) {
+        problems.push(`${label}: 全員に不要な項目は置けません（項目ごと消してください）`);
+      }
+    }
+  }
+
   return problems;
 }
 

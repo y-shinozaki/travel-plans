@@ -21,7 +21,7 @@
 
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
-import { progressOf, PLACE_META, PLACE_KEYS } from "./packing-data.js";
+import { progressOf, groupProgressOf, PLACE_META, PLACE_KEYS } from "./packing-data.js";
 import { itemFocusKey, groupFocusKey } from "./focus-key.js";
 import { iconButton, armedIconButton, CHECK_MARK } from "./row-controls.js";
 
@@ -54,8 +54,11 @@ export function renderProgress({ mount, data }) {
 }
 
 /**
- * チェックボックス 1 つ。**編集モードでなくても押せる**
- * （チェックを付けるのは「編集」ではなく、このページの主目的そのもの）。
+ * チェックボックス 1 つ。**編集モードでは出さない**（`itemRow()` 参照）。
+ * 編集モードの人ごとの欄は `naCell()` の「不要にする」トグルに変わる ──
+ * 役割を分けるため、チェックを付け外しできるのは通常モードだけになった
+ * （plans/packing-not-applicable.md。旧版はここが逆で、編集モードでも
+ * チェックを押せた）。
  *
  * マークアップは controls.css の `.check` の契約に合わせる:
  *   label.switch > span.check > (input[type=checkbox] + span.check__box > svg) , span
@@ -82,6 +85,51 @@ function checkCell(item, member, memberName, onToggle) {
   label.appendChild(wrap);
   label.appendChild(el("span", null, memberName));
   return label;
+}
+
+/** 不要の印。押せないことが分かるよう、ボタンにしない。 */
+const NA_MARK = "—";
+
+/**
+ * 通常モードで、その人に不要な項目の欄。読むだけ。
+ * チェックボックスを出さないのは、押せてしまうと「不要なのにチェックが付く」
+ * 状態を作れるため（進捗からは外れているので、画面と数字が食い違う）。
+ *
+ * checkCell() と同じ「印＋名前」の並びに揃える（`.switch` を流用）。
+ * 「—」だけだと checkCell() の label.switch（印＋名前）より狭くなり、
+ * 不要な行だけ隣の列がずれる。加えて誰の欄かが見た目から分からなくなる
+ * （2026-08-11 実機確認で判明。plans/packing-not-applicable.md）。
+ * `label` にしないのは押せてはいけないため（`.switch` は流用するが、
+ * cursor は packing.css 側で default に戻す）。
+ */
+function naMark(item, memberName) {
+  const cell = el("span", "switch pkitem__na");
+  cell.appendChild(el("span", "pkitem__nadash", NA_MARK));
+  cell.appendChild(el("span", null, memberName));
+  cell.setAttribute("aria-label", `${memberName}には不要: ${item.name}`);
+  return cell;
+}
+
+/**
+ * 編集モードの人ごとの欄。「その人には不要」を切り替える。
+ *
+ * **チェックボックスとは見た目を変えること。** 同じ四角が、モードによって
+ * 「詰めたか」と「要るか」を切り替えると、取り違えが進捗の分母を動かす ──
+ * 画面を見ただけでは気付けない壊れ方になる（plans/packing-not-applicable.md）。
+ */
+function naCell(item, member, memberName, onToggleNa) {
+  const notNeeded = item.na?.includes(member) === true;
+  const button = el("button", notNeeded ? "napill napill--off" : "napill");
+  button.type = "button";
+  // 文字は textContent で入れる。値は innerHTML に混ぜない
+  button.appendChild(el("span", null, notNeeded ? NA_MARK : "不要にする"));
+  button.setAttribute(
+    "aria-label",
+    notNeeded ? `${memberName}に戻す: ${item.name}` : `${memberName}には不要にする: ${item.name}`
+  );
+  button.dataset.focusKey = itemFocusKey(item.id, `na:${member}`);
+  button.addEventListener("click", () => onToggleNa?.(item.id, member, !notNeeded));
+  return button;
 }
 
 /** 名前とメモ。編集モードでは入力欄になる（設計書 §7.3「行がそのまま入力欄になる」）。 */
@@ -181,7 +229,15 @@ function itemRow(item, data, editing, handlers) {
 
   const checks = el("div", "pkitem__checks");
   for (const member of ["a", "b"]) {
-    checks.appendChild(checkCell(item, member, data.members[member], handlers.onToggle));
+    const memberName = data.members[member];
+    if (editing) {
+      // 編集モードでは「要るかどうか」を切り替える。チェックは通常モードで付ける
+      checks.appendChild(naCell(item, member, memberName, handlers.onToggleNa));
+    } else if (item.na?.includes(member)) {
+      checks.appendChild(naMark(item, memberName));
+    } else {
+      checks.appendChild(checkCell(item, member, memberName, handlers.onToggle));
+    }
   }
   row.appendChild(checks);
 
@@ -241,8 +297,11 @@ function groupBlock(group, data, editing, handlers) {
     head.appendChild(el("h2", "pkgroup__name", group.name));
   }
 
-  const done = group.items.filter((i) => i.a && i.b).length;
-  head.appendChild(el("p", "pkgroup__count", `${done} / ${group.items.length}`));
+  // groupProgressOf() は na の人を除いた残り全員がチェック済みかで数える
+  // （packing-data.js）。ここで `i.a && i.b` を書き写すと、na を無視した
+  // ままの分母に逆戻りする
+  const { done, total } = groupProgressOf(group);
+  head.appendChild(el("p", "pkgroup__count", `${done} / ${total}`));
 
   if (editing) {
     const acts = el("div", "pkgroup__acts");
