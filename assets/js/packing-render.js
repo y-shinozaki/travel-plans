@@ -91,9 +91,18 @@ const NA_MARK = "—";
  * 通常モードで、その人に不要な項目の欄。読むだけ。
  * チェックボックスを出さないのは、押せてしまうと「不要なのにチェックが付く」
  * 状態を作れるため（進捗からは外れているので、画面と数字が食い違う）。
+ *
+ * checkCell() と同じ「印＋名前」の並びに揃える（`.switch` を流用）。
+ * 「—」だけだと checkCell() の label.switch（印＋名前）より狭くなり、
+ * 不要な行だけ隣の列がずれる。加えて誰の欄かが見た目から分からなくなる
+ * （2026-08-11 実機確認で判明。plans/packing-not-applicable.md）。
+ * `label` にしないのは押せてはいけないため（`.switch` は流用するが、
+ * cursor は packing.css 側で default に戻す）。
  */
 function naMark(item, memberName) {
-  const cell = el("span", "pkitem__na", NA_MARK);
+  const cell = el("span", "switch pkitem__na");
+  cell.appendChild(el("span", "pkitem__nadash", NA_MARK));
+  cell.appendChild(el("span", null, memberName));
   cell.setAttribute("aria-label", `${memberName}には不要: ${item.name}`);
   return cell;
 }

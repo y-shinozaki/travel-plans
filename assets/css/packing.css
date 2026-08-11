@@ -171,10 +171,15 @@
   color: var(--ink);
   border-color: var(--ink);
 }
-/* 通常モードの「—」。押せないので枠は持たせない。
-   色は --ink-2（副次テキスト）。--ink-3 は tokens.css では「濃色パネル」で
-   --ink-2 より**濃い**ので、薄い印には使わない */
+/* 通常モードの「—」。checkCell() の label.switch（印＋名前）と同じ幅に
+   揃えるため .switch を流用するが、押せてはいけないのでポインタは戻す。
+   薄くするのは「—」だけ（.pkitem__nadash）── 名前まで薄くすると
+   誰の欄か読みにくくなる。色は --ink-2（副次テキスト）。--ink-3 は
+   tokens.css では「濃色パネル」で --ink-2 より**濃い**ので、薄い印には使わない */
 .pkitem__na {
+  cursor: default;
+}
+.pkitem__nadash {
   color: var(--ink-2);
   font-size: 12px;
 }

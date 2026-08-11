@@ -798,6 +798,12 @@ test("通常モードでは、不要な人の欄はチェックではなく「�
   const mark = findFirst(mount, (n) => n.attrs?.["aria-label"] === "朱汰には不要: カード");
   assert.ok(mark, "不要の印がありません");
   assert.ok(textSink.includes("—"), "「—」が textContent に入っていません");
+  // 「—」だけでは誰の欄か目で分からず、checkCell() の幅（印＋名前）とも
+  // 揃わない（2026-08-11 実機確認）。名前も並んで出ていること
+  assert.ok(
+    textSink.includes("朱汰"),
+    "「—」の隣に名前が出ていません（checkCell() と幅が揃いません）"
+  );
 });
 
 test("編集モードでは、不要でない人の欄もトグルになる（チェックは出ない）", () => {
