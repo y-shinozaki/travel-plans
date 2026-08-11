@@ -246,7 +246,7 @@ map.js の createMap() → 座標を持つイベントからマーカーと位�
 - **「公開」を押した端末だけが**、GitHub Contents API 経由でリポジトリへコミットする。
   トークンを持たない端末は閲覧と下書き編集のみ（公開ボタン自体が置かれない）
 
-`localStorage` のキーは `store.js` が `tp:` を前置する。使うのは 8 つ:
+`localStorage` のキーは `store.js` が `tp:` を前置する。使うのは 11 個:
 
 | キー | 中身 | 書く場所 |
 |---|---|---|
@@ -256,6 +256,7 @@ map.js の createMap() → 座標を持つイベントからマーカーと位�
 | `tp:packing-base` | 持ち物リストを最後にリモートと揃えた時点の `updatedAt` 文字列 | 同上 |
 | `tp:souvenirs` | お土産リストの下書き（`souvenirs.json` と同じ形＋`updatedAt`。平文のまま） | `souvenirs.js` が `createSync()` に渡す `config`（Phase B5 で追加） |
 | `tp:souvenirs-base` | お土産リストを最後にリモートと揃えた時点の `updatedAt` 文字列 | 同上 |
+| `tp:events-fp` / `tp:packing-fp` / `tp:souvenirs-fp` | 最後に揃えたリモート**本文の指紋**（`fingerprint.js`）。公開の直前に「リモートが自分の知っている版のままか」を時計を見ずに確かめる | `sync.js`（`draftKey` から導く。`config` には出ていない） |
 | `tp:gh-token` | 公開用トークン（平文） | `token.js` |
 | `tp:key` | 合言葉から導いた鍵素材（`salt.iter.key` を `.` 区切りで連結） | `auth.js` |
 
@@ -264,8 +265,16 @@ map.js の createMap() → 座標を持つイベントからマーカーと位�
 `packing.js` が組み立てる `config` だけ、`tp:souvenirs` / `tp:souvenirs-base` を知っているのは
 `souvenirs.js` が組み立てる `config` だけ、`tp:gh-token` は `token.js`、`tp:key` は
 `auth.js`（唯一の出入口）だけ。
-（この 8 つのほかに `publish-ui.js` が `tp:write-probe` を一瞬だけ書いて消す。
+（この 11 個のほかに `publish-ui.js` が `tp:write-probe` を一瞬だけ書いて消す。
 保存領域に書けるかを実際に試すためで、残さない。）
+
+**`-fp`（指紋）は `-base`（`updatedAt`）を置き換えるものではなく、足したもの。**
+`-base` は「どちらが新しいか」を答えられるが端末の時計に依存し、`-fp` は時計を
+一切見ないが「同じか違うか」しか答えられない。競合検出（公開の直前）に要るのは
+後者なので `-fp` を使い、起動時の判断（`decideSync`）は前者のままにしてある。
+**片方だけ消さないこと** ── `-fp` を消すと時計ずれによる上書きが戻り、
+`-base` を消すと起動時に「リモートが新しい」を判断できなくなる。
+指紋をまだ持たない端末では `-base` の突き合わせに落ちる（移行のための経路）。
 
 **`createSync()` の `config` は owner / repo / branch / path に加えて
 `draftKey` / `baseKey` / `validate` / `commitMessage` / `codec` / `noun` の 6 つを持つ**
