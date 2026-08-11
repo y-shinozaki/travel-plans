@@ -179,7 +179,18 @@
 .pkitem__na {
   cursor: default;
 }
+/* 「—」はチェックの箱（controls.css の .check__box）と同じ場所に立つので、
+   同じ 22px 四方を占めさせる。幅を合わせないと、その行だけ名前の開始位置が
+   ずれて .pkitem__checks の列が崩れる（2026-08-11 実測、48px → 9px → ここで解消）。
+   **22px は .check__box からの書き写し。あちらの数値を変えたら、ここも
+   合わせて変えること**（tokens.css に共有トークンが無いための負債。
+   plans/packing-not-applicable.md） */
 .pkitem__nadash {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
   color: var(--ink-2);
   font-size: 12px;
 }

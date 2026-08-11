@@ -806,6 +806,45 @@ test("通常モードでは、不要な人の欄はチェックではなく「�
   );
 });
 
+/*
+ * Review finding (2026-08-11、実機確認): テキストが出ているだけでは幅の一致は
+ * 保証しない。checkCell() は label.switch（.switch の flex + gap）の中に
+ * 「印＋名前」を並べており、その幅は .check__box（controls.css、22px 四方）で
+ * 決まる。naMark() 側が .switch を失う、または印の要素から .pkitem__nadash
+ * （packing.css が 22px 四方を与えるクラス）が外れると、印の実寸だけ
+ * checkCell() と食い違い、その行だけ列がずれる ── ブラウザでしか気付けない
+ * 壊れ方（実際に 2 度起きた: 48px → 9px → ここで解消）。node --test は幅の
+ * ピクセル値までは検査できないので、代わりに構造（.switch を持つこと、
+ * 印の要素が .pkitem__nadash を持つこと）を固定する。
+ */
+test("不要な行のセルは checkCell() と同じ .switch 構造を持つ（印に .pkitem__nadash、隣に名前）", () => {
+  const { make } = stubDocument();
+  const mount = make("div");
+  const data = {
+    members: { a: "雄一", b: "朱汰" },
+    groups: [{ id: "g1", name: "貴重品", icon: "i-note", items: [
+      { id: "i1", name: "カード", note: "", a: true, b: true, na: ["b"] },
+    ] }],
+  };
+  renderTable({ mount, data, editing: false, handlers: {} });
+
+  const mark = findFirst(mount, (n) => n.attrs?.["aria-label"] === "朱汰には不要: カード");
+  assert.ok(mark, "不要の印がありません");
+  assert.ok(
+    (mark.className ?? "").split(" ").includes("switch"),
+    "checkCell() の label.switch と同じ .switch を持っていません（幅がずれます）"
+  );
+  assert.equal(mark.children.length, 2, "印と名前の 2 要素構成ではありません");
+  const [dash, name] = mark.children;
+  assert.equal(
+    dash.className,
+    "pkitem__nadash",
+    "印の要素に .pkitem__nadash が付いていません（controls.css の .check__box と同じ 22px 四方を確保できません）"
+  );
+  assert.equal(dash.textContent, "—");
+  assert.equal(name.textContent, "朱汰", "印の隣に名前が出ていません");
+});
+
 test("編集モードでは、不要でない人の欄もトグルになる（チェックは出ない）", () => {
   const { make } = stubDocument();
   const mount = make("div");
