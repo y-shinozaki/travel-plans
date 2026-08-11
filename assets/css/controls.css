@@ -418,14 +418,12 @@
 }
 
 /* ── ツールバーボタン ── */
-/* **既知の不具合（2026-08-11 発見、未修正）**
-   この display: inline-flex は UA の `[hidden] { display: none }` に勝つ。
-   そのため `els.add.hidden = true`（souvenirs.js）や
-   `els.addGroup.hidden = true`（packing.js）でボタンを隠しているつもりでも、
-   実際には出たままになる ── 「お土産を追加」「区分を追加」が編集モードの外でも見える。
-   同じ罠は下の .syncbar / .pubpanel / .pubstat では `[hidden]` の打ち消しを
-   足して回避してあり、`.tbtn` にだけ入っていない。
-   直すなら `.tbtn[hidden] { display: none; }` を足す（設計書 §13）。 */
+/* display: inline-flex は UA の [hidden] { display: none } に勝つので、
+   必ず打ち消す（.is-hidden / .syncbar / .pubpanel / .pubstat と同じ罠）。
+   これが無いと `els.add.hidden = true`（souvenirs.js）も
+   `els.addGroup.hidden = true`（packing.js）も効かず、
+   「お土産を追加」「区分を追加」が編集モードの外でも出たままになる
+   （2026-08-11 に実機で発見。設計書 §13） */
 .tbtn {
   display: inline-flex;
   align-items: center;
@@ -441,6 +439,9 @@
   transition: color var(--t-fast) var(--e-out),
     border-color var(--t-fast) var(--e-out),
     background var(--t-fast) var(--e-out);
+}
+.tbtn[hidden] {
+  display: none;
 }
 .tbtn:hover {
   color: var(--ink);
